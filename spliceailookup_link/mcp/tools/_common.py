@@ -134,4 +134,14 @@ def _see_also_full(
                 },
             }
         )
+        hints.append(
+            {
+                "server": "uniprot-link",
+                "hint": f"protein domains, features, and disease variants for {gene}",
+                "example": {
+                    "tool": "find_proteins",
+                    "arguments": {"gene": gene, "organism_taxon": 9606, "reviewed": True},
+                },
+            }
+        )
     return hints

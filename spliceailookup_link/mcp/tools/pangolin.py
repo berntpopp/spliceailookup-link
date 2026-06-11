@@ -109,6 +109,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                         ) from nf
                 raise
             shaped = shape_pangolin(payload, transcripts=transcripts, response_mode=response_mode)
+            if prepared.consequence:
+                shaped["molecular_consequence"] = prepared.consequence
             gene = shaped["transcripts"][0].get("gene") if shaped["transcripts"] else None
             meta: dict[str, Any] = {
                 "next_commands": [

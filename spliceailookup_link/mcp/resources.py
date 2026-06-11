@@ -120,9 +120,17 @@ def get_capabilities_resource() -> dict[str, Any]:
             ),
             "see_also": (
                 "_meta.see_also points at sibling MCP servers for cross-domain follow-up "
-                "(gnomad-link for allele frequency, genereviews-link / gtex-link for context). "
+                "(gnomad-link for allele frequency, genereviews-link / gtex-link for context, "
+                "uniprot-link for protein domains, features, and disease variants). "
                 "These are hints, not callable next_commands on this server. Omitted in minimal "
                 "mode; collapsed to {server, hint} in compact; full example args in full mode."
+            ),
+            "molecular_consequence": (
+                "the resolver's (Ensembl VEP) most-severe molecular consequence for HGVS/rsID "
+                "inputs, e.g. missense_variant; present only when the variant was resolved via "
+                "VEP (not for direct coordinate input). DISTINCT from the top-level `consequence` "
+                "object which is the SAI-10k splice-aberration prediction (exon_skipping, "
+                "intron_retention, frameshift, etc.)."
             ),
             "observability": (
                 "every _meta carries request_id and timing.elapsed_ms; prediction payloads add "

@@ -90,3 +90,71 @@ async def test_capabilities_documents_new_contracts(mcp) -> None:
     assert "concordant_moderate" in blob
     assert "shared_by" in blob
     assert "minimal" in blob and "compact" in blob and "full" in blob
+
+
+# ===== G1: uniprot-link in see_also =====
+
+
+async def test_g1_see_also_includes_uniprot_full(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "response_mode": "full"}
+        )
+    )
+    servers = {h["server"] for h in data["_meta"]["see_also"]}
+    assert "uniprot-link" in servers
+    uni = next(h for h in data["_meta"]["see_also"] if h["server"] == "uniprot-link")
+    assert uni["example"]["tool"] == "find_proteins"
+    assert uni["example"]["arguments"]["gene"] == "TRAPPC9"
+
+
+async def test_g1_see_also_uniprot_collapsed_in_compact(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    servers = {h["server"] for h in data["_meta"]["see_also"]}
+    assert "uniprot-link" in servers
+    uni = next(h for h in data["_meta"]["see_also"] if h["server"] == "uniprot-link")
+    assert set(uni) == {"server", "hint"}  # compact collapses, no example
+
+
+# ===== G2: molecular_consequence =====
+
+
+async def test_g2_combined_molecular_consequence_and_headline(mcp) -> None:
+    data = structured(
+        await mcp.call_tool("predict_splicing", {"variant": "NM_001089.3(ABCA3):c.875A>T"})
+    )
+    assert data["molecular_consequence"] == "missense_variant"
+    assert "missense variant" in data["headline"]
+
+
+async def test_g2_coordinate_has_no_molecular_consequence(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    assert "molecular_consequence" not in data
+    assert "missense variant" not in data["headline"]
+
+
+async def test_g2_single_model_molecular_consequence_field(mcp) -> None:
+    data = structured(
+        await mcp.call_tool("predict_spliceai", {"variant": "NM_001089.3(ABCA3):c.875A>T"})
+    )
+    assert data["molecular_consequence"] == "missense_variant"
+
+
+async def test_g2_combined_minimal_keeps_molecular_consequence(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing",
+            {"variant": "NM_001089.3(ABCA3):c.875A>T", "response_mode": "minimal"},
+        )
+    )
+    assert data["molecular_consequence"] == "missense_variant"
+
+
+# ===== Step 9: capabilities docs =====
+
+
+async def test_capabilities_documents_uniprot_and_molecular_consequence(mcp) -> None:
+    data = structured(await mcp.call_tool("get_server_capabilities", {}))
+    blob = json.dumps(data).lower()
+    assert "uniprot-link" in blob
+    assert "molecular_consequence" in blob

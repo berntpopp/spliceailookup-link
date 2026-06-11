@@ -194,10 +194,18 @@ async def predict_one(
 
     if consequence is not None:
         result["consequence"] = consequence
+    if prepared.consequence:
+        result["molecular_consequence"] = prepared.consequence
     result["agreement"] = assess_agreement(sai_max, pang_max)
     result["interpretation"] = combined_interpretation(sai_max, pang_max)
     result["headline"] = combined_headline(
-        gene, genome_build, sai_max, pang_max, consequence, result["agreement"]
+        gene,
+        genome_build,
+        sai_max,
+        pang_max,
+        consequence,
+        result["agreement"],
+        molecular_consequence=prepared.consequence,
     )
     cache, ups, age_s, ttl_s = _aggregate_cache(teles)
     telemetry = {

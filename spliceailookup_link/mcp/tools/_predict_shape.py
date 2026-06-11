@@ -55,6 +55,7 @@ def combined_headline(
     pang_max: float | None,
     consequence: dict[str, Any] | None,
     agreement: dict[str, Any],
+    molecular_consequence: str | None = None,
 ) -> str:
     """Render a one-line headline whose agreement clause is the verdict verbatim."""
     gene_label = gene or "variant"
@@ -74,7 +75,8 @@ def combined_headline(
         verdict_part = f"; {_INCOMPLETE_CLAUSE}"
     else:
         verdict_part = ""
-    return f"{gene_label} ({build}): {scores}{verdict_part}{tail}."
+    mol = f"; {molecular_consequence.replace('_', ' ')}" if molecular_consequence else ""
+    return f"{gene_label} ({build}): {scores}{verdict_part}{tail}{mol}."
 
 
 def combined_interpretation(sai_max: float | None, pang_max: float | None) -> dict[str, Any]:
@@ -90,7 +92,7 @@ def minimal_combined(result: dict[str, Any], gene: str | None) -> dict[str, Any]
     pang_sub: dict[str, Any] = result.get("pangolin") or {}
     sai_max = sai_sub.get("max_delta_score")
     pang_max = pang_sub.get("max_delta_score")
-    return {
+    out: dict[str, Any] = {
         "variant_id": result["variant_id"],
         "genome_build": result["genome_build"],
         "gene": gene,
@@ -100,3 +102,6 @@ def minimal_combined(result: dict[str, Any], gene: str | None) -> dict[str, Any]
         "interpretation": {"band": result["interpretation"]["band"]},
         "headline": result["headline"],
     }
+    if result.get("molecular_consequence"):
+        out["molecular_consequence"] = result["molecular_consequence"]
+    return out

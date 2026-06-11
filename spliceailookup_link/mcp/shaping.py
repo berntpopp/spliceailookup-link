@@ -17,6 +17,22 @@ Transcripts = Literal["mane", "all"]
 _STRONG = 0.5
 _MODERATE = 0.2
 
+THRESHOLD_BASIS = "Δ>=0.5 high; 0.2-0.5 moderate; >0-0.2 low; 0 none (SpliceAI/Pangolin convention)"
+
+
+def band(score: float | None) -> str:
+    """Public four-value interpretation band for a single max delta score."""
+    if score is None:
+        return "none"
+    if score >= _STRONG:
+        return "high"
+    if score >= _MODERATE:
+        return "moderate"
+    if score > 0:
+        return "low"
+    return "none"
+
+
 _PRIORITY_LABELS = {
     "MS": "MANE Select",
     "MP": "MANE Plus Clinical",

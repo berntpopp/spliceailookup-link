@@ -76,3 +76,28 @@ async def test_see_also_full_keeps_example(mcp) -> None:
         )
     )
     assert any("example" in h for h in data["_meta"]["see_also"])
+
+
+async def test_f5_cross_build_probe_upgrades_to_build_mismatch(
+    mcp, stub_service: StubService
+) -> None:
+    stub_service.only_build = "GRCh38"  # scores in 38, not in 37
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "genome_build": "GRCh37"}
+        )
+    )
+    assert data["success"] is False
+    assert data["error_code"] == "build_mismatch"
+    assert data["fallback_args"]["genome_build"] == "GRCh38"
+
+
+async def test_f5_probe_can_be_disabled(mcp, stub_service: StubService) -> None:
+    stub_service.only_build = "GRCh38"
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai",
+            {"variant": "8-140300616-T-G", "genome_build": "GRCh37", "cross_build_check": False},
+        )
+    )
+    assert data["error_code"] == "not_found"

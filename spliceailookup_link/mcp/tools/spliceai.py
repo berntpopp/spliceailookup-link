@@ -8,11 +8,17 @@ from typing import Annotated, Any, Literal
 from fastmcp import FastMCP
 from pydantic import Field
 
+from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
+from spliceailookup_link.mcp.errors import BuildMismatchError, McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import cmd
 from spliceailookup_link.mcp.shaping import shape_spliceai
-from spliceailookup_link.mcp.tools._common import mask_to_int, prepare_variant, see_also_for
+from spliceailookup_link.mcp.tools._common import (
+    cross_build_probe,
+    mask_to_int,
+    prepare_variant,
+    see_also_for,
+)
 from spliceailookup_link.services import SpliceService
 
 
@@ -61,22 +67,45 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             Literal["compact", "full", "minimal"],
             Field(description="compact (default), full (adds REF/ALT + exon model), or minimal."),
         ] = "compact",
+        cross_build_check: Annotated[
+            bool,
+            Field(description="On not_found, probe the other build to detect a build_mismatch."),
+        ] = True,
     ) -> dict[str, Any]:
         """Use this for the SpliceAI delta scores (acceptor/donor gain/loss, each 0-1 with a position) of a single variant, optionally with the SpliceAI-10k consequence prediction (exon skipping / intron retention / frameshift). For a quick raw-vs-masked or single-model question; use predict_splicing to also get Pangolin. Δ>=0.5 is high-confidence. Returns ~1-4kB (full/all larger). Note: cold calls take 10-30s."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()
             prepared = await prepare_variant(service, variant, genome_build)
-            payload, tele = await service.score(
-                model="spliceai",
-                build=prepared.genome_build,
-                variant_id=prepared.variant_id,
-                distance=max_distance,
-                mask=mask_to_int(mask),
-                gene_set=gene_set,
-                raw=variant,
-                consequence=prepared.consequence,
-            )
+            try:
+                payload, tele = await service.score(
+                    model="spliceai",
+                    build=prepared.genome_build,
+                    variant_id=prepared.variant_id,
+                    distance=max_distance,
+                    mask=mask_to_int(mask),
+                    gene_set=gene_set,
+                    raw=variant,
+                    consequence=prepared.consequence,
+                )
+            except DataNotFoundError as nf:
+                if cross_build_check and prepared.resolution is None:
+                    other = await cross_build_probe(
+                        service,
+                        model="spliceai",
+                        requested_build=genome_build,
+                        variant_id=prepared.variant_id,
+                        distance=max_distance,
+                        mask=mask_to_int(mask),
+                        gene_set=gene_set,
+                    )
+                    if other:
+                        raise BuildMismatchError(
+                            variant_id=prepared.variant_id,
+                            inferred_build=other,
+                            requested_build=genome_build,
+                        ) from nf
+                raise
             shaped = shape_spliceai(
                 payload,
                 transcripts=transcripts,

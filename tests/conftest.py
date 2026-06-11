@@ -28,6 +28,7 @@ class StubService:
         self.score_error: Exception | None = None
         self.resolve_error: Exception | None = None
         self.pangolin_error: Exception | None = None
+        self.only_build: str | None = None  # when set, score() not_founds in the other build
         self._seen_keys: set[tuple[Any, ...]] = set()
 
     async def score(self, *, model: str, build: str, variant_id: str, **kwargs: Any):
@@ -40,6 +41,8 @@ class StubService:
             raise self.pangolin_error
         if self.score_error is not None:
             raise self.score_error
+        if self.only_build is not None and build != self.only_build:
+            raise DataNotFoundError("no overlapping transcript")
         key = (
             model,
             build,

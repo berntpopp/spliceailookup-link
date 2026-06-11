@@ -248,5 +248,116 @@ biggest UX drag.
 
 ---
 
+## Part 4 — Independent re-test of v0.2.0 (fresh session)
+
+**Date:** 2026-06-11 · **Server:** spliceailookup-link **v0.2.0** (MCP protocol
+`2025-11-25`)
+**Basis:** a fresh, black-box exercise of the *deployed* server — all 7 tools and
+all 5 resources — performed without reference to Part 3's conclusions, then a
+source-level confirmation of the one new bug. Calls were paced to respect the
+interactive-use limit (≤2 concurrent, a few requests/minute).
+
+### Reconciliation with Part 3
+
+Part 3 (above) concluded that v0.2.0 reached ~9.1–9.2 with F1–F5 all resolved. This
+independent pass **confirms that live** — the F1–F5 behaviors all check out (see
+below) — **but surfaces one new HIGH-severity correctness bug not previously
+catalogued**: the combined `predict_splicing` headline can contradict its own
+structured `agreement.verdict`. So the "both axes clear 9/10" verdict needs an
+asterisk until this is fixed; this pass scores the *consumer experience* at 8.5 and
+the *test suite* at 8.0, with the single fix below restoring it to ~9.
+
+**F1–F5, re-verified live in v0.2.0:**
+
+- **F1 (multi-allelic rsID) — confirmed fixed.** `resolve_variant("rs6025")` returns
+  a scalar `variant_id:"1-169549811-C-A"` plus structured
+  `variant_ids:[...-C-A, ...-C-T]`, `ambiguous:true`, a `note`, and one
+  `next_command` per allele.
+- **F2 (consequence shape) — confirmed fixed.** `consequence.aberrations` is the
+  stable path in compact/minimal/full; `full` adds `transcript_info` as a sibling;
+  `mask=masked` correctly empties `aberrations`.
+- **F3 (`predict_splicing` next_commands) — confirmed fixed.** Present (a `full`-mode
+  same-server drill-down).
+- **F4 (dedup) — confirmed fixed.** Single top-level `transcript` identity block;
+  `consequence` emitted once.
+- **F5 (build_mismatch) — machinery present, not independently triggered this pass.**
+  The cross-build probe ran on a clean `not_found` (`chr1-100000-A-G`) but stayed
+  `not_found` because the locus is absent in both builds; the upgrade-to-mismatch
+  path was not exercised with a build-specific coordinate.
+
+### 4a. LLM-consumer experience rating (re-rated against v0.2.0)
+
+**Overall: 8.5 / 10.** Best-in-class on errors, observability, and composability;
+the drags are response-mode granularity and an inherent upstream latency floor.
+
+| Dimension | Score | Basis (observed this pass) |
+|---|---|---|
+| Discoverability | 9 | `get_server_capabilities` + 5 resources; tool descriptions state when-to-use, return size, and cold-start latency; `capabilities_version` content hash for cache-skip |
+| Token efficiency | 8 | Strong `headline` lever, sane compact defaults, aggressive caching — but `minimal` barely beats `compact`, and `transcripts:all` has no top-N/dedup |
+| Speed / latency | 7 | Excellent handling (warmup, cache, honest disclosure, concurrency contract) over an unavoidable 13–40 s upstream cold-start floor |
+| Observability | 9 | `request_id`, split server-vs-`upstream_elapsed_ms` timing, `cache` state in every payload |
+| Error handling & recovery | 9 | `retryable`, `fallback_tool`/`fallback_args`, prose `recovery`, `next_commands` on errors; documented 7-code taxonomy |
+| Composability / chaining | 9 | `next_commands` on success and error; cross-server `see_also`; resolver emits one command per allele on ambiguity |
+| Safety / guardrails | 9 | `research_use_only` + `unsafe_for_clinical_use` in every `_meta` |
+| Input-schema ergonomics | 9 | Enums with defaults, min/max bounds, `examples`, strict `additionalProperties:false` |
+
+**Top consumer-side improvements:**
+
+1. **Make `minimal` actually minimal.** Side-by-side, `minimal` shipped the full
+   `transcripts`/`delta_scores`/`consequence` blocks and only dropped `see_also`.
+2. **Surface the background-task capability in discovery.** v0.2.0 implements
+   `task=True` (Part 3, improvement 1), but the *live* tool schemas and
+   `get_server_capabilities` expose no `task` parameter — so from the consumer side
+   it's invisible and an agent will block on a 30 s call instead of backgrounding it.
+   Advertise it in capabilities + tool descriptions.
+3. **Bound `transcripts:all`** with a top-N / dedup (see 4b).
+4. **Hand over the confidence band** — `interpretation:{band, threshold_basis}`
+   beside `max_delta_score` so agents stop re-deriving the 0.5 / 0.2 cutoffs.
+5. **Make cache hits auditable** — add `cache_age_s` / `ttl_s` to `_meta`.
+
+### 4b. Senior-tester report (v0.2.0)
+
+**Verdict: 8.0 / 10 for this pass.** Supporting machinery is 9-tier; one correctness
+bug in the most-read field is the blemish.
+
+Coverage: all 7 tools + 5 resources. Error codes confirmed live — `invalid_input`,
+`not_found`, `validation_failed`. Documented-but-not-triggered — `build_mismatch`,
+`rate_limited`, `upstream_unavailable`, `internal_error`. `gene_set:comprehensive`
+(documented to 503) was not pushed.
+
+| Tool | Score | Notes |
+|---|---|---|
+| `get_server_capabilities` | 9 | Comprehensive, content-hash versioned |
+| `resolve_variant` | 9 | Ambiguity-aware (both alleles + note); local coord fast path (0 ms) |
+| `predict_spliceai` | 8.5 | Robust; masked exactly as documented; `transcripts:all` bloat |
+| `predict_pangolin` | 9 | Clean, `signed_score` direction, instant cache hit |
+| `predict_splicing` | 6 | Rich + agreement verdict, but headline can contradict the verdict |
+| `predict_splicing_batch` | 7 | Excellent partial-failure model; inherits headline bug; thin summary |
+| `warmup` | 9 | Does one thing well, per-model `elapsed_ms` |
+
+**Findings (severity-ranked):**
+
+| # | Sev | Finding | Repro | Root cause / fix |
+|---|---|---|---|---|
+| F6 | **HIGH** | `predict_splicing` (and batch) headline says "models agree" while `agreement.verdict` is `discordant`. F5 Δ0.31/0.09 and ABCA3 Δ0.21/0.05 both reproduce. | `predict_splicing("1-169549811-C-A")`; `predict_splicing_batch([...,"16-2317763-T-A",...])` | **Code-confirmed.** `_combined_headline` (`spliceailookup_link/mcp/tools/_predict.py:236`) recomputes agreement 2-state — `(sai>=_HIGH)==(pang>=_HIGH)` — while `_assess_agreement` (`_predict.py:44`) is 3-state with a separate `_LOW`. They diverge in the moderate band (both `<_HIGH` but not both `<_LOW`). **Fix:** render `agreement["verdict"]` in the headline (single source of truth); regression-test a 0.31/0.09 pair. |
+| F7 | MED | `transcripts:"all"` returns 19 byte-identical transcript blocks for TRAPPC9; `response_mode:compact` does not trim them. | `predict_spliceai("chr8-140300616-T-G", transcripts="all")` | Cheap to produce (`cache:hit` re-projection) but ~19× consumer tokens. **Fix:** collapse identical scores to one block + `shared_by:[ids]`, or `max_transcripts`/top-N + `log` truncation. |
+| F8 | LOW–MED | `minimal` mode barely differs from `compact` (only drops `see_also`). | compare modes | **Fix:** make `minimal` headline-tier. |
+| F9 | LOW | `validation_failed` `_meta` omits `request_id`/`timing`, contradicting the capabilities claim that "every `_meta` carries" them. | `predict_spliceai(..., max_distance=20000)` | **Fix:** stamp them on validation errors, or soften the doc. |
+| F10 | LOW | Batch `summary` counts only `{ok, failed, concordant_high}`; `see_also` points at one gene; no `next_commands` on the batch envelope. | inspect batch payload | `spliceailookup_link/mcp/tools/batch.py:93`. **Fix:** full per-verdict counts; per-result or omitted `see_also`. |
+
+**Positive validations this pass:** error envelopes (retryable / fallback / recovery
+/ next_commands) are best-in-class; the cache key is the *upstream* call, so
+`response_mode`/`transcripts`/`mask` are free re-projections and `cache:"partial"`
+correctly reported SpliceAI-cached + Pangolin-fresh; `mask=masked` matched the
+documented behavior exactly (`donor_loss` 0.62→0, `aberrations` emptied, headline's
+consequence clause correctly dropped); server-side schema validation returns
+structured `field_errors`.
+
+**Prioritized fixes:** (1) F6 headline/verdict — highest leverage, one-line root
+cause; (2) F7 transcript collapse; (3) F8 minimal-tier; (4) F9 validation `_meta`;
+(5) F10 batch summary.
+
+---
+
 *Research use only; not for clinical decision support. Splice predictions are
 computational and must be interpreted alongside orthogonal evidence.*

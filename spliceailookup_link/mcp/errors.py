@@ -236,6 +236,8 @@ def install_validation_error_handler(mcp_server: Any) -> None:
             _original_run: Callable[[dict[str, Any]], Awaitable[Any]] = original_run,
             _tool: Any = tool,
         ) -> Any:
+            request_id = uuid.uuid4().hex[:12]
+            start = time.perf_counter()
             try:
                 return await _original_run(arguments)
             except PydanticValidationError as exc:
@@ -243,6 +245,12 @@ def install_validation_error_handler(mcp_server: Any) -> None:
                     tool_name=str(getattr(_tool, "name", "unknown")),
                     exc=exc,
                 ).payload
+                elapsed_ms = int((time.perf_counter() - start) * 1000)
+                envelope["_meta"] = {
+                    "request_id": request_id,
+                    "timing": {"elapsed_ms": elapsed_ms},
+                    **envelope.get("_meta", {}),
+                }
                 record_mcp_error(
                     tool_name=str(getattr(_tool, "name", "unknown")),
                     error_code="validation_failed",

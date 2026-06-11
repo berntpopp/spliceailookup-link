@@ -50,3 +50,17 @@ async def test_f8_combined_minimal_is_headline_tier(mcp) -> None:
     assert minimal["pangolin_max"] == 0.85
     assert minimal["interpretation"]["band"] == "high"
     assert "TRAPPC9" in minimal["headline"]
+
+
+async def test_f9_validation_failed_has_request_id_and_timing(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "max_distance": 20000}
+        )
+    )
+    assert data["success"] is False
+    assert data["error_code"] == "validation_failed"
+    meta = data["_meta"]
+    assert isinstance(meta["request_id"], str) and len(meta["request_id"]) == 12
+    assert isinstance(meta["timing"]["elapsed_ms"], int)
+    assert data["field_errors"]

@@ -1,3 +1,8 @@
+# Explicit project name so this stack is isolated from the sibling -link
+# projects (which also live under a docker/ directory and would otherwise share
+# the default "docker" Compose project — making `--remove-orphans` dangerous).
+name: spliceailookup-link
+
 services:
   spliceailookup-link:
     build:

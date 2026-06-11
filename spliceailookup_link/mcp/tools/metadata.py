@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
 from mcp.types import Annotations
+from pydantic import Field
 
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import run_mcp_tool
@@ -36,6 +37,28 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             return get_capabilities_resource()
 
         return await run_mcp_tool("get_server_capabilities", call)
+
+    @mcp.tool(
+        name="warmup",
+        title="Warm Up Upstream Scoring Containers",
+        annotations=READ_ONLY_OPEN_WORLD,
+        tags={"ops"},
+    )
+    async def warmup(
+        genome_build: Annotated[
+            Literal["GRCh37", "GRCh38"],
+            Field(description="Build whose scoring containers to warm. GRCh38 default."),
+        ] = "GRCh38",
+    ) -> dict[str, Any]:
+        """Pre-warm the SpliceAI + Pangolin Cloud Run containers before a burst so the first real call does not eat the 10-40s cold start. Returns per-model elapsed_ms. Fast when already warm. Returns <1kB."""
+
+        async def call() -> dict[str, Any]:
+            service = service_factory()
+            detail = await service.warmup(genome_build)
+            warmed = all(d["status"] == "ok" for d in detail.values())
+            return {"warmed": warmed, "genome_build": genome_build, "detail": detail}
+
+        return await run_mcp_tool("warmup", call)
 
     @mcp.resource(
         "spliceailookup://capabilities",

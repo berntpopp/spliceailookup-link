@@ -55,6 +55,8 @@ def get_capabilities_resource() -> dict[str, Any]:
             "predict_spliceai",
             "predict_pangolin",
             "predict_splicing",
+            "predict_splicing_batch",
+            "warmup",
         ],
         "recommended_workflows": [
             "CHROM-POS-REF-ALT (GRCh38) -> predict_splicing (runs SpliceAI + Pangolin)",

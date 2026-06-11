@@ -14,7 +14,12 @@ from typing import Any
 
 from async_lru import alru_cache
 
-from spliceailookup_link.api import EnsemblVepClient, ScoringClient
+from spliceailookup_link.api import (
+    DataNotFoundError,
+    EnsemblVepClient,
+    ScoringClient,
+    SpliceApiError,
+)
 from spliceailookup_link.config import GenomeBuild
 from spliceailookup_link.services.telemetry import CallTelemetry
 from spliceailookup_link.variant import VariantInput, parse_variant_input
@@ -94,6 +99,31 @@ class SpliceService:
             cache="hit" if cached else "miss",
             upstream_elapsed_ms=None if cached else elapsed_ms,
         )
+
+    async def warmup(self, build: GenomeBuild) -> dict[str, Any]:
+        """Wake the upstream Cloud Run containers with a known-good sentinel call."""
+        sentinel = "8-140300616-T-G"
+        detail: dict[str, Any] = {}
+        for model in ("spliceai", "pangolin"):
+            start = perf_counter()
+            status = "ok"
+            try:
+                await self._scoring.score(
+                    model=model,  # type: ignore[arg-type]
+                    build=build,
+                    variant=sentinel,
+                    distance=50,
+                    mask=0,
+                    gene_set="basic",
+                    raw=None,
+                    variant_consequence=None,
+                )
+            except DataNotFoundError:
+                status = "ok"  # a response (even not-found) means the container is warm
+            except SpliceApiError:
+                status = "unavailable"
+            detail[model] = {"status": status, "elapsed_ms": int((perf_counter() - start) * 1000)}
+        return detail
 
     # ---------------- resolution ----------------
 

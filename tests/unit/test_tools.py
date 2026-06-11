@@ -101,6 +101,13 @@ async def test_predict_build_mismatch_short_circuits(mcp, stub_service: StubServ
     assert stub_service.score_calls == []
 
 
+async def test_warmup_pings_both_models(mcp, stub_service: StubService) -> None:
+    data = structured(await mcp.call_tool("warmup", {"genome_build": "GRCh38"}))
+    assert data["success"] is True
+    assert data["warmed"] is True
+    assert {"spliceai", "pangolin"} <= set(data["detail"])
+
+
 async def test_invalid_variant_returns_invalid_input(mcp, stub_service: StubService) -> None:
     from spliceailookup_link.variant import VariantParseError
 

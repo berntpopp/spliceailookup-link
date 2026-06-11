@@ -98,6 +98,12 @@ class StubService:
             "raw_input": text,
         }
 
+    async def warmup(self, build: str) -> dict[str, Any]:
+        return {
+            "spliceai": {"status": "ok", "elapsed_ms": 3},
+            "pangolin": {"status": "ok", "elapsed_ms": 4},
+        }
+
     async def close(self) -> None:  # pragma: no cover - lifecycle no-op
         return None
 

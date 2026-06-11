@@ -70,7 +70,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         ] = True,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
-        """Use this for the Pangolin splice gain/loss scores of a single variant. Pangolin is an independent splice model; agreement with SpliceAI strengthens a prediction, disagreement warrants caution. Use predict_splicing to get both models in one call. Returns ~1-3kB. Note: cold calls take 10-30s."""
+        """Use this for the Pangolin splice gain/loss scores of a single variant. Pangolin is an independent splice model; agreement with SpliceAI strengthens a prediction, disagreement warrants caution. Use predict_splicing to get both models in one call. Returns ~1-3kB. Note: cold calls take 10-30s. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()

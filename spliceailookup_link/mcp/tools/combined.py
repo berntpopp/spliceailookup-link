@@ -64,7 +64,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         ] = True,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
-        """Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls)."""
+        """Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls). Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()

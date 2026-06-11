@@ -64,3 +64,21 @@ async def test_f9_validation_failed_has_request_id_and_timing(mcp) -> None:
     assert isinstance(meta["request_id"], str) and len(meta["request_id"]) == 12
     assert isinstance(meta["timing"]["elapsed_ms"], int)
     assert data["field_errors"]
+
+
+async def test_capabilities_advertises_background_execution(mcp) -> None:
+    data = structured(await mcp.call_tool("get_server_capabilities", {}))
+    bg = data["background_execution"]
+    assert set(bg["task_eligible_tools"]) == {
+        "predict_spliceai",
+        "predict_pangolin",
+        "predict_splicing",
+        "predict_splicing_batch",
+    }
+    assert bg["task_support"] == "optional"
+
+
+async def test_task_tool_descriptions_mention_background(mcp) -> None:
+    for name in ("predict_splicing", "predict_spliceai", "predict_pangolin"):
+        tool = await mcp.get_tool(name)
+        assert "background task" in tool.description.lower()

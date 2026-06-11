@@ -151,6 +151,24 @@ def get_capabilities_resource() -> dict[str, Any]:
                 "cached, so repeat queries are free."
             ),
         },
+        "background_execution": {
+            "task_support": "optional",
+            "task_eligible_tools": [
+                "predict_spliceai",
+                "predict_pangolin",
+                "predict_splicing",
+                "predict_splicing_batch",
+            ],
+            "how_to": (
+                "Augment the tools/call with a `task` field (MCP 2025-11-25 Tasks); "
+                "the call returns a taskId, poll tasks/get, retrieve via tasks/result."
+            ),
+            "backend": (
+                "in-process (memory://); tasks are session-local, lost on server restart, "
+                "and not auth-context-bound -- retrieve results within the session."
+            ),
+            "recommended_for": "cold predict_* calls (13-40s) and predict_splicing_batch.",
+        },
         "resources": {
             "spliceailookup://capabilities": "this capabilities document",
             "spliceailookup://usage": "compact usage notes",

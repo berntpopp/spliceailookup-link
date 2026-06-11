@@ -120,7 +120,7 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             )
             if prepared.consequence:
                 shaped["molecular_consequence"] = prepared.consequence
-            gene = shaped["transcripts"][0].get("gene") if shaped["transcripts"] else None
+            gene = shaped.get("gene") or (shaped.get("transcripts") or [{}])[0].get("gene")
             meta: dict[str, Any] = {
                 "next_commands": [
                     cmd("predict_pangolin", variant=prepared.variant_id, genome_build=genome_build)

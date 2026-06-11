@@ -106,7 +106,9 @@ class SpliceService:
             self._scored_at[key] = now
             age_s = None
             if len(self._scored_at) > self._cache_size:
-                self._scored_at.pop(next(iter(self._scored_at)))
+                oldest = next(iter(self._scored_at))
+                self._scored_at.pop(oldest, None)
+                self._scored_keys.discard(oldest)
         return payload, CallTelemetry(
             cache="hit" if cached else "miss",
             upstream_elapsed_ms=None if cached else elapsed_ms,

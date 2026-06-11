@@ -249,6 +249,7 @@ def install_validation_error_handler(mcp_server: Any) -> None:
                 envelope["_meta"] = {
                     "request_id": request_id,
                     "timing": {"elapsed_ms": elapsed_ms},
+                    **_provenance_meta(),
                     **envelope.get("_meta", {}),
                 }
                 record_mcp_error(

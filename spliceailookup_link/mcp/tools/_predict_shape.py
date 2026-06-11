@@ -70,7 +70,8 @@ def combined_headline(
         aberr = (consequence["aberrations"][0] or {}).get("type")
     tail = f"; predicted {aberr.replace('_', ' ')}" if aberr else ""
     if sai_max is not None and pang_max is not None:
-        verdict_part = f"; {_VERDICT_CLAUSE.get(str(agreement.get('verdict') or ''), '')}"
+        clause = _VERDICT_CLAUSE.get(str(agreement.get("verdict") or ""), "")
+        verdict_part = f"; {clause}" if clause else ""
     elif (sai_max is None) != (pang_max is None):
         verdict_part = f"; {_INCOMPLETE_CLAUSE}"
     else:

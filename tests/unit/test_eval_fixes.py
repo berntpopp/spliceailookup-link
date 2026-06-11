@@ -60,6 +60,7 @@ async def test_see_also_omitted_in_minimal(mcp) -> None:
             "predict_spliceai", {"variant": "8-140300616-T-G", "response_mode": "minimal"}
         )
     )
+    assert data.get("success") is True
     assert "see_also" not in data["_meta"]
 
 

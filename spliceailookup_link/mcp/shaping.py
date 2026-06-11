@@ -33,7 +33,7 @@ def band(score: float | None) -> str:
     return "none"
 
 
-def _minimal_spliceai(result: dict[str, Any]) -> dict[str, Any]:
+def _minimal_single_model(result: dict[str, Any]) -> dict[str, Any]:
     transcripts = result.get("transcripts") or []
     top = transcripts[0] if transcripts else {}
     best_class, best, pos = None, None, None
@@ -269,7 +269,7 @@ def shape_spliceai(
             result["consequence"] = consequence
     result["headline"] = spliceai_headline(result)
     if response_mode == "minimal":
-        return _minimal_spliceai(result)
+        return _minimal_single_model(result)
     return result
 
 
@@ -382,7 +382,7 @@ def shape_pangolin(
         }
     result["headline"] = pangolin_headline(result)
     if response_mode == "minimal":
-        return _minimal_spliceai(result)
+        return _minimal_single_model(result)
     return result
 
 

@@ -158,3 +158,30 @@ async def test_capabilities_documents_uniprot_and_molecular_consequence(mcp) -> 
     blob = json.dumps(data).lower()
     assert "uniprot-link" in blob
     assert "molecular_consequence" in blob
+
+
+# ===== FIX 1 regression: minimal single-model must not crash =====
+
+
+async def test_minimal_single_model_does_not_crash(mcp) -> None:
+    for tool in ("predict_spliceai", "predict_pangolin"):
+        data = structured(
+            await mcp.call_tool(tool, {"variant": "8-140300616-T-G", "response_mode": "minimal"})
+        )
+        assert data.get("success") is True
+        assert "error_code" not in data
+        assert "headline" in data
+        assert data["max_delta_score"] is not None
+
+
+# ===== FIX 2 regression: validation envelope must carry unsafe_for_clinical_use =====
+
+
+async def test_f9_validation_envelope_carries_provenance(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "max_distance": 20000}
+        )
+    )
+    assert data["error_code"] == "validation_failed"
+    assert data["_meta"]["unsafe_for_clinical_use"] is True

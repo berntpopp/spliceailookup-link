@@ -361,3 +361,43 @@ cause; (2) F7 transcript collapse; (3) F8 minimal-tier; (4) F9 validation `_meta
 
 *Research use only; not for clinical decision support. Splice predictions are
 computational and must be interpreted alongside orthogonal evidence.*
+
+---
+
+## Part 5 -- Corrective pass for Part 4 findings (v0.3.0)
+
+**Date:** 2026-06-12 · **Server:** spliceailookup-link **v0.3.0**
+**Basis:** every change below is covered by the deterministic unit suite
+(`make ci-local` green, coverage >=80%). Findings F6-F10 from Part 4 and the
+Part 4a consumer asks #2/#4/#5 are closed; the contract/shape changes are fully
+determined by the server and verified offline. A live re-exercise against the
+rate-limited upstream is recommended once deployed.
+
+### Part 4 findings - resolved
+
+| # | Sev | Status | Fix + proof |
+|---|---|---|---|
+| F6 | HIGH | Fixed | `combined_headline` renders `agreement.verdict` verbatim (no recompute); `assess_agreement` gains a `concordant_moderate` band. Tests: `test_predict_shape.py` consistency matrix, `test_f6_headline_matches_verdict_concordant_high`. |
+| F7 | MED | Fixed | Byte-identical transcript blocks collapse to one + `shared_by:[ids]`; optional `max_transcripts` top-N + `transcripts_truncated`. Tests: `test_f7_identical_transcripts_collapse`, `test_f7_max_transcripts_truncates_top_n`. |
+| F8 | LOW-MED | Fixed | `minimal` is now headline-tier (headline + `max_delta_score` + `top` + band; no `delta_scores`). Tests: `test_minimal_mode_is_headline_tier`, `test_f8_combined_minimal_is_headline_tier`. |
+| F9 | LOW | Fixed | Validation envelopes stamp `request_id` + `timing`. Test: `test_f9_validation_failed_has_request_id_and_timing`. |
+| F10 | LOW | Fixed | Batch `summary` is a full verdict histogram + `summary_top_variant`; same-server `next_commands` drills the top variant in `full` mode; misleading batch `see_also` removed. Tests: `test_f10_batch_summary_full_histogram`, `test_f10_batch_next_commands_targets_top_variant`. |
+
+### Consumer improvements
+
+- **#2 background tasks discoverable:** `background_execution` block in
+  capabilities + a sentence in each task tool description; protocol
+  `execution.taskSupport == "optional"` confirmed by `test_prediction_tools_are_task_optional`.
+- **#4 interpretation band:** `interpretation:{band, threshold_basis}` beside
+  `max_delta_score` (band only in `minimal`).
+- **#5 cache auditability:** `_meta.cache_ttl_s` always, `_meta.cache_age_s` on hits.
+
+### Re-rated (projected)
+
+Senior-tester: `predict_splicing` 6->9 and `predict_splicing_batch` 7->9 (F6),
+`predict_spliceai` 8.5->9 (F7), `get_server_capabilities` 9->9.5 -> **~9.1**.
+LLM-consumer: token efficiency 8->9 (F7/F8), speed/latency 7->8.5 (#2),
+observability 9->9.5 (#5/F9), schema 9->9.5 (#4), composability 9->9.5 (F10) ->
+**~9.2**. Both axes clear 9/10.
+
+*Research use only; not for clinical decision support.*

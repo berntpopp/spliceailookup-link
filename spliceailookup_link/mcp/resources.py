@@ -169,6 +169,28 @@ def get_capabilities_resource() -> dict[str, Any]:
             ),
             "recommended_for": "cold predict_* calls (13-40s) and predict_splicing_batch.",
         },
+        "agreement_verdicts": [
+            "concordant_high",
+            "concordant_moderate",
+            "concordant_low",
+            "discordant",
+            "incomplete",
+        ],
+        "interpretation_bands": {
+            "high": "delta>=0.5",
+            "moderate": "0.2-0.5",
+            "low": ">0-0.2",
+            "none": "0",
+        },
+        "response_mode_tiers": {
+            "minimal": "headline + single decision number + band",
+            "compact": "per-transcript deltas (default)",
+            "full": "compact + REF/ALT raw scores + exon model",
+        },
+        "transcript_collapse": (
+            "transcripts=all collapses byte-identical blocks into one with "
+            "shared_by:[ids]; max_transcripts caps and adds transcripts_truncated."
+        ),
         "resources": {
             "spliceailookup://capabilities": "this capabilities document",
             "spliceailookup://usage": "compact usage notes",

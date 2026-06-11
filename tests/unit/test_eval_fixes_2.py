@@ -82,3 +82,11 @@ async def test_task_tool_descriptions_mention_background(mcp) -> None:
     for name in ("predict_splicing", "predict_spliceai", "predict_pangolin"):
         tool = await mcp.get_tool(name)
         assert "background task" in tool.description.lower()
+
+
+async def test_capabilities_documents_new_contracts(mcp) -> None:
+    data = structured(await mcp.call_tool("get_server_capabilities", {}))
+    blob = json.dumps(data).lower()
+    assert "concordant_moderate" in blob
+    assert "shared_by" in blob
+    assert "minimal" in blob and "compact" in blob and "full" in blob

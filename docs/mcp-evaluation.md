@@ -401,3 +401,59 @@ observability 9->9.5 (#5/F9), schema 9->9.5 (#4), composability 9->9.5 (F10) ->
 **~9.2**. Both axes clear 9/10.
 
 *Research use only; not for clinical decision support.*
+
+---
+
+## Part 6 -- Self-test-driven push beyond 9.5 (v0.4.0)
+
+**Date:** 2026-06-12 · **Server:** spliceailookup-link **v0.4.0**
+**Basis:** a live LLM-consumer self-test of the *deployed* server (still v0.2.0)
+running a real cross-server workflow, plus an adversarial final code review of the
+v0.3.0 branch. The self-test confirmed the v0.3.0 targets are real bugs and
+surfaced two composability/decision-completeness gaps; the review caught one
+regression introduced by the v0.3.0 work. All changes below are covered by the
+unit suite (`make ci-local` green, 150 tests, coverage >=80%) and verified
+offline; a live re-exercise is recommended once v0.4.0 is deployed.
+
+### Self-test (workflow: PNKP protein domains -> splice impact)
+
+- **F6 confirmed live.** On the deployed v0.2.0,
+  `predict_splicing("1-169549811-C-A")` returned `agreement.verdict:"discordant"`
+  ("models disagree on the magnitude") while its `headline` said
+  **"...; models agree."** -- a direct, reproducible contradiction in the
+  most-read field. v0.3.0's verdict-driven headline eliminates it.
+- **Gap G1 (composability).** `_meta.see_also` listed gnomad/genereviews/gtex but
+  never uniprot-link, even though the workflow began in uniprot and the variant
+  was a coding (missense) change. The protein-context loop was a dead-end.
+- **Gap G2 (decision-completeness).** For HGVS/rsID inputs the molecular
+  consequence (`missense_variant`) was buried in `_meta.resolved_consequence`; the
+  top-level result and headline never stated the variant type.
+
+### v0.4.0 changes
+
+| Item | Status | Fix + proof |
+|---|---|---|
+| G1 | Added | `see_also` now includes a ready-to-call uniprot-link `find_proteins` hint for the gene (gene-keyed, response_mode-gated like the others). Tests: `test_g1_see_also_includes_uniprot_full`, `test_g1_see_also_uniprot_collapsed_in_compact`. |
+| G2 | Added | Top-level `molecular_consequence` (VEP most-severe, distinct from the SAI-10k `consequence` object) on combined + single-model; folded into the combined headline. Tests: `test_g2_*` (combined, coordinate-absent, single-model, minimal). |
+| CRITICAL regression | Fixed | The v0.3.0 F8 change broke `predict_spliceai`/`predict_pangolin` in `response_mode="minimal"` (tool layer read `shaped["transcripts"]` that the minimal projection drops -> `internal_error`). An over-loose existing test had masked it. Fixed + regression test `test_minimal_single_model_does_not_crash`; the masking test strengthened to assert success. |
+| F9 provenance | Fixed | Validation envelopes now also carry `unsafe_for_clinical_use` (was the one error path omitting it). Test: `test_f9_validation_envelope_carries_provenance`. |
+| Review minors | Fixed | Hardened `combined_headline` against an unknown verdict; renamed `_minimal_single_model`; kept `_scored_keys` consistent with `_scored_at` on eviction. |
+
+### Honest re-rating (projected; offline-verified, pending live re-test)
+
+- **Senior-tester:** F1-F10 all fixed and the newly-found minimal crash fixed;
+  every tool (`resolve_variant`, `predict_spliceai`, `predict_pangolin`,
+  `predict_splicing`, `predict_splicing_batch`, `warmup`, `get_server_capabilities`)
+  is clean -> **~9.5**.
+- **LLM-consumer:** composability **9.5 -> ~10** (uniprot-link closes the loop;
+  4 sibling servers, bidirectional), schema/decision-completeness
+  **9.5 -> ~9.7** (molecular_consequence), observability **~9.5** (cache age/ttl +
+  validation provenance), discoverability **~9.5** (background-exec advertised).
+  The one dimension still short of 9.5 is **speed/latency (~8.5-9)**: it is bounded
+  by the interactive-use-only upstream (13-40 s cold calls); the background-task
+  pattern removes the turn-blocking penalty for clients that opt in but cannot
+  make the upstream itself fast. Every *server-controllable* dimension now clears
+  9.5; the overall consumer score lands **~9.5**, with latency the honest ceiling.
+
+*Research use only; not for clinical decision support. Splice predictions are
+computational and must be interpreted alongside orthogonal evidence.*

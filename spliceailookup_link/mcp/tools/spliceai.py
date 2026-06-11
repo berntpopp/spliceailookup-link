@@ -131,6 +131,10 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 )
             if tele.upstream_elapsed_ms is not None:
                 meta["upstream_elapsed_ms"] = tele.upstream_elapsed_ms
+            if tele.cache_ttl_s is not None:
+                meta["cache_ttl_s"] = tele.cache_ttl_s
+            if tele.cache_age_s is not None:
+                meta["cache_age_s"] = tele.cache_age_s
             if prepared.resolution is not None:
                 meta["resolved_from"] = prepared.resolution.get("raw_input")
             shaped["_meta"] = meta

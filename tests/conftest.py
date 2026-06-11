@@ -55,7 +55,10 @@ class StubService:
         self._seen_keys.add(key)
         payload = PANGOLIN_TRAPPC9 if model == "pangolin" else SPLICEAI_TRAPPC9
         return payload, CallTelemetry(
-            cache=cache, upstream_elapsed_ms=None if cache == "hit" else 7
+            cache=cache,
+            upstream_elapsed_ms=None if cache == "hit" else 7,
+            cache_age_s=0 if cache == "hit" else None,
+            cache_ttl_s=86400,
         )
 
     async def resolve(self, text: str, build: str) -> dict[str, Any]:

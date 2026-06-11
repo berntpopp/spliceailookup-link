@@ -16,3 +16,5 @@ from dataclasses import dataclass
 class CallTelemetry:
     cache: str  # "hit" | "miss"
     upstream_elapsed_ms: int | None = None
+    cache_age_s: int | None = None
+    cache_ttl_s: int | None = None

@@ -44,10 +44,12 @@ _IDENTITY_KEYS = (
 )
 
 
-def _aggregate_cache(teles: list[CallTelemetry]) -> tuple[str | None, int | None]:
+def _aggregate_cache(
+    teles: list[CallTelemetry],
+) -> tuple[str | None, int | None, int | None, int | None]:
     caches = [t.cache for t in teles]
     if not caches:
-        return None, None
+        return None, None, None, None
     if all(c == "hit" for c in caches):
         cache = "hit"
     elif all(c == "miss" for c in caches):
@@ -55,7 +57,14 @@ def _aggregate_cache(teles: list[CallTelemetry]) -> tuple[str | None, int | None
     else:
         cache = "partial"
     ups = [t.upstream_elapsed_ms for t in teles if t.upstream_elapsed_ms is not None]
-    return cache, (max(ups) if ups else None)
+    ages = [t.cache_age_s for t in teles if t.cache_age_s is not None]
+    ttls = [t.cache_ttl_s for t in teles if t.cache_ttl_s is not None]
+    return (
+        cache,
+        (max(ups) if ups else None),
+        (max(ages) if ages else None),
+        (ttls[0] if ttls else None),
+    )
 
 
 def _lift_identity(
@@ -190,8 +199,7 @@ async def predict_one(
     result["headline"] = combined_headline(
         gene, genome_build, sai_max, pang_max, consequence, result["agreement"]
     )
-    cache, ups = _aggregate_cache(teles)
-    age_s = ttl_s = None  # populated in the telemetry task; placeholder keeps shape stable
+    cache, ups, age_s, ttl_s = _aggregate_cache(teles)
     telemetry = {
         "cache": cache,
         "upstream_elapsed_ms": ups,

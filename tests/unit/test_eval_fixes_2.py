@@ -21,6 +21,17 @@ async def test_interpretation_band_on_combined(mcp) -> None:
     assert "threshold_basis" in data["interpretation"]
 
 
+async def test_cache_ttl_and_age_in_meta(mcp) -> None:
+    first = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    assert first["_meta"]["cache"] == "miss"
+    assert first["_meta"]["cache_ttl_s"] == 86400
+    assert "cache_age_s" not in first["_meta"]
+    second = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    assert second["_meta"]["cache"] == "hit"
+    assert second["_meta"]["cache_age_s"] == 0
+    assert second["_meta"]["cache_ttl_s"] == 86400
+
+
 async def test_f8_combined_minimal_is_headline_tier(mcp) -> None:
     full = structured(
         await mcp.call_tool(

@@ -41,6 +41,8 @@ class SpliceService:
         self._scoring = scoring_client or ScoringClient()
         self._ensembl = ensembl_client or EnsemblVepClient()
         ttl_seconds = max(1, cache_ttl_minutes) * 60
+        self._ttl_seconds = ttl_seconds
+        self._cache_size = cache_size
         # Wrap the leaf upstream calls so identical (variant, params) tuples hit
         # the cache instead of the slow, rate-limited Cloud Run services.
         self._score_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(self._score_uncached)
@@ -49,6 +51,7 @@ class SpliceService:
         )
         # Keys already computed once; used to report cache hit/miss telemetry.
         self._scored_keys: set[tuple[Any, ...]] = set()
+        self._scored_at: dict[tuple[Any, ...], float] = {}
 
     # ---------------- scoring ----------------
 
@@ -94,10 +97,21 @@ class SpliceService:
             model, build, variant_id, distance, mask, gene_set, raw, consequence
         )
         elapsed_ms = int((perf_counter() - start) * 1000)
-        self._scored_keys.add(key)
+        now = perf_counter()
+        if cached:
+            scored_at = self._scored_at.get(key)
+            age_s = int(now - scored_at) if scored_at is not None else None
+        else:
+            self._scored_keys.add(key)
+            self._scored_at[key] = now
+            age_s = None
+            if len(self._scored_at) > self._cache_size:
+                self._scored_at.pop(next(iter(self._scored_at)))
         return payload, CallTelemetry(
             cache="hit" if cached else "miss",
             upstream_elapsed_ms=None if cached else elapsed_ms,
+            cache_age_s=age_s,
+            cache_ttl_s=self._ttl_seconds,
         )
 
     async def warmup(self, build: GenomeBuild) -> dict[str, Any]:

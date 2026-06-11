@@ -92,6 +92,10 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 meta["cache"] = tel["cache"]
             if tel["upstream_elapsed_ms"] is not None:
                 meta["upstream_elapsed_ms"] = tel["upstream_elapsed_ms"]
+            if tel.get("cache_ttl_s") is not None:
+                meta["cache_ttl_s"] = tel["cache_ttl_s"]
+            if tel.get("cache_age_s") is not None:
+                meta["cache_age_s"] = tel["cache_age_s"]
             if tel["resolution"] is not None:
                 meta["resolved_from"] = tel["resolution"].get("raw_input")
                 meta["resolved_consequence"] = tel["resolved_consequence"]

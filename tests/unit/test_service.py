@@ -130,3 +130,22 @@ async def test_resolve_multiallelic_rsid_is_structured() -> None:
     assert len(out["variant_ids"]) == 2
     assert all(coord.match(v) for v in out["variant_ids"])
     assert "note" in out
+
+
+async def test_cache_age_and_ttl_telemetry() -> None:
+    svc, _, _ = _service()
+    args = {
+        "model": "spliceai",
+        "build": "GRCh38",
+        "variant_id": "8-140300616-T-G",
+        "distance": 500,
+        "mask": 0,
+        "gene_set": "basic",
+    }
+    _, t1 = await svc.score(**args)
+    _, t2 = await svc.score(**args)
+    assert t1.cache == "miss"
+    assert t1.cache_ttl_s == 3600
+    assert t2.cache == "hit"
+    assert isinstance(t2.cache_age_s, int) and t2.cache_age_s >= 0
+    assert t2.cache_ttl_s == 3600

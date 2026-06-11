@@ -63,7 +63,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         async def call() -> dict[str, Any]:
             service = service_factory()
             prepared = await prepare_variant(service, variant, genome_build)
-            payload = await service.score(
+            payload, tele = await service.score(
                 model="pangolin",
                 build=prepared.genome_build,
                 variant_id=prepared.variant_id,
@@ -80,7 +80,10 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     cmd("predict_spliceai", variant=prepared.variant_id, genome_build=genome_build)
                 ],
                 "see_also": see_also_for(prepared.variant_id, genome_build, gene),
+                "cache": tele.cache,
             }
+            if tele.upstream_elapsed_ms is not None:
+                meta["upstream_elapsed_ms"] = tele.upstream_elapsed_ms
             if prepared.resolution is not None:
                 meta["resolved_from"] = prepared.resolution.get("raw_input")
             shaped["_meta"] = meta

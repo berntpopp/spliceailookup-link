@@ -9,12 +9,14 @@ long TTL to spare the rate-limited upstream.
 from __future__ import annotations
 
 import logging
+from time import perf_counter
 from typing import Any
 
 from async_lru import alru_cache
 
 from spliceailookup_link.api import EnsemblVepClient, ScoringClient
 from spliceailookup_link.config import GenomeBuild
+from spliceailookup_link.services.telemetry import CallTelemetry
 from spliceailookup_link.variant import VariantInput, parse_variant_input
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,8 @@ class SpliceService:
         self._resolve_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(
             self._resolve_uncached
         )
+        # Keys already computed once; used to report cache hit/miss telemetry.
+        self._scored_keys: set[tuple[Any, ...]] = set()
 
     # ---------------- scoring ----------------
 
@@ -76,10 +80,19 @@ class SpliceService:
         gene_set: str = "basic",
         raw: str | None = None,
         consequence: str | None = None,
-    ) -> dict[str, Any]:
-        """Return the raw SpliceAI or Pangolin payload for one variant (cached)."""
-        return await self._score_cached(
+    ) -> tuple[dict[str, Any], CallTelemetry]:
+        """Return (raw payload, telemetry) for one variant; cached by params."""
+        key = (model, build, variant_id, distance, mask, gene_set, raw, consequence)
+        cached = key in self._scored_keys
+        start = perf_counter()
+        payload = await self._score_cached(
             model, build, variant_id, distance, mask, gene_set, raw, consequence
+        )
+        elapsed_ms = int((perf_counter() - start) * 1000)
+        self._scored_keys.add(key)
+        return payload, CallTelemetry(
+            cache="hit" if cached else "miss",
+            upstream_elapsed_ms=None if cached else elapsed_ms,
         )
 
     # ---------------- resolution ----------------

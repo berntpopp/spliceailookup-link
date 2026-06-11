@@ -28,10 +28,11 @@ class StubService:
         self.score_error: Exception | None = None
         self.resolve_error: Exception | None = None
         self.pangolin_error: Exception | None = None
+        self._seen_keys: set[tuple[Any, ...]] = set()
 
-    async def score(
-        self, *, model: str, build: str, variant_id: str, **kwargs: Any
-    ) -> dict[str, Any]:
+    async def score(self, *, model: str, build: str, variant_id: str, **kwargs: Any):
+        from spliceailookup_link.services.telemetry import CallTelemetry
+
         self.score_calls.append(
             {"model": model, "build": build, "variant_id": variant_id, **kwargs}
         )
@@ -39,7 +40,20 @@ class StubService:
             raise self.pangolin_error
         if self.score_error is not None:
             raise self.score_error
-        return PANGOLIN_TRAPPC9 if model == "pangolin" else SPLICEAI_TRAPPC9
+        key = (
+            model,
+            build,
+            variant_id,
+            kwargs.get("distance"),
+            kwargs.get("mask"),
+            kwargs.get("gene_set"),
+        )
+        cache = "hit" if key in self._seen_keys else "miss"
+        self._seen_keys.add(key)
+        payload = PANGOLIN_TRAPPC9 if model == "pangolin" else SPLICEAI_TRAPPC9
+        return payload, CallTelemetry(
+            cache=cache, upstream_elapsed_ms=None if cache == "hit" else 7
+        )
 
     async def resolve(self, text: str, build: str) -> dict[str, Any]:
         self.resolve_calls.append({"text": text, "build": build})

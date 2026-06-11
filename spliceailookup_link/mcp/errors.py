@@ -325,10 +325,8 @@ async def run_mcp_tool(
 
     try:
         result = await call()
-        if isinstance(result, dict):
-            result.setdefault("success", True)
-            return _stamp(result)
-        return result
+        result.setdefault("success", True)
+        return _stamp(result)
     except McpToolError as exc:
         record_mcp_error(
             tool_name=tool_name,

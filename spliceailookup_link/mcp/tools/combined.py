@@ -120,12 +120,15 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             sai_max = pang_max = None
             consequence = None
             partial: list[str] = []
+            teles = []
 
             if isinstance(sai_res, BaseException):
                 partial.append(f"spliceai_failed: {sai_res!s}"[:200])
             else:
+                sai_payload, sai_tele = sai_res
+                teles.append(sai_tele)
                 shaped_sai = shape_spliceai(
-                    sai_res, transcripts=transcripts, response_mode=response_mode
+                    sai_payload, transcripts=transcripts, response_mode=response_mode
                 )
                 result["spliceai"] = shaped_sai
                 sai_max = shaped_sai.get("max_delta_score")
@@ -136,8 +139,10 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             if isinstance(pang_res, BaseException):
                 partial.append(f"pangolin_failed: {pang_res!s}"[:200])
             else:
+                pang_payload, pang_tele = pang_res
+                teles.append(pang_tele)
                 shaped_pang = shape_pangolin(
-                    pang_res, transcripts=transcripts, response_mode=response_mode
+                    pang_payload, transcripts=transcripts, response_mode=response_mode
                 )
                 result["pangolin"] = shaped_pang
                 pang_max = shaped_pang.get("max_delta_score")
@@ -154,6 +159,18 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             meta: dict[str, Any] = {
                 "see_also": see_also_for(prepared.variant_id, genome_build, gene)
             }
+            caches = [t.cache for t in teles]
+            if caches:
+                meta["cache"] = (
+                    "hit"
+                    if all(c == "hit" for c in caches)
+                    else "miss"
+                    if all(c == "miss" for c in caches)
+                    else "partial"
+                )
+                ups = [t.upstream_elapsed_ms for t in teles if t.upstream_elapsed_ms is not None]
+                if ups:
+                    meta["upstream_elapsed_ms"] = max(ups)
             if prepared.resolution is not None:
                 meta["resolved_from"] = prepared.resolution.get("raw_input")
                 meta["resolved_consequence"] = prepared.consequence

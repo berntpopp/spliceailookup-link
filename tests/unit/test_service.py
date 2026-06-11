@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from spliceailookup_link.services import SpliceService
+from spliceailookup_link.services.telemetry import CallTelemetry
 from tests.fixtures.api_responses import SPLICEAI_TRAPPC9, VEP_ABCA3, VEP_RS6025
 
 
@@ -68,10 +69,27 @@ async def test_score_caches_identical_calls() -> None:
         "distance": 500,
         "mask": 0,
     }
-    a = await svc.score(**args)
-    b = await svc.score(**args)
+    a, _ = await svc.score(**args)
+    b, _ = await svc.score(**args)
     assert a is b or a == b
     # Second identical call served from cache -> exactly one upstream call.
+    assert scoring.calls == 1
+
+
+async def test_score_reports_cache_miss_then_hit() -> None:
+    svc, scoring, _ = _service()
+    args = {
+        "model": "spliceai",
+        "build": "GRCh38",
+        "variant_id": "8-140300616-T-G",
+        "distance": 500,
+        "mask": 0,
+    }
+    _, t1 = await svc.score(**args)
+    _, t2 = await svc.score(**args)
+    assert isinstance(t1, CallTelemetry)
+    assert t1.cache == "miss" and isinstance(t1.upstream_elapsed_ms, int)
+    assert t2.cache == "hit" and t2.upstream_elapsed_ms is None
     assert scoring.calls == 1
 
 

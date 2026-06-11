@@ -63,6 +63,8 @@ def get_capabilities_resource() -> dict[str, Any]:
             "HGVS or rsID -> resolve_variant -> predict_splicing",
             "SpliceAI only -> predict_spliceai (set include_consequence=true for SAI-10k aberrations)",
             "Pangolin only -> predict_pangolin",
+            "Many variants (gene panel) -> predict_splicing_batch (one envelope, fans out server-side)",
+            "Before a burst -> warmup (pre-warm the cold upstream containers)",
         ],
         "parameters": {
             "variant": "CHROM-POS-REF-ALT (chr optional), HGVS, or rsID. resolve_variant normalizes it.",

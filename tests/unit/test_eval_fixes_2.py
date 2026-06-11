@@ -15,6 +15,12 @@ async def test_f6_headline_matches_verdict_concordant_high(mcp) -> None:
     assert "models disagree" not in data["headline"]
 
 
+async def test_interpretation_band_on_combined(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    assert data["interpretation"]["band"] == "high"
+    assert "threshold_basis" in data["interpretation"]
+
+
 async def test_f8_combined_minimal_is_headline_tier(mcp) -> None:
     full = structured(
         await mcp.call_tool(

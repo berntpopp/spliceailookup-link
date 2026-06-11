@@ -147,3 +147,15 @@ def test_no_scores_headline_safe() -> None:
     empty = {"variant": "1-1-A-T", "hg": "38", "scores": []}
     shaped = shape_spliceai(empty)
     assert "no transcript scores" in shaped["headline"]
+
+
+def test_interpretation_band_present_compact() -> None:
+    out = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="compact")
+    assert out["interpretation"]["band"] == "high"
+    assert "0.5" in out["interpretation"]["threshold_basis"]
+
+
+def test_interpretation_band_absent_threshold_in_minimal() -> None:
+    out = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="minimal")
+    assert out["interpretation"]["band"] == "high"
+    assert "threshold_basis" not in out["interpretation"]

@@ -260,6 +260,7 @@ def shape_spliceai(
         "max_delta_score": max_overall,
         "transcripts": shaped,
     }
+    result["interpretation"] = {"band": band(max_overall), "threshold_basis": THRESHOLD_BASIS}
     if truncated is not None:
         result["transcripts_truncated"] = truncated
     if include_consequence:
@@ -370,6 +371,7 @@ def shape_pangolin(
         "max_delta_score": max_overall,
         "transcripts": shaped,
     }
+    result["interpretation"] = {"band": band(max_overall), "threshold_basis": THRESHOLD_BASIS}
     if truncated is not None:
         result["transcripts_truncated"] = truncated
     if response_mode == "full" and payload.get("allNonZeroScores"):

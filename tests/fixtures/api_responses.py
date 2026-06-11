@@ -108,18 +108,28 @@ PANGOLIN_TRAPPC9: dict[str, Any] = {
     "allNonZeroScoresTranscriptId": "ENST00000438773.4",
 }
 
-# SpliceAI payload with two transcripts: one MANE Select + one non-canonical, for
-# exercising transcripts="all".
+# SpliceAI payload: one MANE Select + one non-canonical with DISTINCT scores.
 SPLICEAI_TRAPPC9_ALL: dict[str, Any] = {
     **{k: v for k, v in SPLICEAI_TRAPPC9.items() if k != "scores"},
     "scores": [
         SPLICEAI_TRAPPC9["scores"][0],
         {
             **SPLICEAI_TRAPPC9["scores"][0],
+            "DS_AL": "0.40",  # distinct from the MANE row's 0.83
             "t_id": "ENST00000522608.1",
             "t_priority": "N",
             "t_refseq_ids": [],
         },
+    ],
+}
+
+# SpliceAI payload: three byte-identical transcript score blocks (collapse target).
+SPLICEAI_TRAPPC9_DUP: dict[str, Any] = {
+    **{k: v for k, v in SPLICEAI_TRAPPC9.items() if k != "scores"},
+    "scores": [
+        SPLICEAI_TRAPPC9["scores"][0],
+        {**SPLICEAI_TRAPPC9["scores"][0], "t_id": "ENST00000522608.1", "t_priority": "N"},
+        {**SPLICEAI_TRAPPC9["scores"][0], "t_id": "ENST00000999999.1", "t_priority": "N"},
     ],
 }
 

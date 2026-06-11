@@ -85,6 +85,44 @@ def _select_transcripts(
     return mane or scores
 
 
+def _score_signature(t: dict[str, Any]) -> tuple[Any, ...]:
+    ds = t.get("delta_scores") or {}
+    return (
+        t.get("max_delta_score"),
+        tuple(sorted((k, v.get("score"), v.get("position")) for k, v in ds.items())),
+    )
+
+
+def _collapse_identical_transcripts(shaped: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merge transcript blocks with identical delta scores into one + shared_by."""
+    groups: dict[tuple[Any, ...], dict[str, Any]] = {}
+    order: list[tuple[Any, ...]] = []
+    for t in shaped:
+        sig = _score_signature(t)
+        rep = groups.get(sig)
+        if rep is None:
+            groups[sig] = dict(t)
+            order.append(sig)
+            continue
+        tid = t.get("transcript_id")
+        if tid and tid != rep.get("transcript_id"):
+            rep.setdefault("shared_by", []).append(tid)
+    out = [groups[s] for s in order]
+    for rep in out:
+        if "shared_by" in rep:
+            rep["shared_by"] = sorted(set(rep["shared_by"]))
+    return out
+
+
+def _apply_max_transcripts(
+    shaped: list[dict[str, Any]], max_transcripts: int | None
+) -> tuple[list[dict[str, Any]], dict[str, int] | None]:
+    if max_transcripts is None or len(shaped) <= max_transcripts:
+        return shaped, None
+    ranked = sorted(shaped, key=lambda t: t.get("max_delta_score") or -1.0, reverse=True)
+    return ranked[:max_transcripts], {"kept": max_transcripts, "total": len(shaped)}
+
+
 # ---------------- SpliceAI ----------------
 
 _SPLICEAI_CLASSES = (
@@ -175,10 +213,13 @@ def shape_spliceai(
     transcripts: Transcripts = "mane",
     response_mode: ResponseMode = "compact",
     include_consequence: bool = True,
+    max_transcripts: int | None = None,
 ) -> dict[str, Any]:
     raw_scores = payload.get("scores") or []
     selected = _select_transcripts(raw_scores, transcripts)
     shaped = [_shape_spliceai_transcript(s, response_mode) for s in selected]
+    shaped = _collapse_identical_transcripts(shaped)
+    shaped, truncated = _apply_max_transcripts(shaped, max_transcripts)
     max_overall = max(
         (t["max_delta_score"] for t in shaped if t["max_delta_score"] is not None),
         default=None,
@@ -193,6 +234,8 @@ def shape_spliceai(
         "max_delta_score": max_overall,
         "transcripts": shaped,
     }
+    if truncated is not None:
+        result["transcripts_truncated"] = truncated
     if response_mode == "minimal":
         result["transcripts"] = shaped[:1]
     if include_consequence:
@@ -280,10 +323,13 @@ def shape_pangolin(
     *,
     transcripts: Transcripts = "mane",
     response_mode: ResponseMode = "compact",
+    max_transcripts: int | None = None,
 ) -> dict[str, Any]:
     raw_scores = payload.get("scores") or []
     selected = _select_transcripts(raw_scores, transcripts)
     shaped = [_shape_pangolin_transcript(s, response_mode) for s in selected]
+    shaped = _collapse_identical_transcripts(shaped)
+    shaped, truncated = _apply_max_transcripts(shaped, max_transcripts)
     max_overall = max(
         (t["max_delta_score"] for t in shaped if t["max_delta_score"] is not None),
         default=None,
@@ -298,6 +344,8 @@ def shape_pangolin(
         "max_delta_score": max_overall,
         "transcripts": shaped[:1] if response_mode == "minimal" else shaped,
     }
+    if truncated is not None:
+        result["transcripts_truncated"] = truncated
     if response_mode == "full" and payload.get("allNonZeroScores"):
         result["all_non_zero_scores"] = {
             "transcript_id": payload.get("allNonZeroScoresTranscriptId"),

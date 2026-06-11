@@ -13,14 +13,39 @@ from tests.fixtures.api_responses import (
     SPLICEAI_MASKED_EMPTY_ABERR,
     SPLICEAI_TRAPPC9,
     SPLICEAI_TRAPPC9_ALL,
+    SPLICEAI_TRAPPC9_DUP,
 )
 
 
 def test_transcripts_all_returns_non_mane() -> None:
+    # Distinct scores -> not collapsed; both transcripts present incl. non-canonical.
     out = shape_spliceai(SPLICEAI_TRAPPC9_ALL, transcripts="all", response_mode="compact")
     priorities = {t["transcript_priority"] for t in out["transcripts"]}
-    assert len(out["transcripts"]) >= 2
+    assert len(out["transcripts"]) == 2
     assert "non-canonical" in priorities
+
+
+def test_f7_identical_transcripts_collapse() -> None:
+    out = shape_spliceai(SPLICEAI_TRAPPC9_DUP, transcripts="all", response_mode="compact")
+    assert len(out["transcripts"]) == 1
+    rep = out["transcripts"][0]
+    assert sorted(rep["shared_by"]) == ["ENST00000522608.1", "ENST00000999999.1"]
+
+
+def test_f7_collapse_reduces_serialized_size() -> None:
+    import json
+
+    collapsed = shape_spliceai(SPLICEAI_TRAPPC9_DUP, transcripts="all")
+    assert len(collapsed["transcripts"]) == 1
+    assert "shared_by" in collapsed["transcripts"][0]
+    assert json.dumps(collapsed)
+
+
+def test_f7_max_transcripts_truncates_top_n() -> None:
+    out = shape_spliceai(SPLICEAI_TRAPPC9_ALL, transcripts="all", max_transcripts=1)
+    assert len(out["transcripts"]) == 1
+    assert out["transcripts"][0]["max_delta_score"] == 0.83
+    assert out["transcripts_truncated"] == {"kept": 1, "total": 2}
 
 
 def test_consequence_aberrations_is_stable_path_when_empty() -> None:

@@ -21,13 +21,13 @@ Transport Options:
   stdio    - MCP STDIO only (for AI assistants)
 
 Examples:
-  uv run python server.py --transport unified --port 8030
+  uv run python server.py --transport unified --port 8603
   uv run python server.py --transport stdio
 """,
     )
     parser.add_argument("--transport", choices=["unified", "http", "stdio"], default="unified")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8030)
+    parser.add_argument("--port", type=int, default=8603)
     parser.add_argument("--mcp-path", default="/mcp")
     parser.add_argument(
         "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO"
@@ -36,7 +36,7 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     subparsers.add_parser("config", help="Show configuration")
     health_parser = subparsers.add_parser("health", help="Check server health")
-    health_parser.add_argument("--url", default="http://127.0.0.1:8030")
+    health_parser.add_argument("--url", default="http://127.0.0.1:8603")
     return parser
 
 

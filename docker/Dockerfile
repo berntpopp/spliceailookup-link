@@ -35,7 +35,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH="/home/app/web" \
     SPLICEAILOOKUP_LINK_MCP_TRANSPORT=unified \
     SPLICEAILOOKUP_LINK_MCP_HOST=0.0.0.0 \
-    SPLICEAILOOKUP_LINK_MCP_PORT=8030 \
+    SPLICEAILOOKUP_LINK_MCP_PORT=8603 \
     SPLICEAILOOKUP_LINK_MCP_PATH=/mcp
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -59,6 +59,6 @@ RUN /opt/venv/bin/pip install -e . --no-deps
 
 USER app
 
-EXPOSE 8030
+EXPOSE 8603
 
-CMD ["spliceailookup-link", "--transport", "unified", "--host", "0.0.0.0", "--port", "8030"]
+CMD ["spliceailookup-link", "--transport", "unified", "--host", "0.0.0.0", "--port", "8603"]

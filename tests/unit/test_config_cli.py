@@ -56,7 +56,7 @@ def test_cli_parser_defaults() -> None:
     assert args.transport == "unified"
     cfg = cli.create_config_from_args(args)
     assert isinstance(cfg, ServerConfig)
-    assert cfg.port == 8030
+    assert cfg.port == 8603
 
 
 def test_cli_config_command(capsys) -> None:

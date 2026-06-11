@@ -33,7 +33,7 @@ discovery, and a research-use disclaimer.
 ```bash
 uv sync --group dev          # install
 cp .env.example .env         # optional: override hosts / limits
-make dev                     # FastAPI /health + MCP HTTP at http://127.0.0.1:8030/mcp
+make dev                     # FastAPI /health + MCP HTTP at http://127.0.0.1:8603/mcp
 make mcp-serve               # stdio MCP server (for Claude Desktop)
 ```
 
@@ -58,8 +58,8 @@ Hosted (HTTPS — Claude Desktop / claude.ai connectors, `claude_desktop_config.
 Local development (HTTP on loopback only):
 
 ```bash
-make dev   # serves http://127.0.0.1:8030/mcp
-claude mcp add --transport http spliceailookup-link http://127.0.0.1:8030/mcp
+make dev   # serves http://127.0.0.1:8603/mcp
+claude mcp add --transport http spliceailookup-link http://127.0.0.1:8603/mcp
 ```
 
 stdio (Claude Desktop, no network):

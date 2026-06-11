@@ -17,7 +17,7 @@ def main() -> None:
         config = ServerConfig(
             transport="stdio",
             host="127.0.0.1",
-            port=8030,
+            port=8603,
             mcp_path="/mcp",
             enable_docs=False,
             log_level="WARNING",

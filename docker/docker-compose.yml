@@ -9,18 +9,18 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     image: spliceailookup-link:latest
-    # Host port 8030 chosen to avoid colliding with sibling -link servers
+    # Host port 8603 chosen to avoid colliding with sibling -link servers
     # (gnomad-link 8020, gtex-link 8765, etc.).
     ports:
-      - "${SPLICEAILOOKUP_LINK_HOST_PORT:-8030}:8030"
+      - "${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8603"
     environment:
       SPLICEAILOOKUP_LINK_MCP_TRANSPORT: unified
       SPLICEAILOOKUP_LINK_MCP_HOST: 0.0.0.0
-      SPLICEAILOOKUP_LINK_MCP_PORT: "8030"
+      SPLICEAILOOKUP_LINK_MCP_PORT: "8603"
       SPLICEAILOOKUP_LINK_MCP_PATH: /mcp
       SPLICEAILOOKUP_LINK_LOG_LEVEL: INFO
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8030/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8603/health"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -72,7 +72,7 @@ clean: ## Remove local caches and generated reports
 	rm -rf .pytest_cache .ruff_cache .mypy_cache htmlcov .coverage coverage.xml
 
 dev: ## Run FastAPI host (/health) + mounted MCP HTTP locally
-	uv run python server.py --transport unified --host 127.0.0.1 --port 8030
+	uv run python server.py --transport unified --host 127.0.0.1 --port 8603
 
 mcp-serve: ## Start local stdio MCP server
 	uv run python mcp_server.py
@@ -80,7 +80,7 @@ mcp-serve: ## Start local stdio MCP server
 mcp-serve-http: dev ## Alias: FastAPI host (/health) + mounted MCP HTTP locally
 
 run-prod: ## Run production server with uvicorn
-	uv run python server.py --transport unified --host 0.0.0.0 --port 8030
+	uv run python server.py --transport unified --host 0.0.0.0 --port 8603
 
 docker-build: ## Build Docker image
 	$(DOCKER_COMPOSE) -f docker/docker-compose.yml build

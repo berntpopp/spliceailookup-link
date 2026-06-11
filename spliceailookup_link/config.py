@@ -18,7 +18,7 @@ class ServerConfig:
 
     transport: Literal["unified", "http", "stdio"] = "unified"
     host: str = "127.0.0.1"
-    port: int = 8030
+    port: int = 8603
     mcp_path: str = "/mcp"
     enable_docs: bool = False
     log_level: str = "INFO"
@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     # Transport
     MCP_TRANSPORT: Literal["unified", "http", "stdio"] = "unified"
     MCP_HOST: str = "127.0.0.1"
-    MCP_PORT: int = 8030
+    MCP_PORT: int = 8603
     MCP_PATH: str = "/mcp"
 
     # Logging

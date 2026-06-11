@@ -52,3 +52,27 @@ async def test_f4_no_duplicate_consequence_or_identity(mcp) -> None:
     # identity is lifted OUT of the per-model transcript rows
     assert "refseq_ids" not in data["spliceai"]["transcripts"][0]
     assert "gene_id" not in data["pangolin"]["transcripts"][0]
+
+
+async def test_see_also_omitted_in_minimal(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "response_mode": "minimal"}
+        )
+    )
+    assert "see_also" not in data["_meta"]
+
+
+async def test_see_also_collapsed_in_compact(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    for hint in data["_meta"]["see_also"]:
+        assert "example" not in hint and set(hint) == {"server", "hint"}
+
+
+async def test_see_also_full_keeps_example(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "response_mode": "full"}
+        )
+    )
+    assert any("example" in h for h in data["_meta"]["see_also"])

@@ -88,9 +88,12 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 "next_commands": [
                     cmd("predict_pangolin", variant=prepared.variant_id, genome_build=genome_build)
                 ],
-                "see_also": see_also_for(prepared.variant_id, genome_build, gene),
                 "cache": tele.cache,
             }
+            if response_mode != "minimal":
+                meta["see_also"] = see_also_for(
+                    prepared.variant_id, genome_build, gene, response_mode
+                )
             if tele.upstream_elapsed_ms is not None:
                 meta["upstream_elapsed_ms"] = tele.upstream_elapsed_ms
             if prepared.resolution is not None:

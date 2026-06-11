@@ -80,8 +80,11 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             tel = result.pop("_telemetry")
             meta: dict[str, Any] = {
                 "next_commands": for_combined(result["variant_id"], genome_build),
-                "see_also": see_also_for(result["variant_id"], genome_build, tel["gene"]),
             }
+            if response_mode != "minimal":
+                meta["see_also"] = see_also_for(
+                    result["variant_id"], genome_build, tel["gene"], response_mode
+                )
             if tel["cache"]:
                 meta["cache"] = tel["cache"]
             if tel["upstream_elapsed_ms"] is not None:

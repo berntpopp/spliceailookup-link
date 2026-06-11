@@ -87,6 +87,21 @@ async def cross_build_probe(
 
 
 def see_also_for(
+    variant_id: str,
+    genome_build: GenomeBuild,
+    gene: str | None,
+    response_mode: str = "compact",
+) -> list[dict[str, Any]]:
+    """Cross-server hints. minimal -> []; compact -> {server,hint}; full -> + example args."""
+    if response_mode == "minimal":
+        return []
+    full = _see_also_full(variant_id, genome_build, gene)
+    if response_mode == "full":
+        return full
+    return [{"server": h["server"], "hint": h["hint"]} for h in full]
+
+
+def _see_also_full(
     variant_id: str, genome_build: GenomeBuild, gene: str | None
 ) -> list[dict[str, Any]]:
     """Cross-server follow-up hints (sibling -link MCP servers). Not callable here."""

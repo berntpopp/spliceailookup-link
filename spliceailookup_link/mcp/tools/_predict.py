@@ -25,11 +25,13 @@ from spliceailookup_link.mcp.tools._common import (
     mask_to_int,
     prepare_variant,
 )
+from spliceailookup_link.mcp.tools._predict_shape import (
+    assess_agreement,
+    combined_headline,
+    combined_interpretation,
+)
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.services.telemetry import CallTelemetry
-
-_HIGH = 0.5
-_LOW = 0.2
 
 _IDENTITY_KEYS = (
     "gene",
@@ -39,26 +41,6 @@ _IDENTITY_KEYS = (
     "refseq_ids",
     "strand",
 )
-
-
-def _assess_agreement(sai_max: float | None, pang_max: float | None) -> dict[str, Any]:
-    """Summarise whether the two independent models agree on impact magnitude."""
-    if sai_max is None or pang_max is None:
-        return {"verdict": "incomplete", "detail": "one model returned no score"}
-    both_high = sai_max >= _HIGH and pang_max >= _HIGH
-    both_low = sai_max < _LOW and pang_max < _LOW
-    if both_high:
-        verdict, detail = "concordant_high", "both models predict a strong splicing effect"
-    elif both_low:
-        verdict, detail = "concordant_low", "both models predict little or no splicing effect"
-    else:
-        verdict, detail = "discordant", "models disagree on the magnitude; interpret with caution"
-    return {
-        "verdict": verdict,
-        "detail": detail,
-        "spliceai_max_delta": sai_max,
-        "pangolin_max_delta": pang_max,
-    }
 
 
 def _aggregate_cache(teles: list[CallTelemetry]) -> tuple[str | None, int | None]:
@@ -200,8 +182,11 @@ async def predict_one(
 
     if consequence is not None:
         result["consequence"] = consequence
-    result["agreement"] = _assess_agreement(sai_max, pang_max)
-    result["headline"] = _combined_headline(gene, genome_build, sai_max, pang_max, consequence)
+    result["agreement"] = assess_agreement(sai_max, pang_max)
+    result["interpretation"] = combined_interpretation(sai_max, pang_max)
+    result["headline"] = combined_headline(
+        gene, genome_build, sai_max, pang_max, consequence, result["agreement"]
+    )
     cache, ups = _aggregate_cache(teles)
     result["_telemetry"] = {
         "cache": cache,
@@ -212,29 +197,3 @@ async def predict_one(
         "resolved_consequence": prepared.consequence,
     }
     return result
-
-
-def _combined_headline(
-    gene: str | None,
-    build: str,
-    sai_max: float | None,
-    pang_max: float | None,
-    consequence: dict[str, Any] | None,
-) -> str:
-    gene_label = gene or "variant"
-    parts: list[str] = []
-    if sai_max is not None:
-        parts.append(f"SpliceAI Δ={sai_max:.2f}")
-    if pang_max is not None:
-        parts.append(f"Pangolin Δ={pang_max:.2f}")
-    scores = "; ".join(parts) if parts else "no scores"
-    aberr = None
-    if consequence and consequence.get("aberrations"):
-        aberr = (consequence["aberrations"][0] or {}).get("type")
-    tail = f"; predicted {aberr.replace('_', ' ')}" if aberr else ""
-    if sai_max is not None and pang_max is not None:
-        agree = "agree" if (sai_max >= _HIGH) == (pang_max >= _HIGH) else "disagree"
-        verdict = f"; models {agree}"
-    else:
-        verdict = ""
-    return f"{gene_label} ({build}): {scores}{verdict}{tail}."

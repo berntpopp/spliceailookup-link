@@ -101,3 +101,11 @@ async def test_f5_probe_can_be_disabled(mcp, stub_service: StubService) -> None:
         )
     )
     assert data["error_code"] == "not_found"
+
+
+async def test_capabilities_version_is_stable(mcp) -> None:
+    a = structured(await mcp.call_tool("get_server_capabilities", {}))
+    b = structured(await mcp.call_tool("get_server_capabilities", {}))
+    assert a["capabilities_version"] == b["capabilities_version"]
+    assert len(a["capabilities_version"]) == 12
+    assert isinstance(a["descriptor_chars"], int) and a["descriptor_chars"] > 0

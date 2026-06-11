@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
@@ -27,8 +29,14 @@ def _server_version() -> str:
         return "unknown"
 
 
+def _capabilities_version(doc: dict[str, Any]) -> tuple[str, int]:
+    serialized = json.dumps(doc, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:12]
+    return digest, len(serialized)
+
+
 def get_capabilities_resource() -> dict[str, Any]:
-    return {
+    doc: dict[str, Any] = {
         "server": "spliceailookup-link",
         "server_version": _server_version(),
         "mcp_protocol_version": MCP_PROTOCOL_VERSION,
@@ -106,7 +114,16 @@ def get_capabilities_resource() -> dict[str, Any]:
             "see_also": (
                 "_meta.see_also points at sibling MCP servers for cross-domain follow-up "
                 "(gnomad-link for allele frequency, genereviews-link / gtex-link for context). "
-                "These are hints, not callable next_commands on this server."
+                "These are hints, not callable next_commands on this server. Omitted in minimal "
+                "mode; collapsed to {server, hint} in compact; full example args in full mode."
+            ),
+            "observability": (
+                "every _meta carries request_id and timing.elapsed_ms; prediction payloads add "
+                "cache ('hit'|'miss'|'partial') and upstream_elapsed_ms (on a miss)."
+            ),
+            "capabilities_version": (
+                "stable content hash of this document (+ descriptor_chars); a warm client can "
+                "compare it and skip re-fetching the full capabilities when unchanged."
             ),
         },
         "limitations": [
@@ -141,6 +158,10 @@ def get_capabilities_resource() -> dict[str, Any]:
             "resolver": "Ensembl VEP REST",
         },
     }
+    version_hash, chars = _capabilities_version(doc)
+    doc["capabilities_version"] = version_hash
+    doc["descriptor_chars"] = chars
+    return doc
 
 
 def get_reference_resource() -> dict[str, Any]:

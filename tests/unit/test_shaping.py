@@ -8,7 +8,28 @@ from spliceailookup_link.mcp.shaping import (
     shape_spliceai,
     spliceai_headline,
 )
-from tests.fixtures.api_responses import PANGOLIN_TRAPPC9, SPLICEAI_TRAPPC9
+from tests.fixtures.api_responses import (
+    PANGOLIN_TRAPPC9,
+    SPLICEAI_MASKED_EMPTY_ABERR,
+    SPLICEAI_TRAPPC9,
+)
+
+
+def test_consequence_aberrations_is_stable_path_when_empty() -> None:
+    out = shape_spliceai(SPLICEAI_MASKED_EMPTY_ABERR, response_mode="compact")
+    assert out["consequence"]["aberrations"] == []
+    assert "raw" not in out["consequence"]
+
+
+def test_full_mode_adds_transcript_info_as_sibling() -> None:
+    out = shape_spliceai(SPLICEAI_MASKED_EMPTY_ABERR, response_mode="full")
+    assert "aberrations" in out["consequence"]
+    assert out["consequence"]["transcript_info"] == {"strand": "-", "exon_count": 23}
+
+
+def test_populated_aberrations_unchanged() -> None:
+    out = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="compact")
+    assert out["consequence"]["aberrations"][0]["type"] == "exon_skipping"
 
 
 def test_shape_spliceai_compact() -> None:

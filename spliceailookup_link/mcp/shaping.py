@@ -124,7 +124,7 @@ def _shape_spliceai_transcript(raw: dict[str, Any], mode: ResponseMode) -> dict[
     return out
 
 
-def _shape_consequence(payload: dict[str, Any]) -> dict[str, Any] | None:
+def _shape_consequence(payload: dict[str, Any], mode: ResponseMode) -> dict[str, Any] | None:
     sai = payload.get("sai10kPredictions")
     err = payload.get("sai10kPredictionsError")
     if not sai and not err:
@@ -132,21 +132,25 @@ def _shape_consequence(payload: dict[str, Any]) -> dict[str, Any] | None:
     out: dict[str, Any] = {}
     if err:
         out["error"] = err
-    aberrations = (sai or {}).get("aberrations") if isinstance(sai, dict) else None
-    if aberrations:
-        out["aberrations"] = [
-            {
-                "type": ab.get("aberration_type"),
-                "affected_region": ab.get("affected_region"),
-                "status": ab.get("status"),
-                "size_is_coding": ab.get("size_is_coding"),
-                "introduces_stop_codon": ab.get("introduces_stop_codon"),
-            }
-            for ab in aberrations
-        ]
-    elif isinstance(sai, dict):
-        out["raw"] = sai
-    return out or None
+    raw_aberr = (sai or {}).get("aberrations") if isinstance(sai, dict) else None
+    # `aberrations` is the STABLE path in every mode (possibly empty under mask=1).
+    out["aberrations"] = [
+        {
+            "type": ab.get("aberration_type"),
+            "affected_region": ab.get("affected_region"),
+            "status": ab.get("status"),
+            "size_is_coding": ab.get("size_is_coding"),
+            "introduces_stop_codon": ab.get("introduces_stop_codon"),
+        }
+        for ab in (raw_aberr or [])
+    ]
+    if mode == "full" and isinstance(sai, dict):
+        if sai.get("transcript_info") is not None:
+            out["transcript_info"] = sai["transcript_info"]
+        extras = {k: v for k, v in sai.items() if k not in {"aberrations", "transcript_info"}}
+        if extras:
+            out["raw_extras"] = extras
+    return out
 
 
 def shape_spliceai(
@@ -176,7 +180,7 @@ def shape_spliceai(
     if response_mode == "minimal":
         result["transcripts"] = shaped[:1]
     if include_consequence:
-        consequence = _shape_consequence(payload)
+        consequence = _shape_consequence(payload, response_mode)
         if consequence:
             result["consequence"] = consequence
     result["headline"] = spliceai_headline(result)

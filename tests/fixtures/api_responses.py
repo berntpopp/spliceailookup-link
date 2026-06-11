@@ -108,6 +108,18 @@ PANGOLIN_TRAPPC9: dict[str, Any] = {
     "allNonZeroScoresTranscriptId": "ENST00000438773.4",
 }
 
+# SpliceAI payload where the SAI-10k aberration list is empty (typical under mask=1)
+# but the raw object still carries transcript_info -- this triggered the F2 drift.
+SPLICEAI_MASKED_EMPTY_ABERR: dict[str, Any] = {
+    "variant": "8-140300616-T-G",
+    "hg": "38",
+    "bc": "basic",
+    "distance": 500,
+    "mask": 1,
+    "scores": SPLICEAI_TRAPPC9["scores"],
+    "sai10kPredictions": {"aberrations": [], "transcript_info": {"strand": "-", "exon_count": 23}},
+}
+
 # Upstream "errors" are HTTP 200 bodies carrying an `error` string.
 SPLICEAI_PARSE_ERROR: dict[str, Any] = {
     "variant": "notavariant",

@@ -15,7 +15,8 @@ async def test_batch_scores_each_variant_once_envelope(mcp) -> None:
     assert data["success"] is True
     assert data["count"] == 2
     assert len(data["results"]) == 2
-    assert "see_also" in data["_meta"]  # one block for the batch
+    assert "see_also" not in data["_meta"]  # batch-level see_also is misleading for a panel
+    assert data["_meta"]["next_commands"][0]["tool"] == "predict_splicing"
     assert all("_meta" not in r for r in data["results"])  # per-item _meta suppressed
 
 
@@ -35,3 +36,39 @@ async def test_batch_over_cap_validation_failed(mcp) -> None:
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "validation_failed"
+
+
+async def test_f10_batch_summary_full_histogram(mcp) -> None:
+    res = await mcp.call_tool(
+        "predict_splicing_batch",
+        {"variants": ["chr8-140300616-T-G", "8-140300616-T-G"]},
+    )
+    data = structured(res)
+    summary = data["summary"]
+    for key in (
+        "ok",
+        "failed",
+        "concordant_high",
+        "concordant_moderate",
+        "concordant_low",
+        "discordant",
+        "incomplete",
+    ):
+        assert key in summary
+    verdict_total = (
+        summary["concordant_high"]
+        + summary["concordant_moderate"]
+        + summary["concordant_low"]
+        + summary["discordant"]
+        + summary["incomplete"]
+    )
+    assert verdict_total == summary["ok"]
+    assert data["summary_top_variant"]["variant"]
+
+
+async def test_f10_batch_next_commands_targets_top_variant(mcp) -> None:
+    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
+    data = structured(res)
+    nc = data["_meta"]["next_commands"][0]
+    assert nc["tool"] == "predict_splicing"
+    assert nc["arguments"]["response_mode"] == "full"

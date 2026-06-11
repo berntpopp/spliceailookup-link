@@ -10,11 +10,21 @@ from pydantic import Field
 
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, mcp_tool_error, run_mcp_tool
-from spliceailookup_link.mcp.tools._common import see_also_for
 from spliceailookup_link.mcp.tools._predict import predict_one
 from spliceailookup_link.services import SpliceService
 
 _MAX_BATCH = 25
+
+
+def _result_max_delta(r: dict[str, Any]) -> float | None:
+    candidates = [
+        (r.get("spliceai") or {}).get("max_delta_score"),
+        (r.get("pangolin") or {}).get("max_delta_score"),
+        r.get("spliceai_max"),
+        r.get("pangolin_max"),
+    ]
+    vals = [c for c in candidates if isinstance(c, (int, float))]
+    return max(vals) if vals else None
 
 
 def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceService]) -> None:
@@ -52,7 +62,6 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
             service = service_factory()
             results: list[dict[str, Any]] = []
             ok = failed = 0
-            genes: set[str] = set()
             total = len(variants)
             for idx, variant in enumerate(variants):
                 try:
@@ -67,9 +76,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                         response_mode=response_mode,
                         cross_build_check=cross_build_check,
                     )
-                    tel = one.pop("_telemetry")
-                    if tel.get("gene"):
-                        genes.add(tel["gene"])
+                    one.pop("_telemetry")
                     one["variant"] = variant
                     results.append(one)
                     ok += 1
@@ -90,15 +97,40 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                     await ctx.report_progress(
                         progress=idx + 1, total=total, message=f"{idx + 1}/{total}"
                     )
-            concordant_high = sum(
-                1 for r in results if r.get("agreement", {}).get("verdict") == "concordant_high"
-            )
-            first_gene = next(iter(genes), None)
+            verdict_counts = {
+                "concordant_high": 0,
+                "concordant_moderate": 0,
+                "concordant_low": 0,
+                "discordant": 0,
+                "incomplete": 0,
+            }
+            top: dict[str, Any] | None = None
+            for r in results:
+                verdict = (r.get("agreement") or {}).get("verdict")
+                if verdict in verdict_counts:
+                    verdict_counts[verdict] += 1
+                max_delta = _result_max_delta(r)
+                if max_delta is not None and (top is None or max_delta > top["max_delta_score"]):
+                    top = {"variant": r.get("variant"), "max_delta_score": max_delta}
+            summary = {"ok": ok, "failed": failed, **verdict_counts}
+            meta: dict[str, Any] = {}
+            if top is not None:
+                meta["next_commands"] = [
+                    {
+                        "tool": "predict_splicing",
+                        "arguments": {
+                            "variant": top["variant"],
+                            "genome_build": genome_build,
+                            "response_mode": "full",
+                        },
+                    }
+                ]
             return {
                 "count": total,
                 "results": results,
-                "summary": {"ok": ok, "failed": failed, "concordant_high": concordant_high},
-                "_meta": {"see_also": see_also_for("", genome_build, first_gene, response_mode)},
+                "summary": summary,
+                "summary_top_variant": top,
+                "_meta": meta,
             }
 
         return await run_mcp_tool("predict_splicing_batch", call)

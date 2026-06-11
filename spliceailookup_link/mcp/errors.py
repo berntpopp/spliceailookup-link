@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+import uuid
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -307,12 +309,25 @@ async def run_mcp_tool(
 ) -> dict[str, Any]:
     """Execute an MCP tool body, converting any exception to an envelope dict."""
     ctx = context or McpErrorContext(tool_name=tool_name)
+    request_id = uuid.uuid4().hex[:12]
+    start = time.perf_counter()
+
+    def _stamp(envelope: dict[str, Any]) -> dict[str, Any]:
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        existing: dict[str, Any] = envelope.get("_meta") or {}
+        envelope["_meta"] = {
+            "request_id": request_id,
+            "timing": {"elapsed_ms": elapsed_ms},
+            **existing,
+            **_provenance_meta(),
+        }
+        return envelope
+
     try:
         result = await call()
         if isinstance(result, dict):
             result.setdefault("success", True)
-            existing_meta: dict[str, Any] = result.get("_meta") or {}
-            result["_meta"] = {**existing_meta, **_provenance_meta()}
+            return _stamp(result)
         return result
     except McpToolError as exc:
         record_mcp_error(
@@ -321,13 +336,14 @@ async def run_mcp_tool(
             message=exc.payload.get("message", ""),
             raw_message=str(exc),
         )
-        return exc.payload
+        return _stamp(exc.payload)
     except Exception as exc:  # broad catch is the error-boundary contract
         wrapped = mcp_tool_error(exc, ctx)
         logger.warning(
-            "mcp_tool_error tool=%s code=%s exc=%s",
+            "mcp_tool_error tool=%s code=%s request_id=%s exc=%s",
             tool_name,
             wrapped.payload["error_code"],
+            request_id,
             exc.__class__.__name__,
         )
         record_mcp_error(
@@ -336,4 +352,4 @@ async def run_mcp_tool(
             message=wrapped.payload["message"],
             raw_message=str(exc),
         )
-        return wrapped.payload
+        return _stamp(wrapped.payload)

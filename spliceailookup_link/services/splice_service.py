@@ -115,22 +115,26 @@ class SpliceService:
         await self._ensembl.close()
 
 
+def _strip_chr(value: str) -> str:
+    return value[3:] if value.lower().startswith("chr") else value
+
+
 def _normalize_vep_record(
     record: dict[str, Any], parsed: VariantInput, build: GenomeBuild, raw_input: str
 ) -> dict[str, Any]:
     vcf_string = record.get("vcf_string")
-    # vcf_string is already CHROM-POS-REF-ALT; strip an accidental chr prefix.
-    variant_id = str(vcf_string)
-    if variant_id.lower().startswith("chr"):
-        variant_id = variant_id[3:]
+    # VEP returns vcf_string as a list when an rsID maps to multiple ALT alleles.
+    raw_ids = vcf_string if isinstance(vcf_string, list) else [vcf_string]
+    candidates: list[str] = []
+    for item in raw_ids:
+        if item:
+            cid = _strip_chr(str(item))
+            if cid not in candidates:
+                candidates.append(cid)
     gene_names = record.get("transcript_consequences") or []
-    gene_symbol = None
-    for tc in gene_names:
-        if tc.get("gene_symbol"):
-            gene_symbol = tc["gene_symbol"]
-            break
-    return {
-        "variant_id": variant_id,
+    gene_symbol = next((tc["gene_symbol"] for tc in gene_names if tc.get("gene_symbol")), None)
+    result: dict[str, Any] = {
+        "variant_id": candidates[0],
         "genome_build": build,
         "input_kind": parsed.kind,
         "source": "ensembl_vep",
@@ -140,3 +144,11 @@ def _normalize_vep_record(
         "consequence": record.get("most_severe_consequence"),
         "raw_input": raw_input,
     }
+    if len(candidates) > 1:
+        result["ambiguous"] = True
+        result["variant_ids"] = candidates
+        result["note"] = (
+            f"{parsed.value} maps to {len(candidates)} alleles at this locus; "
+            "pick one variant_id before predicting."
+        )
+    return result

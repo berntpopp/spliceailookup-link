@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from spliceailookup_link.services import SpliceService
-from tests.fixtures.api_responses import SPLICEAI_TRAPPC9, VEP_ABCA3
+from tests.fixtures.api_responses import SPLICEAI_TRAPPC9, VEP_ABCA3, VEP_RS6025
 
 
 class _FakeScoring:
@@ -80,3 +81,25 @@ async def test_score_distinct_params_not_cached_together() -> None:
     await svc.score(distance=500, **base)
     await svc.score(distance=50, **base)
     assert scoring.calls == 2
+
+
+class _FakeEnsemblMulti:
+    async def resolve_hgvs(self, hgvs: str, build: str) -> dict[str, Any]:
+        return VEP_RS6025[0]
+
+    async def resolve_id(self, vid: str, build: str) -> dict[str, Any]:
+        return VEP_RS6025[0]
+
+    async def close(self) -> None:
+        return None
+
+
+async def test_resolve_multiallelic_rsid_is_structured() -> None:
+    svc = SpliceService(scoring_client=_FakeScoring(), ensembl_client=_FakeEnsemblMulti())
+    out = await svc.resolve("rs6025", "GRCh38")
+    coord = re.compile(r"^[\dXYM]+-\d+-[ACGT]+-[ACGT]+$")
+    assert coord.match(out["variant_id"]), out["variant_id"]
+    assert out["ambiguous"] is True
+    assert len(out["variant_ids"]) == 2
+    assert all(coord.match(v) for v in out["variant_ids"])
+    assert "note" in out

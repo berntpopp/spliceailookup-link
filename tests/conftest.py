@@ -45,6 +45,19 @@ class StubService:
         self.resolve_calls.append({"text": text, "build": build})
         if self.resolve_error is not None:
             raise self.resolve_error
+        if text.lower() == "rs6025":
+            return {
+                "variant_id": "1-169549811-C-A",
+                "genome_build": build,
+                "input_kind": "rsid",
+                "source": "ensembl_vep",
+                "gene_symbol": "F5",
+                "consequence": "missense_variant",
+                "ambiguous": True,
+                "variant_ids": ["1-169549811-C-A", "1-169549811-C-T"],
+                "note": "rs6025 maps to 2 alleles at this locus; pick one variant_id.",
+                "raw_input": text,
+            }
         # Coordinate inputs resolve locally; HGVS/rsID use the canned VEP record.
         from spliceailookup_link.variant import parse_variant_input
 

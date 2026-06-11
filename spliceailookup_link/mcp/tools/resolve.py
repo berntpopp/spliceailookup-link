@@ -10,7 +10,7 @@ from pydantic import Field
 
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
-from spliceailookup_link.mcp.next_commands import after_resolve
+from spliceailookup_link.mcp.next_commands import after_resolve_many
 from spliceailookup_link.mcp.schema_relax import relax_output_schema
 from spliceailookup_link.services import SpliceService
 
@@ -25,6 +25,9 @@ _OUTPUT_SCHEMA = relax_output_schema(
             "gene_symbol": {"type": ["string", "null"]},
             "consequence": {"type": ["string", "null"]},
             "assembly_name": {"type": ["string", "null"]},
+            "ambiguous": {"type": "boolean"},
+            "variant_ids": {"type": "array", "items": {"type": "string"}},
+            "note": {"type": ["string", "null"]},
         },
         "required": ["variant_id", "genome_build"],
     }
@@ -63,7 +66,8 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
         async def call() -> dict[str, Any]:
             service = service_factory()
             result = await service.resolve(variant, genome_build)
-            result["_meta"] = {"next_commands": after_resolve(result["variant_id"], genome_build)}
+            ids = result.get("variant_ids") or [result["variant_id"]]
+            result["_meta"] = {"next_commands": after_resolve_many(ids, genome_build)}
             return result
 
         return await run_mcp_tool(

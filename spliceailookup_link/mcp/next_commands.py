@@ -20,6 +20,11 @@ def after_resolve(variant_id: str, genome_build: str) -> list[dict[str, Any]]:
     return [cmd("predict_splicing", variant=variant_id, genome_build=genome_build)]
 
 
+def after_resolve_many(variant_ids: list[str], genome_build: str) -> list[dict[str, Any]]:
+    """One predict_splicing per allele so every candidate is directly callable."""
+    return [cmd("predict_splicing", variant=v, genome_build=genome_build) for v in variant_ids]
+
+
 def for_variant(variant_id: str, genome_build: str) -> list[dict[str, Any]]:
     """Standard follow-ups for a resolved coordinate: SpliceAI then Pangolin."""
     return [

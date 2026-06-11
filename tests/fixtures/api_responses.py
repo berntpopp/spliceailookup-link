@@ -147,3 +147,18 @@ VEP_ABCA3: list[dict[str, Any]] = [
         "transcript_consequences": [{"gene_symbol": "ABCA3", "gene_id": "ENSG00000167972"}],
     }
 ]
+
+# Ensembl VEP rsID resolution where vcf_string is a LIST (multi-allelic locus).
+# rs6025 (Factor V Leiden) reports two ALT alleles at one position.
+VEP_RS6025: list[dict[str, Any]] = [
+    {
+        "input": "rs6025",
+        "id": "rs6025",
+        "seq_region_name": "1",
+        "start": 169549811,
+        "vcf_string": ["1-169549811-C-A", "1-169549811-C-T"],
+        "most_severe_consequence": "missense_variant",
+        "assembly_name": "GRCh38",
+        "transcript_consequences": [{"gene_symbol": "F5", "gene_id": "ENSG00000198734"}],
+    }
+]

@@ -122,7 +122,11 @@ async def predict_one(
     )
     sai_res, pang_res = gathered[0], gathered[1]
     if isinstance(sai_res, BaseException) and isinstance(pang_res, BaseException):
-        if cross_build_check and prepared.resolution is None and isinstance(sai_res, DataNotFoundError):
+        if (
+            cross_build_check
+            and prepared.resolution is None
+            and isinstance(sai_res, DataNotFoundError)
+        ):
             other = await cross_build_probe(
                 service,
                 model="spliceai",
@@ -160,7 +164,9 @@ async def predict_one(
     else:
         sai_payload, sai_tele = sai_res
         teles.append(sai_tele)
-        shaped_sai = shape_spliceai(sai_payload, transcripts=transcripts, response_mode=response_mode)
+        shaped_sai = shape_spliceai(
+            sai_payload, transcripts=transcripts, response_mode=response_mode
+        )
         sai_max = shaped_sai.get("max_delta_score")
         consequence = shaped_sai.pop("consequence", None)  # F4: lift, do not duplicate
         if shaped_sai["transcripts"]:
@@ -173,7 +179,9 @@ async def predict_one(
     else:
         pang_payload, pang_tele = pang_res
         teles.append(pang_tele)
-        shaped_pang = shape_pangolin(pang_payload, transcripts=transcripts, response_mode=response_mode)
+        shaped_pang = shape_pangolin(
+            pang_payload, transcripts=transcripts, response_mode=response_mode
+        )
         pang_max = shaped_pang.get("max_delta_score")
         if shaped_pang["transcripts"]:
             pang_top = shaped_pang["transcripts"][0]

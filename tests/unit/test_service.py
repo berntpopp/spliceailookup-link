@@ -101,6 +101,15 @@ async def test_score_distinct_params_not_cached_together() -> None:
     assert scoring.calls == 2
 
 
+async def test_warmup_calls_both_models() -> None:
+    svc, scoring, _ = _service()
+    detail = await svc.warmup("GRCh38")
+    assert set(detail) == {"spliceai", "pangolin"}
+    assert all(d["status"] == "ok" for d in detail.values())
+    assert all(isinstance(d["elapsed_ms"], int) for d in detail.values())
+    assert scoring.calls == 2
+
+
 class _FakeEnsemblMulti:
     async def resolve_hgvs(self, hgvs: str, build: str) -> dict[str, Any]:
         return VEP_RS6025[0]

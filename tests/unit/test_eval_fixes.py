@@ -92,6 +92,19 @@ async def test_f5_cross_build_probe_upgrades_to_build_mismatch(
     assert data["fallback_args"]["genome_build"] == "GRCh38"
 
 
+async def test_f5_pangolin_cross_build_upgrades_to_build_mismatch(
+    mcp, stub_service: StubService
+) -> None:
+    stub_service.only_build = "GRCh38"
+    data = structured(
+        await mcp.call_tool(
+            "predict_pangolin", {"variant": "8-140300616-T-G", "genome_build": "GRCh37"}
+        )
+    )
+    assert data["success"] is False
+    assert data["error_code"] == "build_mismatch"
+
+
 async def test_f5_probe_can_be_disabled(mcp, stub_service: StubService) -> None:
     stub_service.only_build = "GRCh38"
     data = structured(
@@ -129,7 +142,9 @@ async def test_minimal_strictly_smaller_than_compact(mcp) -> None:
 
 async def test_out_of_range_max_distance_is_validation_failed(mcp) -> None:
     data = structured(
-        await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G", "max_distance": 99999})
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "max_distance": 99999}
+        )
     )
     assert data["success"] is False
     assert data["error_code"] == "validation_failed"

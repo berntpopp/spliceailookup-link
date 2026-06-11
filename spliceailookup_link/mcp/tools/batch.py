@@ -87,7 +87,9 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                     )
                     failed += 1
                 if ctx is not None:
-                    await ctx.report_progress(progress=idx + 1, total=total, message=f"{idx + 1}/{total}")
+                    await ctx.report_progress(
+                        progress=idx + 1, total=total, message=f"{idx + 1}/{total}"
+                    )
             concordant_high = sum(
                 1 for r in results if r.get("agreement", {}).get("verdict") == "concordant_high"
             )

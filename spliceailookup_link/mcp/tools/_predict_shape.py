@@ -69,7 +69,7 @@ def combined_headline(
         aberr = (consequence["aberrations"][0] or {}).get("type")
     tail = f"; predicted {aberr.replace('_', ' ')}" if aberr else ""
     if sai_max is not None and pang_max is not None:
-        verdict_part = f"; {_VERDICT_CLAUSE.get(agreement.get('verdict'), '')}"
+        verdict_part = f"; {_VERDICT_CLAUSE.get(str(agreement.get('verdict') or ''), '')}"
     elif (sai_max is None) != (pang_max is None):
         verdict_part = f"; {_INCOMPLETE_CLAUSE}"
     else:
@@ -82,3 +82,21 @@ def combined_interpretation(sai_max: float | None, pang_max: float | None) -> di
     scores = [s for s in (sai_max, pang_max) if s is not None]
     top = max(scores) if scores else None
     return {"band": band(top), "threshold_basis": THRESHOLD_BASIS}
+
+
+def minimal_combined(result: dict[str, Any], gene: str | None) -> dict[str, Any]:
+    """Headline-tier projection of a combined predict_splicing result."""
+    sai_sub: dict[str, Any] = result.get("spliceai") or {}
+    pang_sub: dict[str, Any] = result.get("pangolin") or {}
+    sai_max = sai_sub.get("max_delta_score")
+    pang_max = pang_sub.get("max_delta_score")
+    return {
+        "variant_id": result["variant_id"],
+        "genome_build": result["genome_build"],
+        "gene": gene,
+        "agreement": {"verdict": result["agreement"]["verdict"]},
+        "spliceai_max": sai_max,
+        "pangolin_max": pang_max,
+        "interpretation": {"band": result["interpretation"]["band"]},
+        "headline": result["headline"],
+    }

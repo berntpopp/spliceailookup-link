@@ -124,11 +124,23 @@ def test_pangolin_headline() -> None:
     assert "splice loss" in h
 
 
-def test_minimal_mode_keeps_single_transcript() -> None:
-    payload = dict(SPLICEAI_TRAPPC9)
-    payload["scores"] = SPLICEAI_TRAPPC9["scores"] * 3
-    shaped = shape_spliceai(payload, transcripts="all", response_mode="minimal")
-    assert len(shaped["transcripts"]) == 1
+def test_minimal_mode_is_headline_tier() -> None:
+    shaped = shape_spliceai(SPLICEAI_TRAPPC9, transcripts="all", response_mode="minimal")
+    assert "transcripts" not in shaped
+    assert "delta_scores" not in shaped
+    assert shaped["max_delta_score"] == 0.83
+    assert shaped["top"]["score"] == 0.83
+    assert shaped["top"]["class"] == "acceptor_loss"
+    assert shaped["interpretation"]["band"] == "high"
+    assert "TRAPPC9" in shaped["headline"]
+
+
+def test_minimal_smaller_than_compact_single_model() -> None:
+    import json
+
+    minimal = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="minimal")
+    compact = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="compact")
+    assert len(json.dumps(minimal)) < len(json.dumps(compact))
 
 
 def test_no_scores_headline_safe() -> None:

@@ -29,6 +29,7 @@ from spliceailookup_link.mcp.tools._predict_shape import (
     assess_agreement,
     combined_headline,
     combined_interpretation,
+    minimal_combined,
 )
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.services.telemetry import CallTelemetry
@@ -141,17 +142,19 @@ async def predict_one(
     sai_top = pang_top = None
     partial: list[str] = []
 
+    # For combined shaping, always use at least compact internally so transcript
+    # identity can be lifted (minimal_combined is applied at the end).
+    _shape_mode = "compact" if response_mode == "minimal" else response_mode
+
     if isinstance(sai_res, BaseException):
         partial.append(f"spliceai_failed: {sai_res!s}"[:200])
     else:
         sai_payload, sai_tele = sai_res
         teles.append(sai_tele)
-        shaped_sai = shape_spliceai(
-            sai_payload, transcripts=transcripts, response_mode=response_mode
-        )
+        shaped_sai = shape_spliceai(sai_payload, transcripts=transcripts, response_mode=_shape_mode)
         sai_max = shaped_sai.get("max_delta_score")
         consequence = shaped_sai.pop("consequence", None)  # F4: lift, do not duplicate
-        if shaped_sai["transcripts"]:
+        if shaped_sai.get("transcripts"):
             sai_top = shaped_sai["transcripts"][0]
             gene = sai_top.get("gene")
         result["spliceai"] = shaped_sai
@@ -162,10 +165,10 @@ async def predict_one(
         pang_payload, pang_tele = pang_res
         teles.append(pang_tele)
         shaped_pang = shape_pangolin(
-            pang_payload, transcripts=transcripts, response_mode=response_mode
+            pang_payload, transcripts=transcripts, response_mode=_shape_mode
         )
         pang_max = shaped_pang.get("max_delta_score")
-        if shaped_pang["transcripts"]:
+        if shaped_pang.get("transcripts"):
             pang_top = shaped_pang["transcripts"][0]
             if gene is None:
                 gene = pang_top.get("gene")
@@ -188,12 +191,20 @@ async def predict_one(
         gene, genome_build, sai_max, pang_max, consequence, result["agreement"]
     )
     cache, ups = _aggregate_cache(teles)
-    result["_telemetry"] = {
+    age_s = ttl_s = None  # populated in the telemetry task; placeholder keeps shape stable
+    telemetry = {
         "cache": cache,
         "upstream_elapsed_ms": ups,
+        "cache_age_s": age_s,
+        "cache_ttl_s": ttl_s,
         "gene": gene,
         "partial": partial,
         "resolution": prepared.resolution,
         "resolved_consequence": prepared.consequence,
     }
-    return result
+    if response_mode == "minimal":
+        body = minimal_combined(result, gene)
+    else:
+        body = result
+    body["_telemetry"] = telemetry
+    return body

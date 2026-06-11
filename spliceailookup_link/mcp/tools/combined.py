@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from pydantic import Field
 
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
@@ -61,6 +61,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             bool,
             Field(description="On not_found, probe the other build to detect a build_mismatch."),
         ] = True,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
         """Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls)."""
 
@@ -76,6 +77,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 transcripts=transcripts,
                 response_mode=response_mode,
                 cross_build_check=cross_build_check,
+                ctx=ctx,
             )
             tel = result.pop("_telemetry")
             meta: dict[str, Any] = {

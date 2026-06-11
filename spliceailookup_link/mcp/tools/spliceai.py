@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from pydantic import Field
 
 from spliceailookup_link.api import DataNotFoundError
@@ -71,12 +71,17 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             bool,
             Field(description="On not_found, probe the other build to detect a build_mismatch."),
         ] = True,
+        ctx: Context | None = None,
     ) -> dict[str, Any]:
         """Use this for the SpliceAI delta scores (acceptor/donor gain/loss, each 0-1 with a position) of a single variant, optionally with the SpliceAI-10k consequence prediction (exon skipping / intron retention / frameshift). For a quick raw-vs-masked or single-model question; use predict_splicing to also get Pangolin. Δ>=0.5 is high-confidence. Returns ~1-4kB (full/all larger). Note: cold calls take 10-30s."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()
+            if ctx is not None:
+                await ctx.report_progress(progress=0, total=2, message="resolving")
             prepared = await prepare_variant(service, variant, genome_build)
+            if ctx is not None:
+                await ctx.report_progress(progress=1, total=2, message="scoring")
             try:
                 payload, tele = await service.score(
                     model="spliceai",

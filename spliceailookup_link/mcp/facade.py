@@ -42,6 +42,10 @@ def create_spliceai_mcp(*, service_factory: Callable[[], SpliceService]) -> Fast
     `app.state.splice_service` and stdio mode can hold a directly constructed
     instance.
     """
+    # Per-tool `task=True` (on the async prediction tools) opts those tools into the
+    # 2025-11-25 background-task protocol via Docket. We deliberately do NOT set a
+    # server-wide `tasks=True` default, which would force every component -- including
+    # the sync resources -- to be task-eligible (and async).
     mcp = FastMCP(
         name="spliceailookup-link",
         instructions=_INSTRUCTIONS,

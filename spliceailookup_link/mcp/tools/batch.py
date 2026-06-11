@@ -23,6 +23,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         title="Predict Splicing for Many Variants",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction"},
+        task=True,
     )
     async def predict_splicing_batch(
         variants: Annotated[

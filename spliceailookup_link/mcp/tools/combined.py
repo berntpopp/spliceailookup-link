@@ -22,6 +22,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         title="Predict Splicing Impact (SpliceAI + Pangolin)",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction"},
+        task=True,
     )
     async def predict_splicing(
         variant: Annotated[

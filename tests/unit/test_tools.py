@@ -101,6 +101,19 @@ async def test_predict_build_mismatch_short_circuits(mcp, stub_service: StubServ
     assert stub_service.score_calls == []
 
 
+async def test_prediction_tools_are_task_optional(mcp) -> None:
+    # The slow scoring tools opt into the 2025-11-25 background-task protocol.
+    for name in (
+        "predict_splicing",
+        "predict_spliceai",
+        "predict_pangolin",
+        "predict_splicing_batch",
+    ):
+        tool = await mcp.get_tool(name)
+        assert tool.task_config is not None
+        assert tool.task_config.mode == "optional"
+
+
 async def test_warmup_pings_both_models(mcp, stub_service: StubService) -> None:
     data = structured(await mcp.call_tool("warmup", {"genome_build": "GRCh38"}))
     assert data["success"] is True

@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     CACHE_SIZE: int = 1024
     CACHE_TTL_MINUTES: int = 1440
 
+    # Background-task (FastMCP Tasks / Docket) backend. memory:// is in-process and
+    # correct for the single-process unified host; set redis://... for multi-worker.
+    DOCKET_URL: str = "memory://"
+
     # Transport
     MCP_TRANSPORT: Literal["unified", "http", "stdio"] = "unified"
     MCP_HOST: str = "127.0.0.1"

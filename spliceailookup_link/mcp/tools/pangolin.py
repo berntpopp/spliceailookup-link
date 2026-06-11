@@ -28,6 +28,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         title="Predict Splicing Impact (Pangolin)",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction", "pangolin"},
+        task=True,
     )
     async def predict_pangolin(
         variant: Annotated[

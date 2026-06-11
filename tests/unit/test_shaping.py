@@ -12,7 +12,15 @@ from tests.fixtures.api_responses import (
     PANGOLIN_TRAPPC9,
     SPLICEAI_MASKED_EMPTY_ABERR,
     SPLICEAI_TRAPPC9,
+    SPLICEAI_TRAPPC9_ALL,
 )
+
+
+def test_transcripts_all_returns_non_mane() -> None:
+    out = shape_spliceai(SPLICEAI_TRAPPC9_ALL, transcripts="all", response_mode="compact")
+    priorities = {t["transcript_priority"] for t in out["transcripts"]}
+    assert len(out["transcripts"]) >= 2
+    assert "non-canonical" in priorities
 
 
 def test_consequence_aberrations_is_stable_path_when_empty() -> None:

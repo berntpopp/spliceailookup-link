@@ -96,7 +96,10 @@ def get_capabilities_resource() -> dict[str, Any]:
             ),
             "sai10k_consequence": (
                 "predicted transcript aberration (e.g. exon_skipping, intron_retention) with "
-                "coding status (e.g. frameshift, in-frame) from the SpliceAI-10k calculator."
+                "coding status (e.g. frameshift, in-frame) from the SpliceAI-10k calculator. "
+                "consequence.aberrations is the stable path in every response_mode (it may be an "
+                "empty list under mask='masked', which zeroes the relevant site, even when raw "
+                "mode predicts an aberration); full mode adds consequence.transcript_info."
             ),
         },
         "error_codes": [

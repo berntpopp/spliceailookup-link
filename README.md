@@ -19,14 +19,27 @@ discovery, and a research-use disclaimer.
   Pangolin, includes the SpliceAI-10k consequence prediction (exon skipping,
   intron retention, frameshift), and reports whether the two models agree.
 - **predict_spliceai** / **predict_pangolin** — single-model delta scores.
+- **predict_splicing_batch** — score a whole gene panel in one call (server-side
+  fan-out under the concurrency cap; per-variant errors don't fail the batch).
 - **resolve_variant** — HGVS / rsID / loose coordinates → canonical
-  `CHROM-POS-REF-ALT` via Ensembl VEP (also returns gene + consequence).
-- **get_server_capabilities** — tools, parameters, score glossary, limits.
+  `CHROM-POS-REF-ALT` via Ensembl VEP (also returns gene + consequence;
+  multi-allelic rsIDs return a structured `variant_ids` list, never a stringified one).
+- **get_server_capabilities** — tools, parameters, score glossary, limits, plus a
+  `capabilities_version` content hash so warm clients can skip re-fetching it.
+- **warmup** — pre-warm the cold upstream before a burst.
 - GRCh37 + GRCh38; `raw`/`masked`; `basic`/`comprehensive` gene sets;
   MANE-only or all transcripts; `compact`/`full`/`minimal` responses.
-- Build-mismatch pre-flight, aggressive caching, conservative rate limiting
-  (the upstream is interactive-use-only), and cross-server `see_also` hints to
-  gnomad-link / genereviews-link / gtex-link.
+- Build-mismatch pre-flight **and** an opportunistic cross-build probe on
+  `not_found`, aggressive caching, conservative rate limiting (the upstream is
+  interactive-use-only), and cross-server `see_also` hints to gnomad-link /
+  genereviews-link / gtex-link.
+- **Long-running calls are first-class**: every prediction tool emits MCP
+  progress notifications and opts into the 2025-11-25 background-task protocol
+  (`task=True`), so an agent can fire-and-continue instead of blocking on a 30 s+
+  cold call.
+- **Runtime observability**: every `_meta` carries `request_id` and
+  `timing.elapsed_ms`; prediction payloads add `cache` (`hit`/`miss`/`partial`)
+  and `upstream_elapsed_ms`.
 
 ## Quick start
 
@@ -96,6 +109,8 @@ predict_splicing(variant="chr8-140300616-T-G")
 | `predict_spliceai` | SpliceAI delta scores (+ optional SAI-10k consequence) |
 | `predict_pangolin` | Pangolin splice gain/loss scores |
 | `predict_splicing` | Combined SpliceAI + Pangolin + consequence (headline tool) |
+| `predict_splicing_batch` | Score many variants (gene panel) in one envelope, fanned out server-side |
+| `warmup` | Pre-warm the upstream Cloud Run containers before a burst |
 
 ## Configuration
 
@@ -103,6 +118,11 @@ All environment variables are prefixed `SPLICEAILOOKUP_LINK_` (see `.env.example
 Key knobs: the scoring/Ensembl host templates, `REQUEST_TIMEOUT` (default 90s),
 `MAX_CONCURRENCY` (default 2 — the upstream is rate-limited), `CACHE_TTL_MINUTES`
 (default 1440), and `MCP_TRANSPORT`/`MCP_HOST`/`MCP_PORT`/`MCP_PATH`.
+
+Background tasks use FastMCP's Docket backend. `DOCKET_URL` defaults to
+`memory://` (in-process, correct for the single-process unified host); set
+`SPLICEAILOOKUP_LINK_DOCKET_URL=redis://…` (or the FastMCP-native
+`FASTMCP_DOCKET_URL`) for a multi-worker deployment.
 
 ## Development
 

@@ -109,3 +109,27 @@ async def test_capabilities_version_is_stable(mcp) -> None:
     assert a["capabilities_version"] == b["capabilities_version"]
     assert len(a["capabilities_version"]) == 12
     assert isinstance(a["descriptor_chars"], int) and a["descriptor_chars"] > 0
+
+
+async def test_minimal_strictly_smaller_than_compact(mcp) -> None:
+    import json
+
+    c = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "response_mode": "compact"}
+        )
+    )
+    m = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "8-140300616-T-G", "response_mode": "minimal"}
+        )
+    )
+    assert len(json.dumps(m)) < len(json.dumps(c))
+
+
+async def test_out_of_range_max_distance_is_validation_failed(mcp) -> None:
+    data = structured(
+        await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G", "max_distance": 99999})
+    )
+    assert data["success"] is False
+    assert data["error_code"] == "validation_failed"

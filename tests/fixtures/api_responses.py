@@ -108,6 +108,21 @@ PANGOLIN_TRAPPC9: dict[str, Any] = {
     "allNonZeroScoresTranscriptId": "ENST00000438773.4",
 }
 
+# SpliceAI payload with two transcripts: one MANE Select + one non-canonical, for
+# exercising transcripts="all".
+SPLICEAI_TRAPPC9_ALL: dict[str, Any] = {
+    **{k: v for k, v in SPLICEAI_TRAPPC9.items() if k != "scores"},
+    "scores": [
+        SPLICEAI_TRAPPC9["scores"][0],
+        {
+            **SPLICEAI_TRAPPC9["scores"][0],
+            "t_id": "ENST00000522608.1",
+            "t_priority": "N",
+            "t_refseq_ids": [],
+        },
+    ],
+}
+
 # SpliceAI payload where the SAI-10k aberration list is empty (typical under mask=1)
 # but the raw object still carries transcript_info -- this triggered the F2 drift.
 SPLICEAI_MASKED_EMPTY_ABERR: dict[str, Any] = {

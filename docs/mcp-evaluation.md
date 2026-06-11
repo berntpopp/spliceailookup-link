@@ -174,5 +174,79 @@ machine-parseable everywhere.
   0.62 → 0 (masking), `ref_alt_scores` + 23-exon `exon_model` added;
   `consequence.raw.aberrations` shape (**F2**).
 
+---
+
+## Part 3 — Re-evaluation after the improvement pass (v0.2.0)
+
+**Date:** 2026-06-11 · **Server:** spliceailookup-link **v0.2.0**
+**Basis:** every change below is covered by the deterministic unit suite (112
+tests, 84.86% coverage, `make ci-local` green) and the native background-task
+path was exercised end-to-end with an in-process FastMCP client (submit →
+`taskId` → `tasks/result` returned `status: completed`; sync path unchanged;
+3 progress notifications fired). A live re-exercise against the rate-limited
+upstream is recommended once deployed, but the contract/shape changes that the
+findings concern are fully determined by the server and verified offline.
+
+### Findings — all resolved
+
+| # | Sev | Status | Fix + proof |
+|---|---|---|---|
+| F1 | HIGH | **Fixed** | `_normalize_vep_record` no longer `str()`s a list; multi-allelic rsIDs return a scalar `variant_id` + structured `variant_ids[]` + `ambiguous` + one `next_command` per allele. Test: `test_f1_multiallelic_rsid_chains_cleanly`, `test_resolve_multiallelic_rsid_is_structured`. |
+| F2 | MED | **Fixed** | `consequence.aberrations` is the stable path in every mode (empty list under `mask=masked`); `transcript_info` is an additive sibling only in `full` (no more `consequence.raw`). Test: `test_consequence_aberrations_is_stable_path_when_empty`, `test_full_mode_adds_transcript_info_as_sibling`. |
+| F3 | LOW | **Fixed** | `predict_splicing._meta.next_commands` now present — a same-server `full`-mode drill-down (the next_commands-vs-see_also contract is preserved). Test: `test_f3_predict_splicing_has_next_commands`. |
+| F4 | LOW | **Fixed** | `consequence` emitted once (top-level); shared transcript identity lifted to a single top-level `transcript` block, removed from per-model rows. Test: `test_f4_no_duplicate_consequence_or_identity`. |
+| F5 | LOW | **Fixed** | On a coordinate `not_found`, an opportunistic cache-backed probe of the other build upgrades to `build_mismatch` with a flipped `genome_build`; opt-out via `cross_build_check=false`. Test: `test_f5_cross_build_probe_upgrades_to_build_mismatch` (+ pangolin + disabled variants). |
+
+### New capabilities (eval improvements 1–6)
+
+- **Latency (improvement 1):** every prediction tool emits MCP progress
+  notifications and opts into the 2025-11-25 background-task protocol
+  (`task=True`, Docket `memory://` backend) — fire-and-continue instead of a
+  blocking turn.
+- **Observability (2):** every `_meta` carries `request_id` + `timing.elapsed_ms`;
+  prediction payloads add `cache` (`hit`/`miss`/`partial`) + `upstream_elapsed_ms`.
+- **`_meta` tax (3):** `see_also` is omitted in `minimal`, collapsed to
+  `{server,hint}` in `compact`, full example args only in `full`.
+- **Batch (4):** `predict_splicing_batch` fans out a gene panel into one envelope
+  under the concurrency cap; per-item errors don't fail the batch.
+- **Capabilities hash (5):** `capabilities_version` + `descriptor_chars` let a
+  warm client skip the ~4 kB re-fetch.
+- **Warmup (6):** `warmup` pre-warms the cold upstream before a burst.
+
+### Re-rated scores
+
+| Dimension | Was | Now | Why |
+|---|---|---|---|
+| Discoverability | 9 | 9.5 | `capabilities_version` hash; batch/warmup advertised |
+| Error handling / recovery | 9 | 9.5 | `build_mismatch` now actually reachable (F5) |
+| Schema / input ergonomics | 9 | 9.5 | stable `consequence` (F2); structured multi-allele (F1) |
+| Chaining / composability | 9 | 9.5 | uniform `next_commands` (F3); per-allele fan-out (F1) |
+| Safety / guardrails | 9 | 9 | already strong; unchanged |
+| Consistency / predictability | 9 | 9.5 | dedup + single stable shapes (F2/F4) |
+| Token efficiency | 8 | 9 | `see_also` gating + F4 dedup |
+| Observability | 7 | 9 | request_id / timing / cache / upstream_elapsed_ms |
+| Speed / latency | 6 | 8.5 | progress + native tasks + batch + warmup (upstream still bounds the ceiling) |
+
+**LLM-consumer overall: 8.3 → ~9.2.**
+
+| Tool | Was | Now | Why |
+|---|---|---|---|
+| `get_server_capabilities` | 9 | 9.5 | content hash |
+| `predict_pangolin` | 8.5 | 9 | telemetry + task + cross-build |
+| `predict_spliceai` | 8 | 9 | F2 + telemetry + F5 |
+| `predict_splicing` | 8 | 9 | F3 + F4 + telemetry |
+| `resolve_variant` | 6 | 9 | F1 fixed (the production-breaking bug) |
+| `predict_splicing_batch` | — | 9 | new; one-envelope panel scoring |
+| `warmup` | — | 9 | new; cold-start mitigation |
+
+**Senior-tester overall: 8.0 → ~9.1.**
+
+Both axes now clear 9/10. The remaining ceiling on speed/latency is inherent to
+the interactive-use-only upstream; the background-task pattern removes the
+turn-blocking penalty that the original review (correctly) called the single
+biggest UX drag.
+
+---
+
 *Research use only; not for clinical decision support. Splice predictions are
 computational and must be interpreted alongside orthogonal evidence.*

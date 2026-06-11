@@ -1,0 +1,142 @@
+"""Business logic: variant resolution + SpliceAI/Pangolin scoring with caching.
+
+Returns raw upstream payloads (plus a normalized resolution result); the MCP
+tool layer is responsible for LLM-facing shaping. Scoring is deterministic per
+(model, build, variant, distance, mask, gene_set), so results are cached with a
+long TTL to spare the rate-limited upstream.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from async_lru import alru_cache
+
+from spliceailookup_link.api import EnsemblVepClient, ScoringClient
+from spliceailookup_link.config import GenomeBuild
+from spliceailookup_link.variant import VariantInput, parse_variant_input
+
+logger = logging.getLogger(__name__)
+
+
+class SpliceService:
+    """Facade over the scoring and Ensembl clients with in-process caching."""
+
+    def __init__(
+        self,
+        *,
+        scoring_client: ScoringClient | None = None,
+        ensembl_client: EnsemblVepClient | None = None,
+        cache_size: int = 1024,
+        cache_ttl_minutes: int = 1440,
+    ):
+        self._scoring = scoring_client or ScoringClient()
+        self._ensembl = ensembl_client or EnsemblVepClient()
+        ttl_seconds = max(1, cache_ttl_minutes) * 60
+        # Wrap the leaf upstream calls so identical (variant, params) tuples hit
+        # the cache instead of the slow, rate-limited Cloud Run services.
+        self._score_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(self._score_uncached)
+        self._resolve_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(
+            self._resolve_uncached
+        )
+
+    # ---------------- scoring ----------------
+
+    async def _score_uncached(
+        self,
+        model: str,
+        build: GenomeBuild,
+        variant_id: str,
+        distance: int,
+        mask: int,
+        gene_set: str,
+        raw: str | None,
+        consequence: str | None,
+    ) -> dict[str, Any]:
+        return await self._scoring.score(
+            model=model,  # type: ignore[arg-type]
+            build=build,
+            variant=variant_id,
+            distance=distance,
+            mask=mask,
+            gene_set=gene_set,
+            raw=raw,
+            variant_consequence=consequence,
+        )
+
+    async def score(
+        self,
+        *,
+        model: str,
+        build: GenomeBuild,
+        variant_id: str,
+        distance: int,
+        mask: int,
+        gene_set: str = "basic",
+        raw: str | None = None,
+        consequence: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the raw SpliceAI or Pangolin payload for one variant (cached)."""
+        return await self._score_cached(
+            model, build, variant_id, distance, mask, gene_set, raw, consequence
+        )
+
+    # ---------------- resolution ----------------
+
+    async def _resolve_uncached(self, value: str, kind: str, build: GenomeBuild) -> dict[str, Any]:
+        if kind == "hgvs":
+            return await self._ensembl.resolve_hgvs(value, build)
+        return await self._ensembl.resolve_id(value, build)
+
+    async def resolve(self, text: str, build: GenomeBuild) -> dict[str, Any]:
+        """Resolve any supported input to a normalized result dict.
+
+        For coordinate inputs no upstream call is made. For HGVS/rsID inputs the
+        Ensembl VEP service supplies vcf_string + most_severe_consequence.
+        Returns: {variant_id, genome_build, input_kind, source, gene?, consequence?, raw_input}.
+        """
+        parsed: VariantInput = parse_variant_input(text)
+        if parsed.kind == "coordinate":
+            return {
+                "variant_id": parsed.value,
+                "genome_build": build,
+                "input_kind": "coordinate",
+                "source": "direct",
+                "raw_input": text,
+            }
+        record = await self._resolve_cached(parsed.value, parsed.kind, build)
+        return _normalize_vep_record(record, parsed, build, text)
+
+    # ---------------- lifecycle ----------------
+
+    async def close(self) -> None:
+        await self._scoring.close()
+        await self._ensembl.close()
+
+
+def _normalize_vep_record(
+    record: dict[str, Any], parsed: VariantInput, build: GenomeBuild, raw_input: str
+) -> dict[str, Any]:
+    vcf_string = record.get("vcf_string")
+    # vcf_string is already CHROM-POS-REF-ALT; strip an accidental chr prefix.
+    variant_id = str(vcf_string)
+    if variant_id.lower().startswith("chr"):
+        variant_id = variant_id[3:]
+    gene_names = record.get("transcript_consequences") or []
+    gene_symbol = None
+    for tc in gene_names:
+        if tc.get("gene_symbol"):
+            gene_symbol = tc["gene_symbol"]
+            break
+    return {
+        "variant_id": variant_id,
+        "genome_build": build,
+        "input_kind": parsed.kind,
+        "source": "ensembl_vep",
+        "resolved_from": parsed.value,
+        "assembly_name": record.get("assembly_name"),
+        "gene_symbol": gene_symbol,
+        "consequence": record.get("most_severe_consequence"),
+        "raw_input": raw_input,
+    }

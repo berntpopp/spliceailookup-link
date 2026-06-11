@@ -1,0 +1,2 @@
+# Per-file LOC ceilings for grandfathered modules (path:ceiling).
+# See AGENTS.md "File Size Discipline". Empty for now — keep all modules < 600.

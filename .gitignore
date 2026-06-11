@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual envs
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+htmlcov/
+.coverage
+coverage.xml
+
+# Env
+.env
+
+# Investigation scratch (reverse-engineering artifacts, screenshots, captures)
+.investigation/
+
+# OS
+.DS_Store

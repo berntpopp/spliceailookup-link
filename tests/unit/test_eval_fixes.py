@@ -35,3 +35,20 @@ async def test_error_envelope_has_request_id(mcp, stub_service: StubService) -> 
     data = structured(res)
     assert data["success"] is False
     assert "request_id" in data["_meta"]
+
+
+async def test_f3_predict_splicing_has_next_commands(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    cmds = data["_meta"]["next_commands"]
+    assert cmds and cmds[0]["tool"] in {"predict_spliceai", "predict_pangolin"}
+    assert cmds[0]["arguments"]["response_mode"] == "full"
+
+
+async def test_f4_no_duplicate_consequence_or_identity(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    assert "consequence" in data  # top-level only
+    assert "consequence" not in data["spliceai"]
+    assert data["transcript"]["gene"] == "TRAPPC9"  # single lifted identity block
+    # identity is lifted OUT of the per-model transcript rows
+    assert "refseq_ids" not in data["spliceai"]["transcripts"][0]
+    assert "gene_id" not in data["pangolin"]["transcripts"][0]

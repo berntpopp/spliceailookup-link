@@ -31,3 +31,15 @@ def for_variant(variant_id: str, genome_build: str) -> list[dict[str, Any]]:
         cmd("predict_spliceai", variant=variant_id, genome_build=genome_build),
         cmd("predict_pangolin", variant=variant_id, genome_build=genome_build),
     ]
+
+
+def for_combined(variant_id: str, genome_build: str) -> list[dict[str, Any]]:
+    """Same-server drill-down: full single-model scores for this variant."""
+    return [
+        cmd(
+            "predict_spliceai",
+            variant=variant_id,
+            genome_build=genome_build,
+            response_mode="full",
+        ),
+    ]

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.config import GenomeBuild
 from spliceailookup_link.mcp.build_check import detect_build_mismatch
 from spliceailookup_link.mcp.errors import BuildMismatchError
@@ -57,6 +58,32 @@ async def prepare_variant(
         consequence=resolution.get("consequence"),
         resolution=resolution,
     )
+
+
+async def cross_build_probe(
+    service: SpliceService,
+    *,
+    model: str,
+    requested_build: GenomeBuild,
+    variant_id: str,
+    distance: int,
+    mask: int,
+    gene_set: str,
+) -> GenomeBuild | None:
+    """Return the OTHER build if the variant scores there (cache-backed), else None."""
+    other: GenomeBuild = "GRCh37" if requested_build == "GRCh38" else "GRCh38"
+    try:
+        payload, _ = await service.score(
+            model=model,
+            build=other,
+            variant_id=variant_id,
+            distance=distance,
+            mask=mask,
+            gene_set=gene_set,
+        )
+    except DataNotFoundError:
+        return None
+    return other if payload.get("scores") else None
 
 
 def see_also_for(

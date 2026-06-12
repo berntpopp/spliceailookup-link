@@ -81,8 +81,13 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                     results.append(one)
                     ok += 1
                 except Exception as exc:  # capture per-item, never fail the batch
+                    # Build the per-item error as a standalone predict_splicing on
+                    # this variant so _fallback_for routes recovery to
+                    # resolve_variant{variant} (parity with the single-call error),
+                    # not the batch-context get_server_capabilities fallback.
                     env = mcp_tool_error(
-                        exc, McpErrorContext(tool_name="predict_splicing_batch", variant=variant)
+                        exc,
+                        McpErrorContext(tool_name="predict_splicing", variant=variant),
                     ).payload
                     results.append(
                         {
@@ -90,6 +95,11 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                             "error_code": env["error_code"],
                             "message": env["message"],
                             "retryable": env["retryable"],
+                            "recovery_action": env["recovery_action"],
+                            "fallback_tool": env["fallback_tool"],
+                            "fallback_args": env["fallback_args"],
+                            "recovery": env["recovery"],
+                            "next_commands": env["_meta"]["next_commands"],
                         }
                     )
                     failed += 1

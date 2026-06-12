@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import json
 
+from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.mcp.shaping import THRESHOLD_BASIS, shape_spliceai
-from tests.conftest import structured
+from tests.conftest import StubService, structured
 from tests.fixtures.api_responses import (
     SPLICEAI_MASKED_EMPTY_ABERR,
     SPLICEAI_MASKED_NO_EFFECT,
@@ -113,3 +114,39 @@ async def test_f15_combined_masked_does_not_crash(mcp) -> None:
         await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G", "mask": "masked"})
     )
     assert data["success"] is True
+
+
+_RECOVERY_KEYS = (
+    "error_code",
+    "message",
+    "retryable",
+    "recovery_action",
+    "fallback_tool",
+    "fallback_args",
+    "recovery",
+    "next_commands",
+)
+
+
+async def test_f11_batch_error_item_has_full_scaffold(mcp, stub_service: StubService) -> None:
+    stub_service.score_error = DataNotFoundError("no overlap")
+    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["1-1-A-T"]})
+    data = structured(res)
+    assert data["success"] is True
+    assert data["summary"]["failed"] == 1
+    item = data["results"][0]
+    for key in _RECOVERY_KEYS:
+        assert key in item, f"batch error item missing {key}"
+    assert item["error_code"] == "not_found"
+    assert item["next_commands"][0]["tool"] == "resolve_variant"
+    assert item["next_commands"][0]["arguments"]["variant"] == "1-1-A-T"
+
+
+async def test_f11_batch_error_matches_standalone(mcp, stub_service: StubService) -> None:
+    stub_service.score_error = DataNotFoundError("no overlap")
+    standalone = structured(await mcp.call_tool("predict_splicing", {"variant": "1-1-A-T"}))
+    batch = structured(await mcp.call_tool("predict_splicing_batch", {"variants": ["1-1-A-T"]}))
+    item = batch["results"][0]
+    for key in ("error_code", "retryable", "recovery_action", "fallback_tool", "recovery"):
+        assert item[key] == standalone[key], f"scaffold mismatch on {key}"
+    assert item["next_commands"] == standalone["_meta"]["next_commands"]

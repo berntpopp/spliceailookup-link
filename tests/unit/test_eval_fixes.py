@@ -182,7 +182,21 @@ async def test_single_predict_ambiguous_rsid_does_not_silently_score(mcp, stub_s
     assert stub_service.score_calls == []
 
 
-from spliceailookup_link.mcp.resources import get_capabilities_version
+from spliceailookup_link.mcp.resources import (
+    get_capabilities_resource,
+    get_capabilities_version,
+    get_reference_resource,
+)
+
+
+def test_capabilities_documents_new_codes_and_verdict() -> None:
+    doc = get_capabilities_resource()
+    assert "ref_mismatch" in doc["error_codes"]
+    assert "ambiguous" in doc["error_codes"]
+    assert "discordant_subthreshold" in doc["agreement_verdicts"]
+    ref = get_reference_resource()
+    assert "ref_mismatch" in ref["error_taxonomy"]["codes"]
+    assert "ambiguous" in ref["error_taxonomy"]["codes"]
 
 
 async def test_capabilities_version_echoed_on_success(mcp) -> None:

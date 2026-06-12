@@ -127,13 +127,17 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "aberration."
             ),
             "resolve_caveat": (
-                "Coordinate inputs are normalized, not validated: a wrong REF allele passes "
-                "resolution and only fails at prediction time."
+                "Coordinate inputs are normalized, not deeply validated up front, but a "
+                "wrong REF allele is now detected at prediction time via an Ensembl "
+                "reference-base check and returned as ref_mismatch (not a misleading "
+                "not_found)."
             ),
         },
         "error_codes": [
             "invalid_input",
             "not_found",
+            "ref_mismatch",
+            "ambiguous",
             "build_mismatch",
             "rate_limited",
             "validation_failed",
@@ -166,8 +170,9 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "cache ('hit'|'miss'|'partial') and upstream_elapsed_ms (on a miss)."
             ),
             "capabilities_version": (
-                "stable content hash of this document (+ descriptor_chars); a warm client can "
-                "compare it and skip re-fetching the full capabilities when unchanged."
+                "stable content hash of this document (+ descriptor_chars), ALSO echoed in "
+                "every response's _meta so a warm client compares it and skips re-fetching "
+                "the full capabilities until it changes. detail='lean' returns a trimmed doc."
             ),
         },
         "limitations": [
@@ -195,6 +200,12 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "upstream 429 it is a conservative floor.)"
             ),
         },
+        "prediction_deadline": (
+            "Foreground predict_* calls have a server soft deadline "
+            f"({settings.PREDICT_SOFT_DEADLINE_SECONDS}s); exceeding it returns a retryable "
+            "upstream_unavailable. Background tasks bypass the deadline -- use them for "
+            "comprehensive gene_set / large max_distance."
+        ),
         "background_execution": {
             "task_support": "optional",
             "task_eligible_tools": [
@@ -213,11 +224,21 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             ),
             "recommended_for": "cold predict_* calls (13-40s) and predict_splicing_batch.",
         },
+        "warmth": {
+            "scope": "warmup warms the (basic gene_set, chosen mask) path per model.",
+            "ttl": "upstream-controlled (Cloud Run idle scale-down, ~minutes); not guaranteed.",
+            "caveat": (
+                "Cloud Run autoscales per-instance, so a subsequent call with other params or "
+                "under concurrency may still cold-start. For a guaranteed-cold first call, "
+                "prefer a background task over relying on warmup."
+            ),
+        },
         "agreement_verdicts": [
             "concordant_high",
             "concordant_moderate",
             "concordant_low",
             "discordant",
+            "discordant_subthreshold",
             "incomplete",
         ],
         "interpretation_bands": {
@@ -306,6 +327,16 @@ def get_reference_resource() -> dict[str, Any]:
                 "not_found": {
                     "retryable": False,
                     "when": "well-formed variant but no overlapping transcript for the gene set",
+                },
+                "ref_mismatch": {
+                    "retryable": False,
+                    "when": "coordinate REF allele does not match the genome reference at that "
+                    "position/build (swapped REF/ALT, wrong strand, or wrong build)",
+                },
+                "ambiguous": {
+                    "retryable": False,
+                    "when": "input (e.g. an rsID) maps to >1 ALT allele; pick one variant_id "
+                    "(see variant_ids / next_commands) and retry",
                 },
                 "build_mismatch": {
                     "retryable": False,

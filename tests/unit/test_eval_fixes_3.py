@@ -303,8 +303,8 @@ async def test_caps_document_new_contracts(mcp) -> None:
     blob = json.dumps(caps).lower()
     # F17 which-tool guidance
     assert "which tool" in blob or ("both models" in blob and "one model" in blob)
-    # F16 caveat
-    assert "normalized, not validated" in blob
+    # F16 caveat (updated: now mentions ref_mismatch detection)
+    assert "normalized, not deeply validated" in blob or "ref_mismatch" in blob
     # #C1 concurrency unit (never a fabricated window)
     assert "concurrent_requests" in blob
     assert "window_s" not in blob

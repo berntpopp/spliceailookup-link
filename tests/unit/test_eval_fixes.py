@@ -19,8 +19,11 @@ _COORD = re.compile(r"^[\dXYM]+-\d+-[ACGT]+-[ACGT]+$")
 async def test_f1_multiallelic_rsid_chains_cleanly(mcp) -> None:
     res = await mcp.call_tool("resolve_variant", {"variant": "rs6025"})
     data = structured(res)
-    assert _COORD.match(data["variant_id"])
+    # D3: an ambiguous resolve nulls the singular variant_id so an agent cannot
+    # silently pick one allele; the candidates chain via variant_ids/next_commands.
+    assert data["variant_id"] is None
     assert data["ambiguous"] is True
+    assert all(_COORD.match(v) for v in data["variant_ids"])
     cmds = data["_meta"]["next_commands"]
     assert len(cmds) == 2
     for c in cmds:

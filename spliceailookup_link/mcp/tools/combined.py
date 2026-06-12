@@ -8,12 +8,14 @@ from typing import Annotated, Any, Literal
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
+from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import for_combined
 from spliceailookup_link.mcp.tools._common import see_also_for
 from spliceailookup_link.mcp.tools._predict import predict_one
 from spliceailookup_link.services import SpliceService
+from spliceailookup_link.services.telemetry import is_served_warm
 
 
 def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceService]) -> None:
@@ -73,6 +75,8 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
     ) -> dict[str, Any]:
         """BOTH models (SpliceAI + Pangolin) in one call -- the default "what does this variant do to splicing?" answer. Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls). Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
 
+        lean = response_mode == "minimal" or not include_hints
+
         async def call() -> dict[str, Any]:
             service = service_factory()
             result = await predict_one(
@@ -97,15 +101,19 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     )
             if tel["cache"]:
                 meta["cache"] = tel["cache"]
-            if tel["upstream_elapsed_ms"] is not None:
-                meta["upstream_elapsed_ms"] = tel["upstream_elapsed_ms"]
-            if tel.get("cache_ttl_s") is not None:
-                meta["cache_ttl_s"] = tel["cache_ttl_s"]
-            if tel.get("cache_age_s") is not None:
-                meta["cache_age_s"] = tel["cache_age_s"]
-            if tel["resolution"] is not None:
-                meta["resolved_from"] = tel["resolution"].get("raw_input")
-                meta["resolved_consequence"] = tel["resolved_consequence"]
+            meta["served_warm"] = is_served_warm(
+                tel["cache"], tel["upstream_elapsed_ms"], settings.WARM_THRESHOLD_MS
+            )
+            if not lean:
+                if tel["upstream_elapsed_ms"] is not None:
+                    meta["upstream_elapsed_ms"] = tel["upstream_elapsed_ms"]
+                if tel.get("cache_ttl_s") is not None:
+                    meta["cache_ttl_s"] = tel["cache_ttl_s"]
+                if tel.get("cache_age_s") is not None:
+                    meta["cache_age_s"] = tel["cache_age_s"]
+                if tel["resolution"] is not None:
+                    meta["resolved_from"] = tel["resolution"].get("raw_input")
+                    meta["resolved_consequence"] = tel["resolved_consequence"]
             if tel["partial"]:
                 meta["partial"] = tel["partial"]
             result["_meta"] = meta
@@ -117,4 +125,5 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             context=McpErrorContext(
                 tool_name="predict_splicing", variant=variant, genome_build=genome_build
             ),
+            lean_meta=lean,
         )

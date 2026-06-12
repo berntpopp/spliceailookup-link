@@ -9,6 +9,7 @@ from fastmcp import Context, FastMCP
 from pydantic import Field
 
 from spliceailookup_link.api import DataNotFoundError
+from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import cmd
@@ -21,6 +22,7 @@ from spliceailookup_link.mcp.tools._common import (
 )
 from spliceailookup_link.mcp.tools._diagnose import diagnose_coordinate_failure
 from spliceailookup_link.services import SpliceService
+from spliceailookup_link.services.telemetry import is_served_warm
 
 
 def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceService]) -> None:
@@ -80,6 +82,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
     ) -> dict[str, Any]:
         """ONE model only (Pangolin); use predict_splicing for BOTH models with an agreement verdict. Use this for the Pangolin splice gain/loss scores of a single variant. Pangolin is an independent splice model; agreement with SpliceAI strengthens a prediction, disagreement warrants caution. Use predict_splicing to get both models in one call. Returns ~1-3kB. Note: cold calls take 10-30s. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
 
+        lean = response_mode == "minimal" or not include_hints
+
         async def call() -> dict[str, Any]:
             service = service_factory()
             if ctx is not None:
@@ -118,7 +122,12 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             if prepared.consequence:
                 shaped["molecular_consequence"] = prepared.consequence
             gene = shaped.get("gene") or (shaped.get("transcripts") or [{}])[0].get("gene")
-            meta: dict[str, Any] = {"cache": tele.cache}
+            meta: dict[str, Any] = {
+                "cache": tele.cache,
+                "served_warm": is_served_warm(
+                    tele.cache, tele.upstream_elapsed_ms, settings.WARM_THRESHOLD_MS
+                ),
+            }
             if include_hints:
                 meta["next_commands"] = [
                     cmd("predict_spliceai", variant=prepared.variant_id, genome_build=genome_build)
@@ -127,14 +136,15 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     meta["see_also"] = see_also_for(
                         prepared.variant_id, genome_build, gene, response_mode
                     )
-            if tele.upstream_elapsed_ms is not None:
-                meta["upstream_elapsed_ms"] = tele.upstream_elapsed_ms
-            if tele.cache_ttl_s is not None:
-                meta["cache_ttl_s"] = tele.cache_ttl_s
-            if tele.cache_age_s is not None:
-                meta["cache_age_s"] = tele.cache_age_s
-            if prepared.resolution is not None:
-                meta["resolved_from"] = prepared.resolution.get("raw_input")
+            if not lean:
+                if tele.upstream_elapsed_ms is not None:
+                    meta["upstream_elapsed_ms"] = tele.upstream_elapsed_ms
+                if tele.cache_ttl_s is not None:
+                    meta["cache_ttl_s"] = tele.cache_ttl_s
+                if tele.cache_age_s is not None:
+                    meta["cache_age_s"] = tele.cache_age_s
+                if prepared.resolution is not None:
+                    meta["resolved_from"] = prepared.resolution.get("raw_input")
             shaped["_meta"] = meta
             return shaped
 
@@ -144,4 +154,5 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             context=McpErrorContext(
                 tool_name="predict_pangolin", variant=variant, genome_build=genome_build
             ),
+            lean_meta=lean,
         )

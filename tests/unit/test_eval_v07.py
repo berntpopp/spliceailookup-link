@@ -59,3 +59,46 @@ async def test_resolve_ambiguous_nulls_singular_id(mcp) -> None:
     # The per-allele next_commands still guide the choice.
     tools = [c["tool"] for c in data["_meta"]["next_commands"]]
     assert tools and all(t == "predict_splicing" for t in tools)
+
+
+# --- D4 + C4: lean _meta and served_warm -------------------------------------
+
+async def test_meta_full_provenance_in_compact(mcp) -> None:
+    res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})
+    meta = structured(res)["_meta"]
+    assert "capabilities_version" in meta
+    assert meta["unsafe_for_clinical_use"] is True
+    assert "served_warm" in meta
+
+
+async def test_meta_trimmed_when_hints_off(mcp) -> None:
+    res = await mcp.call_tool(
+        "predict_spliceai", {"variant": "8-140300616-T-G", "include_hints": False}
+    )
+    meta = structured(res)["_meta"]
+    # Bulky/redundant provenance dropped on the lean path...
+    assert "capabilities_version" not in meta
+    assert "cache_ttl_s" not in meta
+    assert "cache_age_s" not in meta
+    assert "next_commands" not in meta
+    # ...but request_id, timing, cache, served_warm, and the safety flag stay.
+    assert "request_id" in meta
+    assert "elapsed_ms" in meta["timing"]
+    assert "cache" in meta
+    assert "served_warm" in meta
+    assert meta["unsafe_for_clinical_use"] is True
+
+
+async def test_meta_trimmed_in_minimal_mode(mcp) -> None:
+    res = await mcp.call_tool(
+        "predict_splicing", {"variant": "8-140300616-T-G", "response_mode": "minimal"}
+    )
+    meta = structured(res)["_meta"]
+    assert "capabilities_version" not in meta
+    assert "served_warm" in meta
+
+
+async def test_served_warm_true_on_cache_hit(mcp, stub_service: StubService) -> None:
+    await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})  # warms cache
+    res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})
+    assert structured(res)["_meta"]["served_warm"] is True

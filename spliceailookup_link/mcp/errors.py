@@ -420,8 +420,14 @@ async def run_mcp_tool(
     call: Callable[[], Awaitable[dict[str, Any]]],
     *,
     context: McpErrorContext | None = None,
+    lean_meta: bool = False,
 ) -> dict[str, Any]:
-    """Execute an MCP tool body, converting any exception to an envelope dict."""
+    """Execute an MCP tool body, converting any exception to an envelope dict.
+
+    lean_meta=True (response_mode='minimal' or include_hints=False) drops the
+    repetitive capabilities_version from _meta to save tokens on high-volume
+    calls; the research-use disclaimer (unsafe_for_clinical_use) is always kept.
+    """
     ctx = context or McpErrorContext(tool_name=tool_name)
     request_id = uuid.uuid4().hex[:12]
     start = time.perf_counter()
@@ -429,12 +435,15 @@ async def run_mcp_tool(
     def _stamp(envelope: dict[str, Any]) -> dict[str, Any]:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         existing: dict[str, Any] = envelope.get("_meta") or {}
-        envelope["_meta"] = {
+        meta: dict[str, Any] = {
             "request_id": request_id,
             "timing": {"elapsed_ms": elapsed_ms},
             **existing,
-            **_provenance_meta(),
+            **_BASE_META,  # unsafe_for_clinical_use -- always present
         }
+        if not lean_meta:
+            meta["capabilities_version"] = get_capabilities_version()
+        envelope["_meta"] = meta
         return envelope
 
     try:

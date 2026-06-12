@@ -554,3 +554,50 @@ Design + scoped fixes: `docs/superpowers/specs/2026-06-12-eval-improvements-3-de
 
 *Research use only; not for clinical decision support. Splice predictions are
 computational and must be interpreted alongside orthogonal evidence.*
+
+---
+
+## Part 8 -- Corrective pass for Part 7 findings (v0.5.0)
+
+**Date:** 2026-06-12 · **Server:** spliceailookup-link **v0.5.0**
+**Basis:** deterministic unit suite green via `make ci-local`
+(format + lint + 600-LOC budget + mypy + 172 unit tests; coverage 86.90%).
+Findings F11-F17 + #C1 from Part 7 are closed and verified offline, plus four
+structural **durability invariants** added. A live re-exercise against the
+rate-limited upstream is recommended once deployed; the contract/shape changes are
+fully determined by the server and verified offline.
+
+> **Engineering-review note.** Before implementation the Part 7 design was
+> code-reviewed and four items were corrected against the live source: **#C1** ships
+> a concurrency quota (`{limit, remaining, unit:"concurrent_requests"}`), **not** a
+> fabricated `window_s` -- the server enforces an `asyncio.Semaphore`, not a time
+> window (IETF `qu=concurrent-requests`); **F13** is combined-path-only (standalone
+> single-model tools keep their one legitimate `threshold_basis`); **F14** needed no
+> live spike (the sub-fields were already plumbed -- a fixture populates them -- so
+> the fix is omit-when-null, not "plumb them through"); **F15** ships a non-asserting,
+> score-gated caveat rather than a claim that raw "would" show an aberration.
+
+### Part 7 findings -- resolved
+
+| # | Sev | Status | Fix + proof (test) |
+|---|---|---|---|
+| F11 | MED | Fixed | Batch per-item errors carry the full standalone scaffold (`recovery_action`/`fallback_*`/`recovery`/`next_commands`), built with a `predict_splicing` context so per-item recovery targets `resolve_variant{variant}`. `test_f11_batch_error_item_has_full_scaffold`; parity `test_f11_batch_error_matches_standalone`. |
+| F12 | LOW-MED | Fixed | Each batch success item carries a slim `_meta` (`cache`/`upstream_elapsed_ms`/`cache_age_s`); the stale `test_batch.py` assertion was flipped. `test_f12_batch_items_carry_slim_meta`. |
+| F13 | LOW | Fixed | `threshold_basis` emitted once per combined payload (sub-block copies stripped in `predict_one`; single-model unchanged). `test_f13_*`; invariant `test_inv_no_duplicated_threshold_basis`. |
+| F14 | INVESTIGATE | Resolved | Aberration sub-fields are real (fixture populates them); shaped output omits them per-field when upstream sends `null`, preserving falsy `False`/`0`. `test_f14_*`; invariant `test_inv_no_null_leaf_in_full_mode`. |
+| F15 | LOW | Fixed | Score-gated (`>=0.2`), non-asserting masked-suppression caveat on `consequence.note`; silent on no-effect and on raw mode. `test_f15_*`. |
+| F16 | LOW | Fixed (doc) | `resolve_variant` description + capabilities glossary state coordinates are normalized, not validated. `test_f16_*`. |
+| F17 | ERGONOMIC | Fixed (non-breaking) | Descriptions lead with ONE vs BOTH; capabilities adds a which-tool line. Rename deferred. `test_f17_*`. |
+| #C1 | additive | Added | `rate_limited` envelope carries `_meta.rate_budget {limit, remaining, unit:"concurrent_requests"}` -- a local concurrency quota, no fabricated window. `test_c1_*`. |
+
+### Durability margin (new)
+
+Four structural invariants now forbid the "second-class path" class that every prior
+independent re-test surfaced: **batch <-> single-call shape parity**, **cross-tool
+error-envelope parity**, **single-`threshold_basis`**, and **no-null-leaf-in-full**.
+All four passed on first run against the implemented fixes, converting one-off fixes
+into a standing contract the suite enforces. The intent is to deny the next
+independent pass a new unscoped cluster to find.
+
+*Research use only; not for clinical decision support. Splice predictions are
+computational and must be interpreted alongside orthogonal evidence.*

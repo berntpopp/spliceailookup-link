@@ -73,6 +73,13 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             bool,
             Field(description="On not_found, probe the other build to detect a build_mismatch."),
         ] = True,
+        include_hints: Annotated[
+            bool,
+            Field(
+                description="Include _meta.next_commands + see_also chaining hints (default true; "
+                "set false to trim tokens once you know the workflow)."
+            ),
+        ] = True,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         """ONE model only (SpliceAI); use predict_splicing for BOTH models with an agreement verdict. Use this for the SpliceAI delta scores (acceptor/donor gain/loss, each 0-1 with a position) of a single variant, optionally with the SpliceAI-10k consequence prediction (exon skipping / intron retention / frameshift). For a quick raw-vs-masked or single-model question; use predict_splicing to also get Pangolin. Δ>=0.5 is high-confidence. Returns ~1-4kB (full/all larger). Note: cold calls take 10-30s. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
@@ -118,16 +125,15 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             if prepared.consequence:
                 shaped["molecular_consequence"] = prepared.consequence
             gene = shaped.get("gene") or (shaped.get("transcripts") or [{}])[0].get("gene")
-            meta: dict[str, Any] = {
-                "next_commands": [
+            meta: dict[str, Any] = {"cache": tele.cache}
+            if include_hints:
+                meta["next_commands"] = [
                     cmd("predict_pangolin", variant=prepared.variant_id, genome_build=genome_build)
-                ],
-                "cache": tele.cache,
-            }
-            if response_mode != "minimal":
-                meta["see_also"] = see_also_for(
-                    prepared.variant_id, genome_build, gene, response_mode
-                )
+                ]
+                if response_mode != "minimal":
+                    meta["see_also"] = see_also_for(
+                        prepared.variant_id, genome_build, gene, response_mode
+                    )
             if tele.upstream_elapsed_ms is not None:
                 meta["upstream_elapsed_ms"] = tele.upstream_elapsed_ms
             if tele.cache_ttl_s is not None:

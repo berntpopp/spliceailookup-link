@@ -113,6 +113,19 @@ class AmbiguousVariantError(ValueError):
         )
 
 
+class CoordinateRangeError(ValueError):
+    """Raised when a coordinate's position exceeds the chromosome length in all builds."""
+
+    def __init__(self, *, chrom: str, pos: int, grch38_len: int, grch37_len: int):
+        self.chrom = chrom
+        self.pos = pos
+        super().__init__(
+            f"Position {pos:,} exceeds the length of chr{chrom.removeprefix('chr')} in all "
+            f"supported builds (GRCh38 {grch38_len:,}, GRCh37 {grch37_len:,}). Verify the "
+            "coordinate; if you have an HGVS/rsID, resolve_variant can derive valid coordinates."
+        )
+
+
 def _provenance_meta() -> dict[str, Any]:
     return {**_BASE_META, "capabilities_version": get_capabilities_version()}
 
@@ -152,6 +165,8 @@ def _classify(
         return "ref_mismatch", False, tool, args
     if isinstance(exc, AmbiguousVariantError):
         return "ambiguous", False, "resolve_variant", {"variant": exc.variant}
+    if isinstance(exc, CoordinateRangeError):
+        return "invalid_input", False, _FALLBACK_TOOL, None
     if isinstance(exc, DataNotFoundError):
         tool, args = _fallback_for(context)
         return "not_found", False, tool, args
@@ -371,6 +386,12 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
             **_provenance_meta(),
         },
     }
+    if isinstance(exc, CoordinateRangeError):
+        payload["recovery"] = (
+            "The position is beyond the chromosome length in every supported build, so no "
+            "build can score it. Verify the coordinate against the reference. resolve_variant "
+            "cannot rescue a bad coordinate -- only an HGVS/rsID input."
+        )
     if isinstance(exc, AmbiguousVariantError):
         build = context.genome_build or "GRCh38"
         payload["variant_ids"] = exc.candidates

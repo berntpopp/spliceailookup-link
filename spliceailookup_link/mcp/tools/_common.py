@@ -84,6 +84,16 @@ async def prepare_variant(
     parsed = parse_variant_input(raw_variant)
     if parsed.kind == "coordinate":
         _reject_unsupported_contig(parsed.value)
+        from spliceailookup_link.mcp.build_check import out_of_range
+
+        chrom_s, pos_s, _, _ = parsed.value.split("-", 3)
+        lengths = out_of_range(chrom_s, int(pos_s))
+        if lengths is not None:
+            from spliceailookup_link.mcp.errors import CoordinateRangeError
+
+            raise CoordinateRangeError(
+                chrom=chrom_s, pos=int(pos_s), grch38_len=lengths[0], grch37_len=lengths[1]
+            )
         inferred = detect_build_mismatch(parsed.value, genome_build)
         if inferred is not None:
             raise BuildMismatchError(

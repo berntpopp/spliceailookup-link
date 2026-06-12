@@ -13,6 +13,7 @@ from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import after_resolve_many
 from spliceailookup_link.mcp.schema_relax import relax_output_schema
 from spliceailookup_link.services import SpliceService
+from spliceailookup_link.variant import unsupported_contig_reason
 
 _OUTPUT_SCHEMA = relax_output_schema(
     {
@@ -26,6 +27,7 @@ _OUTPUT_SCHEMA = relax_output_schema(
             "consequence": {"type": ["string", "null"]},
             "assembly_name": {"type": ["string", "null"]},
             "ambiguous": {"type": "boolean"},
+            "scoring_supported": {"type": "boolean"},
             "variant_ids": {"type": "array", "items": {"type": "string"}},
             "note": {"type": ["string", "null"]},
         },
@@ -70,6 +72,13 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
         async def call() -> dict[str, Any]:
             service = service_factory()
             result = await service.resolve(variant, genome_build)
+            reason = unsupported_contig_reason(result["variant_id"])
+            if reason is not None:
+                result["scoring_supported"] = False
+                result["note"] = (
+                    f"{reason} For mitochondrial variants, use gnomad-link "
+                    "get_mitochondrial_variant."
+                )
             ids = result.get("variant_ids") or [result["variant_id"]]
             result["_meta"] = (
                 {"next_commands": after_resolve_many(ids, genome_build)} if include_hints else {}

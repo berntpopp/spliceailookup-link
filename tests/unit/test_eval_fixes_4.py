@@ -182,3 +182,16 @@ async def test_f22_include_hints_false_on_single_and_resolve(mcp) -> None:
         )
     )
     assert "next_commands" not in rv["_meta"]
+
+
+# --- F19b: resolve_variant flags non-nuclear contigs as not scoring-supported ---
+async def test_f19b_resolve_marks_mt_not_scoring_supported(mcp) -> None:
+    data = structured(await mcp.call_tool("resolve_variant", {"variant": "MT-3243-A-G"}))
+    assert data["success"] is True  # resolve normalizes coordinates; it does not score
+    assert data["scoring_supported"] is False
+    assert "MT" in data["note"] or "itochondrial" in data["note"]
+
+
+async def test_f19b_resolve_nuclear_has_no_scoring_supported_flag(mcp) -> None:
+    data = structured(await mcp.call_tool("resolve_variant", {"variant": "chr8-140300616-T-G"}))
+    assert "scoring_supported" not in data  # additive: only set when NOT supported

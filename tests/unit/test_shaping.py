@@ -175,10 +175,14 @@ def _grch37_payload() -> dict:
                 "g_id": "ENSG00000198734.13_12",
                 "t_id": "ENST00000367797.9_9",
                 "t_priority": "MS",
-                "DS_AG": 0.1, "DP_AG": -5,
-                "DS_AL": 0.0, "DP_AL": 1,
-                "DS_DG": 0.0, "DP_DG": 2,
-                "DS_DL": 0.0, "DP_DL": 3,
+                "DS_AG": 0.1,
+                "DP_AG": -5,
+                "DS_AL": 0.0,
+                "DP_AL": 1,
+                "DS_DG": 0.0,
+                "DP_DG": 2,
+                "DS_DL": 0.0,
+                "DP_DL": 3,
             }
         ],
     }

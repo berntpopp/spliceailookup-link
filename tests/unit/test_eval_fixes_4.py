@@ -120,7 +120,9 @@ async def test_f23_runner_attaches_rate_budget_to_per_item_rate_limited(stub_ser
     assert item["rate_budget"]["unit"] == "concurrent_requests"
 
 
-async def test_f18_batch_retryable_item_goes_to_retry_variants(mcp, stub_service: StubService) -> None:
+async def test_f18_batch_retryable_item_goes_to_retry_variants(
+    mcp, stub_service: StubService
+) -> None:
     from spliceailookup_link.config import settings
 
     stub_service.score_error = SpliceApiError("upstream 503")

@@ -63,9 +63,7 @@ def _error_item(exc: BaseException, variant: str, genome_build: str) -> tuple[di
     """Return (per-item error dict, error_code). Mirrors the single-call envelope."""
     env = mcp_tool_error(
         exc,
-        McpErrorContext(
-            tool_name="predict_splicing", variant=variant, genome_build=genome_build
-        ),
+        McpErrorContext(tool_name="predict_splicing", variant=variant, genome_build=genome_build),
     ).payload
     item: dict[str, Any] = {
         "variant": variant,
@@ -102,11 +100,9 @@ async def _run_item(
     retried = False
     while True:
         try:
-            one = await predict_fn(
-                service, variant=variant, genome_build=genome_build, **params
-            )
+            one = await predict_fn(service, variant=variant, genome_build=genome_build, **params)
             return _success_item(one, variant), "ok", retried
-        except Exception as exc:  # noqa: BLE001 - boundary: classify every per-item fault
+        except Exception as exc:  # boundary: classify every per-item fault into an envelope
             item, code = _error_item(exc, variant, genome_build)
             if code in _RETRYABLE_CODES and not retried:
                 retried = True
@@ -157,7 +153,7 @@ async def run_batch(
         if ctx is not None:
             await ctx.report_progress(progress=idx + 1, total=total, message=f"{idx + 1}/{total}")
 
-    verdict_counts = {v: 0 for v in _VERDICTS}
+    verdict_counts = dict.fromkeys(_VERDICTS, 0)
     top: dict[str, Any] | None = None
     for r in results:
         verdict = (r.get("agreement") or {}).get("verdict")

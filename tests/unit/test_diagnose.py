@@ -42,6 +42,7 @@ async def test_genuine_not_found_when_ref_matches_requested_build() -> None:
     svc = StubService()
     svc.ref_bases = {"GRCh38": "A", "GRCh37": "A"}  # REF matches -> real no-overlap
     await _run(svc, "8-140300616-A-G")  # returns (no raise)
+    assert svc.score_calls == []
 
 
 async def test_falls_back_to_scoring_probe_when_ensembl_unavailable() -> None:
@@ -58,3 +59,4 @@ async def test_skips_non_acgt_ref() -> None:
     svc.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
     await _run(svc, "8-140300616-N-G")  # symbolic/N ref -> no-op
     assert svc.refbase_calls == []
+    assert svc.score_calls == []

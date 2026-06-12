@@ -155,3 +155,10 @@ async def test_capabilities_tool_detail_lean(mcp) -> None:
     data = structured(await mcp.call_tool("get_server_capabilities", {"detail": "lean"}))
     assert "parameters" not in data
     assert data["error_codes"]
+
+
+async def test_predict_chr99_is_unsupported_contig(mcp) -> None:
+    res = await mcp.call_tool("predict_spliceai", {"variant": "chr99-1000-A-G"})
+    data = structured(res)
+    assert data["success"] is False
+    assert data["error_code"] == "unsupported_contig"

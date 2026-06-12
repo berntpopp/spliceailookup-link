@@ -97,12 +97,12 @@ def clean_hgvs(text: str) -> str:
     return t.strip()
 
 
-def normalize_coordinate(text: str) -> str | None:
-    """Return canonical CHROM-POS-REF-ALT for a coordinate-shaped input, else None.
+def _coordinate_tokens(text: str) -> tuple[str, int, str, str] | None:
+    """Return (chrom, pos, ref, alt) for a 4-token coordinate-shaped input, else None.
 
-    Accepts dash, colon, or whitespace/tab delimiters and an optional `chr`
-    prefix. Returns None (rather than raising) when the input is not four
-    coordinate tokens, so the caller can fall through to HGVS/rsID handling.
+    Validates structure only (integer pos >= 1, ACGTN ref/alt). The chrom may be
+    any token; the caller decides whether the contig is in scope. chrom is
+    upper-cased with an optional `chr` prefix stripped.
     """
     t = text.strip()
     if not t:
@@ -113,14 +113,28 @@ def normalize_coordinate(text: str) -> str | None:
         return None
     chrom, pos, ref, alt = tokens
     chrom = re.sub(r"^chr", "", chrom, flags=re.IGNORECASE).upper()
-    if chrom not in _VALID_CHROMS:
-        return None
     if not pos.isdigit() or int(pos) < 1:
         return None
     ref_u, alt_u = ref.upper(), alt.upper()
     if not _ALLELE_RE.match(ref_u) or not _ALLELE_RE.match(alt_u):
         return None
-    return f"{chrom}-{int(pos)}-{ref_u}-{alt_u}"
+    return chrom, int(pos), ref_u, alt_u
+
+
+def normalize_coordinate(text: str) -> str | None:
+    """Return canonical CHROM-POS-REF-ALT for a *recognised-contig* coordinate input.
+
+    Returns None when the input is not four coordinate tokens OR the contig is not
+    a recognised chromosome (1-22, X, Y, M, MT), so the caller can fall through to
+    HGVS/rsID handling.
+    """
+    tokens = _coordinate_tokens(text)
+    if tokens is None:
+        return None
+    chrom, pos, ref, alt = tokens
+    if chrom not in _VALID_CHROMS:
+        return None
+    return f"{chrom}-{pos}-{ref}-{alt}"
 
 
 def parse_variant_input(text: str) -> VariantInput:
@@ -139,9 +153,19 @@ def parse_variant_input(text: str) -> VariantInput:
     if looks_like_rsid(t):
         return VariantInput(kind="rsid", value=t.lower())
 
-    coordinate = normalize_coordinate(t)
-    if coordinate is not None:
-        return VariantInput(kind="coordinate", value=coordinate)
+    tokens = _coordinate_tokens(t)
+    if tokens is not None:
+        chrom, pos, ref, alt = tokens
+        if chrom in _VALID_CHROMS:
+            # M/MT parse here; unsupported_contig_reason flags them downstream.
+            return VariantInput(kind="coordinate", value=f"{chrom}-{pos}-{ref}-{alt}")
+        # Well-formed coordinate on a non-standard contig (e.g. chr99): a distinct
+        # unsupported_contig, not invalid_input (D2). Static message (no echoed input).
+        raise UnsupportedContigError(
+            "Coordinate is on a non-standard contig. The SpliceAI/Pangolin splice "
+            "models score only the nuclear chromosomes (1-22, X, Y); mitochondrial "
+            "and other contigs are out of scope."
+        )
 
     if looks_like_hgvs(t):
         return VariantInput(kind="hgvs", value=clean_hgvs(t))

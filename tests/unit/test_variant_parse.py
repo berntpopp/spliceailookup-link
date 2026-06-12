@@ -100,3 +100,32 @@ def test_unsupported_contig_reason_allows_nuclear():
 
 def test_unsupported_contig_error_is_parse_error_subclass():
     assert issubclass(UnsupportedContigError, Exception)
+
+
+def test_well_formed_nonstandard_contig_is_unsupported_not_invalid() -> None:
+    from spliceailookup_link.variant import parse_variant_input
+
+    for v in ("chr99-1000-A-G", "chr0-100-A-G", "23-100-A-G"):
+        try:
+            parse_variant_input(v)
+        except UnsupportedContigError:
+            continue
+        raise AssertionError(f"{v} should raise UnsupportedContigError")
+
+
+def test_standard_contig_still_parses_as_coordinate() -> None:
+    from spliceailookup_link.variant import parse_variant_input
+
+    assert parse_variant_input("chr8-140300616-T-G").kind == "coordinate"
+    assert parse_variant_input("X-100-A-T").kind == "coordinate"
+
+
+def test_genuine_junk_is_invalid_not_unsupported() -> None:
+    from spliceailookup_link.variant import VariantParseError, parse_variant_input
+
+    try:
+        parse_variant_input("totally invalid")
+    except VariantParseError as exc:
+        assert not isinstance(exc, UnsupportedContigError)
+    else:
+        raise AssertionError("expected VariantParseError")

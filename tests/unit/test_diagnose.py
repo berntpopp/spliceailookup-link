@@ -64,3 +64,34 @@ async def test_skips_non_acgt_ref() -> None:
     await _run(svc, "8-140300616-N-G")  # symbolic/N ref -> no-op
     assert svc.refbase_calls == []
     assert svc.score_calls == []
+
+
+async def test_check_ref_match() -> None:
+    from spliceailookup_link.mcp.tools._diagnose import check_ref
+
+    svc = StubService()
+    svc.ref_bases = {"GRCh38": "T"}
+    verdict = await check_ref(svc, variant_id="8-140300616-T-G", requested_build="GRCh38")
+    assert verdict.status == "match"
+    assert verdict.requested_base == "T"
+
+
+async def test_check_ref_mismatch_with_other_build() -> None:
+    from spliceailookup_link.mcp.tools._diagnose import check_ref
+
+    svc = StubService()
+    svc.ref_bases = {"GRCh38": "T", "GRCh37": "A"}
+    verdict = await check_ref(svc, variant_id="8-140300616-A-G", requested_build="GRCh38")
+    assert verdict.status == "mismatch"
+    assert verdict.requested_base == "T"
+    assert verdict.observed_ref == "A"
+    assert verdict.other_build == "GRCh37"
+
+
+async def test_check_ref_inconclusive_when_ensembl_unavailable() -> None:
+    from spliceailookup_link.mcp.tools._diagnose import check_ref
+
+    svc = StubService()
+    svc.ref_bases = {}  # reference_base returns None
+    verdict = await check_ref(svc, variant_id="8-140300616-A-G", requested_build="GRCh38")
+    assert verdict.status == "inconclusive"

@@ -25,6 +25,7 @@ from spliceailookup_link.api import (
     SpliceApiError,
     UpstreamInputError,
 )
+from spliceailookup_link.config import settings
 from spliceailookup_link.variant import VariantParseError
 
 logger = logging.getLogger(__name__)
@@ -288,6 +289,16 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
             **_provenance_meta(),
         },
     }
+    if error_code == "rate_limited":
+        # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a
+        # time window -- IETF qu=concurrent-requests, no window_s (no bucket to
+        # reset). remaining=0 is exact for local saturation; for an upstream HTTP
+        # 429 (also RateLimitedError) it is a conservative floor, not upstream quota.
+        payload["_meta"]["rate_budget"] = {
+            "limit": settings.MAX_CONCURRENCY,
+            "remaining": 0,
+            "unit": "concurrent_requests",
+        }
     return McpToolError(payload)
 
 

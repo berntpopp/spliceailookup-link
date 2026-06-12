@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import json
 
-from spliceailookup_link.api import DataNotFoundError
+from spliceailookup_link.api import DataNotFoundError, RateLimitedError
+from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.shaping import THRESHOLD_BASIS, shape_spliceai
 from tests.conftest import StubService, structured
 from tests.fixtures.api_responses import (
@@ -168,3 +169,20 @@ async def test_f12_batch_items_carry_slim_meta(mcp) -> None:
     assert "resolution" not in first["_meta"]
     # Aggregate envelope _meta is unchanged (next_commands present).
     assert data["_meta"]["next_commands"][0]["tool"] == "predict_splicing"
+
+
+async def test_c1_rate_limited_carries_concurrency_budget(mcp, stub_service: StubService) -> None:
+    stub_service.score_error = RateLimitedError("Local concurrency limit saturated")
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    assert data["error_code"] == "rate_limited"
+    budget = data["_meta"]["rate_budget"]
+    assert budget["limit"] == settings.MAX_CONCURRENCY
+    assert budget["remaining"] == 0
+    assert budget["unit"] == "concurrent_requests"
+    assert "window_s" not in budget  # never fabricate a window we don't enforce
+
+
+async def test_c1_success_envelope_has_no_rate_budget(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    assert data["success"] is True
+    assert "rate_budget" not in data["_meta"]

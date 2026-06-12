@@ -500,7 +500,9 @@ async def run_mcp_tool(
             **existing,
             **_BASE_META,  # unsafe_for_clinical_use -- always present
         }
-        if not lean_meta:
+        if not lean_meta and "capabilities_version" not in envelope:
+            # P1#1: the capabilities document already carries capabilities_version at the
+            # top level; do not duplicate it in _meta on that one call.
             meta["capabilities_version"] = get_capabilities_version()
         envelope["_meta"] = meta
         return envelope

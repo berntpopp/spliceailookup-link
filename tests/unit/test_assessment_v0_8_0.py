@@ -138,3 +138,17 @@ async def test_threshold_basis_only_in_full_combined(mcp) -> None:
         )
     )
     assert "threshold_basis" in full["interpretation"]
+
+
+# ---------------- P1#1: capabilities_version not duplicated ----------------
+
+async def test_capabilities_version_not_duplicated_in_meta(mcp) -> None:
+    data = structured(await mcp.call_tool("get_server_capabilities", {}))
+    assert "capabilities_version" in data  # top-level (the document's own hash)
+    assert "capabilities_version" not in data["_meta"], "must not duplicate in _meta"
+
+
+async def test_prediction_still_carries_version_in_meta(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    assert "capabilities_version" not in data  # no top-level on predictions
+    assert "capabilities_version" in data["_meta"]  # provenance lives in _meta here

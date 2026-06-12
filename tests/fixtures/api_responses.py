@@ -145,6 +145,26 @@ SPLICEAI_MASKED_EMPTY_ABERR: dict[str, Any] = {
     "sai10kPredictions": {"aberrations": [], "transcript_info": {"strand": "-", "exon_count": 23}},
 }
 
+# Masked payload with NO splice signal (all deltas 0) and empty aberrations -- the
+# F15 caveat must NOT fire here (this is a genuinely no-effect variant).
+SPLICEAI_MASKED_NO_EFFECT: dict[str, Any] = {
+    "variant": "8-140300616-T-G",
+    "hg": "38",
+    "bc": "basic",
+    "distance": 500,
+    "mask": 1,
+    "scores": [
+        {
+            **SPLICEAI_TRAPPC9["scores"][0],
+            "DS_AG": 0.0,
+            "DS_AL": 0.0,
+            "DS_DG": 0.0,
+            "DS_DL": 0.0,
+        }
+    ],
+    "sai10kPredictions": {"aberrations": []},
+}
+
 # Upstream "errors" are HTTP 200 bodies carrying an `error` string.
 SPLICEAI_PARSE_ERROR: dict[str, Any] = {
     "variant": "notavariant",

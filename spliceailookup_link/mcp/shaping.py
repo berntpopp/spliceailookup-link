@@ -204,7 +204,9 @@ def _shape_spliceai_transcript(raw: dict[str, Any], mode: ResponseMode) -> dict[
     return out
 
 
-def _shape_consequence(payload: dict[str, Any], mode: ResponseMode) -> dict[str, Any] | None:
+def _shape_consequence(
+    payload: dict[str, Any], mode: ResponseMode, max_score: float | None = None
+) -> dict[str, Any] | None:
     sai = payload.get("sai10kPredictions")
     err = payload.get("sai10kPredictionsError")
     if not sai and not err:
@@ -234,6 +236,13 @@ def _shape_consequence(payload: dict[str, Any], mode: ResponseMode) -> dict[str,
         extras = {k: v for k, v in sai.items() if k not in {"aberrations", "transcript_info"}}
         if extras:
             out["raw_extras"] = extras
+    masked = str(payload.get("mask")) in ("1", "True", "true")
+    if masked and not out["aberrations"] and (max_score or 0.0) >= _MODERATE:
+        out["note"] = (
+            "mask='masked' computes aberrations on masked scores and can suppress an "
+            "aberration that mask='raw' would predict; this site has a non-trivial "
+            "delta (>=0.2) but no masked aberration -- re-run with mask='raw' to check."
+        )
     return out
 
 
@@ -268,7 +277,7 @@ def shape_spliceai(
     if truncated is not None:
         result["transcripts_truncated"] = truncated
     if include_consequence:
-        consequence = _shape_consequence(payload, response_mode)
+        consequence = _shape_consequence(payload, response_mode, max_overall)
         if consequence:
             result["consequence"] = consequence
     result["headline"] = spliceai_headline(result)

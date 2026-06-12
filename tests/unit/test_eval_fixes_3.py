@@ -7,7 +7,11 @@ import json
 
 from spliceailookup_link.mcp.shaping import THRESHOLD_BASIS, shape_spliceai
 from tests.conftest import structured
-from tests.fixtures.api_responses import SPLICEAI_TRAPPC9
+from tests.fixtures.api_responses import (
+    SPLICEAI_MASKED_EMPTY_ABERR,
+    SPLICEAI_MASKED_NO_EFFECT,
+    SPLICEAI_TRAPPC9,
+)
 
 
 async def test_f13_threshold_basis_emitted_once_in_combined(mcp) -> None:
@@ -80,3 +84,32 @@ def test_f14_falsy_aberration_fields_are_kept_not_omitted() -> None:
     assert ab["size_is_coding"] is False  # falsy but not None -> kept
     assert ab["introduces_stop_codon"] is False
     assert "status" not in ab  # genuinely absent -> omitted
+
+
+def test_f15_masked_suppression_note_fires_on_real_signal() -> None:
+    shaped = shape_spliceai(SPLICEAI_MASKED_EMPTY_ABERR, response_mode="full")
+    cons = shaped["consequence"]
+    assert cons["aberrations"] == []
+    assert "note" in cons
+    assert "mask='raw'" in cons["note"]
+
+
+def test_f15_no_note_on_no_effect_masked_variant() -> None:
+    shaped = shape_spliceai(SPLICEAI_MASKED_NO_EFFECT, response_mode="full")
+    cons = shaped.get("consequence")
+    # Either no consequence object, or one without a note -- never a misleading note.
+    assert not (cons and cons.get("note"))
+
+
+def test_f15_no_note_in_raw_mode() -> None:
+    raw = {**SPLICEAI_MASKED_EMPTY_ABERR, "mask": 0}
+    shaped = shape_spliceai(raw, response_mode="full")
+    cons = shaped.get("consequence") or {}
+    assert "note" not in cons
+
+
+async def test_f15_combined_masked_does_not_crash(mcp) -> None:
+    data = structured(
+        await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G", "mask": "masked"})
+    )
+    assert data["success"] is True

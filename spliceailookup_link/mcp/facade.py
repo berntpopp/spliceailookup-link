@@ -30,6 +30,7 @@ _INSTRUCTIONS = (
     "steps) and _meta.see_also (cross-server hints for gnomad-link / genereviews-link / "
     "gtex-link). Read the top-level headline first. Set include_hints=false on predict_* / "
     "resolve_variant to drop these once the workflow is known.\n"
+    "- All tools are read-only, idempotent, and safe to auto-call (no data side effects).\n"
     "- Upstream is interactive-use-only and rate-limited; calls can take 30s+. Discovery: "
     "call get_server_capabilities or read spliceailookup://capabilities. "
     f"{RESEARCH_USE_NOTICE}"

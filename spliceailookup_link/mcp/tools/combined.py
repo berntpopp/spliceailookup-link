@@ -12,6 +12,7 @@ from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import for_combined
+from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.tools._common import see_also_for
 from spliceailookup_link.mcp.tools._predict import predict_one
 from spliceailookup_link.services import SpliceService
@@ -68,7 +69,8 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             bool,
             Field(
                 description="Include _meta.next_commands + see_also chaining hints (default true; "
-                "set false to trim tokens once you know the workflow)."
+                "set false to trim tokens once you know the workflow; also drops the static "
+                "capabilities_version from _meta)."
             ),
         ] = True,
         include_see_also: Annotated[
@@ -79,6 +81,15 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 "entries)."
             ),
         ] = True,
+        correlation_id: Annotated[
+            str | None,
+            Field(
+                default=None,
+                max_length=128,
+                description="Optional client trace id echoed into _meta.correlation_id (on "
+                "success and error) so a multi-step workflow is traceable as one unit.",
+            ),
+        ] = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         """BOTH models (SpliceAI + Pangolin) in one call -- the default "what does this variant do to splicing?" answer. Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls). Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
@@ -100,6 +111,8 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 ctx=ctx,
             )
             tel = result.pop("_telemetry")
+            if response_mode != "minimal":
+                result["provenance"] = prediction_provenance(genome_build)
             meta: dict[str, Any] = {}
             if include_hints:
                 meta["next_commands"] = for_combined(result["variant_id"], genome_build)
@@ -140,4 +153,5 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 tool_name="predict_splicing", variant=variant, genome_build=genome_build
             ),
             lean_meta=lean,
+            correlation_id=correlation_id,
         )

@@ -13,6 +13,7 @@ from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import cmd
+from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.shaping import shape_pangolin
 from spliceailookup_link.mcp.tools._common import (
     mask_to_int,
@@ -75,7 +76,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             bool,
             Field(
                 description="Include _meta.next_commands + see_also chaining hints (default true; "
-                "set false to trim tokens once you know the workflow)."
+                "set false to trim tokens once you know the workflow; also drops the static "
+                "capabilities_version from _meta)."
             ),
         ] = True,
         include_see_also: Annotated[
@@ -86,6 +88,15 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 "entries)."
             ),
         ] = True,
+        correlation_id: Annotated[
+            str | None,
+            Field(
+                default=None,
+                max_length=128,
+                description="Optional client trace id echoed into _meta.correlation_id (on "
+                "success and error) so a multi-step workflow is traceable as one unit.",
+            ),
+        ] = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         """ONE model only (Pangolin); use predict_splicing for BOTH models with an agreement verdict. Use this for the Pangolin splice gain/loss scores of a single variant. Pangolin is an independent splice model; agreement with SpliceAI strengthens a prediction, disagreement warrants caution. Use predict_splicing to get both models in one call. Returns ~1-3kB. Note: cold calls take 10-30s. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
@@ -160,6 +171,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     meta["cache_age_s"] = tele.cache_age_s
                 if prepared.resolution is not None:
                     meta["resolved_from"] = prepared.resolution.get("raw_input")
+            if response_mode != "minimal":
+                shaped["provenance"] = prediction_provenance(genome_build)
             shaped["_meta"] = meta
             return shaped
 
@@ -170,4 +183,5 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 tool_name="predict_pangolin", variant=variant, genome_build=genome_build
             ),
             lean_meta=lean,
+            correlation_id=correlation_id,
         )

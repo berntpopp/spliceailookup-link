@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 from mcp.types import Annotations
 from pydantic import Field
 
+from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import run_mcp_tool
 from spliceailookup_link.mcp.resources import (
@@ -57,19 +58,28 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             Field(description="Build whose scoring containers to warm. GRCh38 default."),
         ] = "GRCh38",
         mask: Annotated[
-            Literal["raw", "masked"],
+            Literal["raw", "masked", "both"],
             Field(
-                description="Which mask path to warm (raw default; warm masked if you'll use it)."
+                description="Which mask path(s) to warm: raw (default), masked, or both "
+                "(warms raw and masked per model in one call)."
             ),
         ] = "raw",
     ) -> dict[str, Any]:
-        """Pre-warm the SpliceAI + Pangolin Cloud Run containers before a burst so the first real call does not eat the 10-40s cold start. Warms the (basic gene_set, chosen mask) path per model; Cloud Run scales per-instance, so other param combos or concurrent calls may still cold-start and warmth decays after minutes idle. Returns per-model elapsed_ms + coverage. Returns <1kB."""
+        """Pre-warm the SpliceAI + Pangolin Cloud Run containers before a burst so the first real call does not eat the 10-40s cold start. Warms the (basic gene_set, chosen mask) path per model; pass mask='both' to warm raw and masked together. Cloud Run scales per-instance, so other param combos or concurrent calls may still cold-start and warmth decays after minutes idle. Returns per-(model,mask) elapsed_ms, coverage, and stay_warm_estimate_s. Returns <1kB."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()
-            mask_int = 1 if mask == "masked" else 0
-            detail = await service.warmup(genome_build, mask_int)
-            warmed = all(d["status"] == "ok" for d in detail.values())
+            detail: dict[str, Any] = {}
+            if mask == "both":
+                # Suffix keys per mask only when warming both, so the single-mask
+                # path keeps its existing {spliceai, pangolin} detail shape.
+                for mask_name, mask_int in (("raw", 0), ("masked", 1)):
+                    per_model = await service.warmup(genome_build, mask_int)
+                    for model_name, d in per_model.items():
+                        detail[f"{model_name}_{mask_name}"] = d
+            else:
+                detail = await service.warmup(genome_build, 1 if mask == "masked" else 0)
+            warmed = all(d.get("status") == "ok" for d in detail.values())
             return {
                 "warmed": warmed,
                 "genome_build": genome_build,
@@ -79,10 +89,12 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     "mask": mask,
                     "gene_set": "basic",
                 },
+                "stay_warm_estimate_s": settings.WARMUP_STAY_WARM_ESTIMATE_SECONDS,
                 "note": (
-                    "Warms only this (mask, basic gene_set) path per model. Cloud Run "
+                    "Warms the (mask, basic gene_set) path per model. Cloud Run "
                     "autoscales per-instance: subsequent calls with other params or under "
                     "concurrency may still cold-start, and warmth decays after minutes idle. "
+                    "stay_warm_estimate_s is a conservative estimate, not a guarantee. "
                     "For a guaranteed-cold first call, prefer a background task."
                 ),
             }

@@ -79,6 +79,15 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
                 description="Include _meta.next_commands (default true; set false to trim tokens)."
             ),
         ] = True,
+        correlation_id: Annotated[
+            str | None,
+            Field(
+                default=None,
+                max_length=128,
+                description="Optional client trace id echoed into _meta.correlation_id (on "
+                "success and error) so a multi-step workflow is traceable as one unit.",
+            ),
+        ] = None,
     ) -> dict[str, Any]:
         """Use this when the caller's variant is HGVS, an rsID, or loosely formatted, and you need the canonical CHROM-POS-REF-ALT that the prediction tools require. Coordinate inputs are normalized locally; HGVS/rsIDs are resolved via Ensembl VEP, which also returns the most-severe consequence and gene symbol. Then call predict_splicing. Returns <1kB. Coordinate inputs are normalized; by default the REF base is also checked against the requested build (one Ensembl lookup) and a ref_warning + ref_validated:false is returned on mismatch (set check_ref=false to skip). HGVS/rsIDs are resolved and validated via Ensembl VEP."""
 
@@ -143,4 +152,5 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
                 genome_build=genome_build,
                 query=variant,
             ),
+            correlation_id=correlation_id,
         )

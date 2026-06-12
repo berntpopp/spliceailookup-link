@@ -55,6 +55,9 @@ class SpliceService:
         self._overlap_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(
             self._overlap_uncached
         )
+        self._nearest_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(
+            self._nearest_uncached
+        )
         # Keys already computed once; used to report cache hit/miss telemetry.
         self._scored_keys: set[tuple[Any, ...]] = set()
         self._scored_at: dict[tuple[Any, ...], float] = {}
@@ -199,6 +202,17 @@ class SpliceService:
     ) -> int | None:
         """Cached transcript-overlap count for the not_found fast-fail pre-check."""
         return await self._overlap_cached(chrom, pos, build, window)
+
+    async def _nearest_uncached(
+        self, chrom: str, pos: int, build: GenomeBuild, max_window: int
+    ) -> dict[str, Any] | None:
+        return await self._ensembl.nearest_transcript(chrom, pos, build, max_window)
+
+    async def nearest_transcript(
+        self, chrom: str, pos: int, build: GenomeBuild, max_window: int = 100_000
+    ) -> dict[str, Any] | None:
+        """Cached nearest-transcript lookup for the not_found enhancement."""
+        return await self._nearest_cached(chrom, pos, build, max_window)
 
     # ---------------- lifecycle ----------------
 

@@ -10,16 +10,12 @@ from typing import Any
 from mcp.types import LATEST_PROTOCOL_VERSION as MCP_PROTOCOL_VERSION
 
 from spliceailookup_link.config import settings
+from spliceailookup_link.mcp.provenance import data_sources as _data_sources
 
 RESEARCH_USE_NOTICE = (
     "Research use only; not for clinical decision support. Splice predictions are "
     "computational and must be interpreted alongside orthogonal evidence."
 )
-
-# Upstream model provenance surfaced in every response's _meta.
-SPLICEAI_MODEL = "SpliceAI (Illumina) via Broad SpliceAI Lookup"
-PANGOLIN_MODEL = "Pangolin (Tongji/Invitae) via Broad SpliceAI Lookup"
-SAI10K_MODEL = "SpliceAI-10k calculator (consequence prediction)"
 
 
 def _server_version() -> str:
@@ -64,6 +60,24 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
         ),
         "genome_builds": ["GRCh37", "GRCh38"],
         "default_genome_build": "GRCh38",
+        "tool_safety": {
+            "all_tools_read_only": True,
+            "idempotent": True,
+            "open_world": True,
+            "note": (
+                "All 7 tools are read-only, idempotent, and open-world "
+                "(readOnlyHint/idempotentHint/openWorldHint are also set on every tool "
+                "schema). They have no side effects on your data and are safe for a "
+                "trusted client to auto-approve."
+            ),
+        },
+        "token_tips": (
+            "Once the workflow is known, set include_hints=false on predict_*/"
+            "resolve_variant to drop next_commands, see_also, AND the static "
+            "capabilities_version from _meta. Use response_mode='minimal' for just the "
+            "headline + one decision number (provenance is omitted in minimal). "
+            "include_see_also=false keeps next_commands but drops the cross-server hints."
+        ),
         "tools": [
             "get_server_capabilities",
             "resolve_variant",
@@ -95,7 +109,13 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "unannotated sites. Use raw for alternative-splicing analysis, masked for "
                 "variant interpretation."
             ),
-            "gene_set": "'basic' (default, MANE/curated) or 'comprehensive' (all GENCODE; much slower).",
+            "gene_set": (
+                "'basic' (default) = GENCODE v44 basic transcripts (MANE-prioritised) or "
+                "'comprehensive' = all GENCODE (much slower). NOTE: 'basic' includes "
+                "non-coding genes (e.g. lncRNAs like CCAT2 that have a basic transcript), "
+                "not only protein-coding -- a low-scoring lncRNA hit is a real transcript, "
+                "not the absence of annotation."
+            ),
             "transcripts": "'mane' (default, MANE Select only) or 'all' (every overlapping transcript).",
             "response_mode": "'compact' (default), 'full' (adds REF/ALT raw scores, exon model), or 'minimal'.",
         },
@@ -335,12 +355,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             "spliceailookup://research-use": "research-use-only notice",
             "spliceailookup://citations": "SpliceAI / Pangolin / SAI-10k / Ensembl citations",
         },
-        "data_sources": {
-            "spliceai": SPLICEAI_MODEL,
-            "pangolin": PANGOLIN_MODEL,
-            "sai10k": SAI10K_MODEL,
-            "resolver": "Ensembl VEP REST",
-        },
+        "data_sources": _data_sources(),
     }
     version_hash, chars = _capabilities_version(doc)
     doc["capabilities_version"] = version_hash
@@ -357,6 +372,7 @@ def _lean_capabilities(full: dict[str, Any]) -> dict[str, Any]:
         "server_version": full["server_version"],
         "mcp_protocol_version": full["mcp_protocol_version"],
         "research_use_only": True,
+        "tool_safety": full["tool_safety"],
         "tools": full["tools"],
         "recommended_workflows": full["recommended_workflows"],
         "agreement_verdicts": full["agreement_verdicts"],

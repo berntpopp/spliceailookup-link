@@ -93,3 +93,40 @@ class EnsemblVepClient(BaseHTTPClient):
         except SpliceApiError:
             return None
         return len(payload) if isinstance(payload, list) else None
+
+    async def nearest_transcript(
+        self, chrom: str, pos: int, build: GenomeBuild, max_window: int = 100_000
+    ) -> dict[str, Any] | None:
+        """Closest transcript to chrom:pos within max_window, or None.
+
+        Returns {distance_nt, gene, transcript_id}; distance_nt is 0 when pos is
+        inside a transcript. None on any fault / no transcript within the window
+        (never invents data), so a not_found stays a not_found.
+        """
+        c = chrom.removeprefix("chr").removeprefix("CHR").upper()
+        start = max(1, pos - max_window)
+        end = pos + max_window
+        url = f"{settings.ensembl_url(build)}/overlap/region/human/{c}:{start}..{end}"
+        try:
+            payload = await self.get_json(
+                url, {"feature": "transcript", "content-type": "application/json"}
+            )
+        except SpliceApiError:
+            return None
+        if not isinstance(payload, list) or not payload:
+            return None
+        best: dict[str, Any] | None = None
+        best_dist: int | None = None
+        for tx in payload:
+            t_start, t_end = tx.get("start"), tx.get("end")
+            if not isinstance(t_start, int) or not isinstance(t_end, int):
+                continue
+            dist = 0 if t_start <= pos <= t_end else min(abs(pos - t_start), abs(pos - t_end))
+            if best_dist is None or dist < best_dist:
+                best_dist = dist
+                best = {
+                    "distance_nt": dist,
+                    "gene": tx.get("external_name") or tx.get("Parent") or tx.get("id"),
+                    "transcript_id": tx.get("id"),
+                }
+        return best

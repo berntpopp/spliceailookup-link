@@ -11,13 +11,15 @@ a time; the loop scales to ceil(cap/2) concurrent items only if the cap is raise
 from __future__ import annotations
 
 import asyncio
+import copy
 import random
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from spliceailookup_link.config import settings
+from spliceailookup_link.config import GenomeBuild, settings
 from spliceailookup_link.mcp.errors import McpErrorContext, mcp_tool_error
+from spliceailookup_link.mcp.tools._batch_dedup import build_dedup_plan
 from spliceailookup_link.mcp.tools._predict import predict_one
 from spliceailookup_link.services import SpliceService
 
@@ -129,7 +131,7 @@ async def run_batch(
     service: SpliceService,
     *,
     variants: list[str],
-    genome_build: str,
+    genome_build: GenomeBuild,
     params: dict[str, Any],
     ctx: Any = None,
     predict_fn: PredictFn = predict_one,
@@ -144,7 +146,36 @@ async def run_batch(
     retry_variants: list[str] = []
     total = len(variants)
 
+    # W2: resolve all inputs and group by canonical variant_id so a variant
+    # submitted twice (e.g. coordinate + its HGVS) is scored once upstream.
+    plan = await build_dedup_plan(service, variants, genome_build)
+    owner_result: dict[str, dict[str, Any]] = {}
+    upstream_calls_saved = 0
+
     for idx, variant in enumerate(variants):
+        canonical = plan.canonical.get(idx)
+        if canonical is not None and not plan.is_owner(idx) and canonical in owner_result:
+            # Duplicate of an already-scored variant: copy, never re-score.
+            base = copy.deepcopy(owner_result[canonical])
+            base["variant"] = variant
+            item_meta = dict(base.get("_meta") or {})
+            item_meta["request_id"] = uuid.uuid4().hex[:12]  # own id for log correlation
+            item_meta["cache"] = "deduped"
+            item_meta["served_from"] = canonical
+            item_meta["served_warm"] = True  # served instantly from a sibling's result
+            # No upstream call for this copy -> drop the owner's timing fields.
+            item_meta.pop("upstream_elapsed_ms", None)
+            item_meta.pop("cache_age_s", None)
+            base["_meta"] = item_meta
+            results.append(base)
+            ok += 1
+            upstream_calls_saved += 2  # the two model calls this copy avoided
+            if ctx is not None:
+                await ctx.report_progress(
+                    progress=idx + 1, total=total, message=f"{idx + 1}/{total}"
+                )
+            continue
+
         item, kind, retried = await _run_item(
             predict_fn,
             service,
@@ -154,6 +185,8 @@ async def run_batch(
             retry_backoff_s=retry_backoff_s,
         )
         results.append(item)
+        if canonical is not None and plan.is_owner(idx) and kind == "ok":
+            owner_result[canonical] = item
         if retried:
             retried_count += 1
         if kind == "ok":
@@ -182,6 +215,8 @@ async def run_batch(
         "terminal_failed": terminal,
         "retryable_failed": retryable,
         "retried": retried_count,
+        "unique_variants": plan.unique_count,
+        "upstream_calls_saved": upstream_calls_saved,
         **verdict_counts,
     }
     from spliceailookup_link.mcp.errors import rate_budget_snapshot
@@ -189,6 +224,7 @@ async def run_batch(
     meta: dict[str, Any] = {
         "items_submitted": total,
         "max_items": max_items,
+        "deduped": {"unique": plan.unique_count, "duplicates": plan.duplicate_count},
         "rate_budget": rate_budget_snapshot(saturated=False),
     }
     if top is not None:

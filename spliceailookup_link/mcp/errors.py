@@ -466,6 +466,25 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
         # RateLimitedError) it is a conservative floor. retry_after_s gives an actionable
         # backoff per current MCP rate-limit guidance.
         payload["_meta"]["rate_budget"] = rate_budget_snapshot(saturated=True)
+    nearest = getattr(exc, "nearest_transcript", None)
+    if error_code == "not_found" and isinstance(nearest, dict):
+        # W4: distance to the nearest annotated transcript so a caller can decide
+        # mechanically whether widening max_distance would help.
+        payload["nearest_transcript"] = nearest
+        dist = nearest.get("distance_nt")
+        if isinstance(dist, int):
+            if dist <= 10000:
+                payload["recovery"] = (
+                    f"{payload['recovery']} Nearest annotated transcript "
+                    f"({nearest.get('gene')}) is {dist:,} bp away; re-run with a larger "
+                    "max_distance (up to 10000) to score against it."
+                )
+            else:
+                payload["recovery"] = (
+                    f"{payload['recovery']} Nearest annotated transcript is {dist:,} bp "
+                    "away -- beyond the 10 kb model window; this position is effectively "
+                    "intergenic for splice prediction."
+                )
     return McpToolError(payload)
 
 
@@ -494,6 +513,7 @@ async def run_mcp_tool(
     *,
     context: McpErrorContext | None = None,
     lean_meta: bool = False,
+    correlation_id: str | None = None,
 ) -> dict[str, Any]:
     """Execute an MCP tool body, converting any exception to an envelope dict.
 
@@ -518,6 +538,10 @@ async def run_mcp_tool(
             # P1#1: the capabilities document already carries capabilities_version at the
             # top level; do not duplicate it in _meta on that one call.
             meta["capabilities_version"] = get_capabilities_version()
+        if correlation_id is not None:
+            # W8: echo the client-supplied trace id on success AND error so a
+            # multi-step workflow is traceable as one unit.
+            meta["correlation_id"] = correlation_id
         envelope["_meta"] = meta
         return envelope
 

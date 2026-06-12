@@ -114,6 +114,15 @@ class Settings(BaseSettings):
         "spliceailookup-link/0.1 (research MCP; +https://github.com/berntpopp/spliceailookup-link)"
     )
 
+    # Documented Broad SpliceAI Lookup backend transcript-annotation release,
+    # surfaced in prediction `provenance`. Env-overridable so an operator can bump
+    # it when the backend updates without a code change.
+    GENCODE_VERSION: str = "v44"
+
+    # Conservative Cloud Run idle-decay estimate surfaced by `warmup` as
+    # stay_warm_estimate_s. An estimate, not a guarantee.
+    WARMUP_STAY_WARM_ESTIMATE_SECONDS: int = 900
+
     model_config = SettingsConfigDict(
         env_prefix="SPLICEAILOOKUP_LINK_",
         env_file=".env",

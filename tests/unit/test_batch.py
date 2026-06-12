@@ -6,7 +6,9 @@ from spliceailookup_link.api import DataNotFoundError
 from tests.conftest import StubService, structured
 
 
-async def test_batch_scores_each_variant_once_envelope(mcp) -> None:
+async def test_batch_scores_each_variant_once_envelope(mcp, stub_service: StubService) -> None:
+    # The two inputs are the SAME variant (chr-prefix normalizes), so W2 dedup
+    # scores it once upstream and serves the duplicate from the first result.
     res = await mcp.call_tool(
         "predict_splicing_batch",
         {"variants": ["chr8-140300616-T-G", "8-140300616-T-G"]},
@@ -17,8 +19,13 @@ async def test_batch_scores_each_variant_once_envelope(mcp) -> None:
     assert len(data["results"]) == 2
     assert "see_also" not in data["_meta"]  # batch-level see_also is misleading for a panel
     assert data["_meta"]["next_commands"][0]["tool"] == "predict_splicing"
-    # F12: each success item now carries a slim per-item _meta (cache visibility).
-    assert all(r["_meta"]["cache"] in ("hit", "miss") for r in data["results"])
+    # F12: each success item carries a slim per-item _meta (cache visibility).
+    assert data["results"][0]["_meta"]["cache"] in ("hit", "miss")
+    assert data["results"][1]["_meta"]["cache"] == "deduped"
+    assert data["results"][1]["_meta"]["served_from"] == "8-140300616-T-G"
+    # Scored once: 2 model calls, not 4; the duplicate's 2 calls were saved.
+    assert len(stub_service.score_calls) == 2
+    assert data["summary"]["upstream_calls_saved"] == 2
 
 
 async def test_batch_partial_failure_does_not_fail_batch(mcp, stub_service: StubService) -> None:

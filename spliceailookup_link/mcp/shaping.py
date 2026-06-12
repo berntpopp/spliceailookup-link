@@ -360,8 +360,8 @@ def spliceai_headline(shaped: dict[str, Any]) -> str:
         s = d.get("score")
         if s is not None and s > best:
             best, best_class = s, name
-    if best_class is None:
-        return f"SpliceAI ({build}): {gene} — no non-zero delta scores."
+    if band(best) == "none":
+        return f"SpliceAI ({build}): {gene} — no predicted splicing impact (max Δ=0.00)."
     pos = (top["delta_scores"][best_class] or {}).get("position")
     label = best_class.replace("_", " ")
     consequence = shaped.get("consequence") or {}
@@ -479,8 +479,8 @@ def pangolin_headline(shaped: dict[str, Any]) -> str:
         s = d.get("score")
         if s is not None and s > best:
             best, best_class = s, name
-    if best_class is None:
-        return f"Pangolin ({build}): {gene} — no non-zero delta scores."
+    if band(best) == "none":
+        return f"Pangolin ({build}): {gene} — no predicted splicing impact (max Δ=0.00)."
     pos = (top["delta_scores"][best_class] or {}).get("position")
     label = best_class.replace("_", " ")
     return f"Pangolin ({build}): {gene} — {_strength(best)} {label} (Δ={best:.2f} at {pos:+d} bp)."

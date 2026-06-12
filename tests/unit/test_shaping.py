@@ -221,6 +221,23 @@ def test_f20_grch38_clean_ids_untouched():
     assert "gencode_id" not in t
 
 
+def test_band_none_headline_reads_naturally() -> None:
+    import copy
+
+    sai = copy.deepcopy(SPLICEAI_TRAPPC9)
+    for sc in sai["scores"]:
+        sc["DS_AG"] = sc["DS_AL"] = sc["DS_DG"] = sc["DS_DL"] = "0.00"
+    out = shape_spliceai(sai, response_mode="compact", include_consequence=False)
+    assert "no predicted splicing impact" in out["headline"]
+    assert "none acceptor" not in out["headline"]
+
+    pang = copy.deepcopy(PANGOLIN_TRAPPC9)
+    for sc in pang["scores"]:
+        sc["DS_SG"] = sc["DS_SL"] = "0.00"
+    pout = shape_pangolin(pang, response_mode="compact")
+    assert "no predicted splicing impact" in pout["headline"]
+
+
 def test_pangolin_all_non_zero_scores_are_numeric() -> None:
     out = shape_pangolin(PANGOLIN_TRAPPC9, response_mode="full")
     scores = out["all_non_zero_scores"]["scores"]

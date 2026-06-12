@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from spliceailookup_link.mcp.shaping import THRESHOLD_BASIS, band
+from spliceailookup_link.mcp.shaping import THRESHOLD_BASIS, _gene_label, band
 
 _HIGH = 0.5
 _LOW = 0.2
@@ -70,7 +70,7 @@ def combined_headline(
     molecular_consequence: str | None = None,
 ) -> str:
     """Render a one-line headline whose agreement clause is the verdict verbatim."""
-    gene_label = gene or "variant"
+    gene_label = _gene_label(gene) if gene else "variant"
     parts: list[str] = []
     if sai_max is not None:
         parts.append(f"SpliceAI Δ={sai_max:.2f}")

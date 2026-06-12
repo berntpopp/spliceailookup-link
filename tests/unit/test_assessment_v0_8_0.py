@@ -215,3 +215,29 @@ async def test_gtex_see_also_uses_gene_id_combined_full(mcp) -> None:
     )
     gtex = next(h for h in data["_meta"]["see_also"] if h["server"] == "gtex-link")
     assert gtex["example"]["arguments"]["gencode_id"] == ["ENSG00000167632.19"]
+
+
+# ---------------- F5a: symbol-less lncRNA headline ----------------
+
+def test_gene_label_marks_ensembl_only_genes() -> None:
+    from spliceailookup_link.mcp.shaping import _gene_label
+
+    assert _gene_label("TRAPPC9") == "TRAPPC9"
+    assert _gene_label("ENSG00000241860") == "ENSG00000241860 (no gene symbol)"
+    assert _gene_label(None) == "unknown gene"
+
+
+def test_spliceai_headline_uses_gene_label() -> None:
+    from spliceailookup_link.mcp.shaping import spliceai_headline
+
+    shaped = {
+        "genome_build": "GRCh38",
+        "variant_id": "1-100000-C-G",
+        "transcripts": [
+            {
+                "gene": "ENSG00000241860",
+                "delta_scores": {"acceptor_gain": {"score": 0.0, "position": 0}},
+            }
+        ],
+    }
+    assert "ENSG00000241860 (no gene symbol)" in spliceai_headline(shaped)

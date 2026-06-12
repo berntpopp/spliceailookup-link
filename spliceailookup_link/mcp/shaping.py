@@ -132,6 +132,16 @@ def _delta(score: Any, pos: Any) -> dict[str, Any]:
     return {"score": _to_float(score), "position": _to_int(pos)}
 
 
+_ENSG_ONLY_RE = re.compile(r"^ENSG\d+")
+
+
+def _gene_label(gene: str | None) -> str:
+    """Human-facing gene label; flags symbol-less Ensembl-only genes (e.g. some lncRNAs)."""
+    if not gene:
+        return "unknown gene"
+    return f"{gene} (no gene symbol)" if _ENSG_ONLY_RE.match(gene) else gene
+
+
 def _strength(score: float | None) -> str:
     if score is None:
         return "none"
@@ -369,7 +379,7 @@ def spliceai_headline(shaped: dict[str, Any]) -> str:
     if not transcripts:
         return f"SpliceAI ({build}): no transcript scores for {shaped.get('variant_id')}."
     top = transcripts[0]
-    gene = top.get("gene") or "unknown gene"
+    gene = _gene_label(top.get("gene"))
     best_class, best = None, -1.0
     for name, d in (top.get("delta_scores") or {}).items():
         s = d.get("score")
@@ -493,7 +503,7 @@ def pangolin_headline(shaped: dict[str, Any]) -> str:
     if not transcripts:
         return f"Pangolin ({build}): no transcript scores for {shaped.get('variant_id')}."
     top = transcripts[0]
-    gene = top.get("gene") or "unknown gene"
+    gene = _gene_label(top.get("gene"))
     best_class, best = None, -1.0
     for name, d in (top.get("delta_scores") or {}).items():
         s = d.get("score")

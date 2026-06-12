@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import json
 
-from spliceailookup_link.mcp.shaping import THRESHOLD_BASIS
+from spliceailookup_link.mcp.shaping import THRESHOLD_BASIS, shape_spliceai
 from tests.conftest import structured
+from tests.fixtures.api_responses import SPLICEAI_TRAPPC9
 
 
 async def test_f13_threshold_basis_emitted_once_in_combined(mcp) -> None:
@@ -26,3 +27,36 @@ async def test_f13_single_model_still_has_one_threshold_basis(mcp) -> None:
     data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
     assert data["interpretation"]["threshold_basis"] == THRESHOLD_BASIS
     assert json.dumps(data).count("threshold_basis") == 1
+
+
+def test_f14_populated_aberration_fields_are_kept() -> None:
+    shaped = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="full")
+    ab = shaped["consequence"]["aberrations"][0]
+    # The fixture populates these -> they must survive.
+    assert ab["type"] == "exon_skipping"
+    assert ab["status"] == "frameshift"
+    assert ab["size_is_coding"] is True
+    assert ab["introduces_stop_codon"] is True
+
+
+def test_f14_null_aberration_fields_are_omitted_not_null() -> None:
+    sparse = {
+        **SPLICEAI_TRAPPC9,
+        "sai10kPredictions": {
+            "aberrations": [
+                {
+                    "aberration_type": "exon_skipping",
+                    "affected_region": {"region_type": "intron"},
+                    "status": None,
+                    "size_is_coding": None,
+                    "introduces_stop_codon": None,
+                }
+            ]
+        },
+    }
+    shaped = shape_spliceai(sparse, response_mode="full")
+    ab = shaped["consequence"]["aberrations"][0]
+    assert ab["type"] == "exon_skipping"
+    assert "status" not in ab  # omitted, not null
+    assert "size_is_coding" not in ab
+    assert "introduces_stop_codon" not in ab

@@ -216,11 +216,15 @@ def _shape_consequence(payload: dict[str, Any], mode: ResponseMode) -> dict[str,
     # `aberrations` is the STABLE path in every mode (possibly empty under mask=1).
     out["aberrations"] = [
         {
-            "type": ab.get("aberration_type"),
-            "affected_region": ab.get("affected_region"),
-            "status": ab.get("status"),
-            "size_is_coding": ab.get("size_is_coding"),
-            "introduces_stop_codon": ab.get("introduces_stop_codon"),
+            k: v
+            for k, v in {
+                "type": ab.get("aberration_type"),
+                "affected_region": ab.get("affected_region"),
+                "status": ab.get("status"),
+                "size_is_coding": ab.get("size_is_coding"),
+                "introduces_stop_codon": ab.get("introduces_stop_codon"),
+            }.items()
+            if v is not None
         }
         for ab in (raw_aberr or [])
     ]

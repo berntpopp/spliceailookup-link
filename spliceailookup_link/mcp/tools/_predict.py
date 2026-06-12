@@ -33,6 +33,7 @@ from spliceailookup_link.mcp.tools._predict_shape import (
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.services.telemetry import CallTelemetry
 
+
 def _running_as_task(ctx: Any) -> bool:
     return bool(ctx is not None and getattr(ctx, "is_background_task", False))
 
@@ -117,7 +118,7 @@ async def predict_one(
     if deadline and not _running_as_task(ctx):
         try:
             gathered: list[Any] = list(await asyncio.wait_for(gather_coro, timeout=deadline))
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             raise SpliceApiError(
                 f"Scoring exceeded the server's {deadline}s deadline "
                 "(comprehensive gene_set and/or a large max_distance are slow)."

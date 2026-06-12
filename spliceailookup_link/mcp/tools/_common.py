@@ -70,6 +70,7 @@ async def prepare_variant(
     genome_build: GenomeBuild,
     *,
     cross_build_check: bool = True,
+    max_distance: int = 500,
 ) -> PreparedVariant:
     """Normalize any input to a CHROM-POS-REF-ALT id, resolving HGVS/rsID via VEP.
 
@@ -96,6 +97,16 @@ async def prepare_variant(
 
             await preflight_ref_mismatch(
                 service, variant_id=parsed.value, requested_build=genome_build
+            )
+        if cross_build_check and settings.PREFLIGHT_OVERLAP_CHECK_ENABLED:
+            # D4: fast-fail a genuine not_found before the slow scoring dispatch.
+            from spliceailookup_link.mcp.tools._diagnose import preflight_no_overlap
+
+            await preflight_no_overlap(
+                service,
+                variant_id=parsed.value,
+                requested_build=genome_build,
+                window=max_distance,
             )
         return PreparedVariant(
             variant_id=parsed.value,

@@ -80,6 +80,13 @@ class Settings(BaseSettings):
     # Disable only if Ensembl sequence lookups are unavailable in an environment.
     PREFLIGHT_REF_CHECK_ENABLED: bool = True
 
+    # Fast-fail not_found: before the slow scoring dispatch, ask Ensembl whether any
+    # transcript overlaps [pos-max_distance, pos+max_distance]. A conclusive zero means
+    # neither gene_set can score the variant, so return not_found in <0.5s instead of a
+    # ~20s cold round-trip. Conservative: any inconclusive/non-zero result falls through
+    # to real scoring (never invents a not_found). Disable if Ensembl overlap is unavailable.
+    PREFLIGHT_OVERLAP_CHECK_ENABLED: bool = True
+
     # Background-task (FastMCP Tasks / Docket) backend. memory:// is in-process and
     # correct for the single-process unified host; set redis://... for multi-worker.
     DOCKET_URL: str = "memory://"

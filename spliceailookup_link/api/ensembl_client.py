@@ -72,3 +72,24 @@ class EnsemblVepClient(BaseHTTPClient):
             return None
         seq = payload.get("seq") if isinstance(payload, dict) else None
         return seq.upper() if isinstance(seq, str) and seq else None
+
+    async def overlapping_transcripts(
+        self, chrom: str, pos: int, build: GenomeBuild, window: int
+    ) -> int | None:
+        """Return the count of transcripts overlapping [pos-window, pos+window], or None.
+
+        Uses Ensembl REST overlap/region on the build-specific host. Returns None on any
+        upstream fault / unexpected shape so the caller treats it as inconclusive and
+        falls back to real scoring (never a false fast-fail).
+        """
+        c = chrom.removeprefix("chr").removeprefix("CHR").upper()
+        start = max(1, pos - window)
+        end = pos + window
+        url = f"{settings.ensembl_url(build)}/overlap/region/human/{c}:{start}..{end}"
+        try:
+            payload = await self.get_json(
+                url, {"feature": "transcript", "content-type": "application/json"}
+            )
+        except SpliceApiError:
+            return None
+        return len(payload) if isinstance(payload, list) else None

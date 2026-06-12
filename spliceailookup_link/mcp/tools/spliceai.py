@@ -101,7 +101,11 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             if ctx is not None:
                 await ctx.report_progress(progress=0, total=2, message="resolving")
             prepared = await prepare_variant(
-                service, variant, genome_build, cross_build_check=cross_build_check
+                service,
+                variant,
+                genome_build,
+                cross_build_check=cross_build_check,
+                max_distance=max_distance,
             )
             if ctx is not None:
                 await ctx.report_progress(progress=1, total=2, message="scoring")

@@ -52,6 +52,9 @@ class SpliceService:
         self._refbase_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(
             self._refbase_uncached
         )
+        self._overlap_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(
+            self._overlap_uncached
+        )
         # Keys already computed once; used to report cache hit/miss telemetry.
         self._scored_keys: set[tuple[Any, ...]] = set()
         self._scored_at: dict[tuple[Any, ...], float] = {}
@@ -185,6 +188,17 @@ class SpliceService:
     ) -> str | None:
         """Cached reference-base lookup (used by the failure-path diagnostic)."""
         return await self._refbase_cached(chrom, pos, length, build)
+
+    async def _overlap_uncached(
+        self, chrom: str, pos: int, build: GenomeBuild, window: int
+    ) -> int | None:
+        return await self._ensembl.overlapping_transcripts(chrom, pos, build, window)
+
+    async def overlapping_transcripts(
+        self, chrom: str, pos: int, build: GenomeBuild, window: int
+    ) -> int | None:
+        """Cached transcript-overlap count for the not_found fast-fail pre-check."""
+        return await self._overlap_cached(chrom, pos, build, window)
 
     # ---------------- lifecycle ----------------
 

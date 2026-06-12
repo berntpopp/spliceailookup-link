@@ -108,3 +108,25 @@ async def test_resolve_check_ref_false_makes_no_ensembl_call(
     assert "ref_validated" not in data
     assert "ref_warning" not in data
     assert stub_service.refbase_calls == []
+
+
+async def test_not_found_fast_fails_on_zero_overlap(mcp, stub_service: StubService) -> None:
+    stub_service.overlap_count = 0
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    assert data["success"] is False
+    assert data["error_code"] == "not_found"
+    assert stub_service.score_calls == []  # never dispatched to scoring
+
+
+async def test_overlap_present_proceeds_to_scoring(mcp, stub_service: StubService) -> None:
+    stub_service.overlap_count = 1
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    assert "headline" in data
+    assert len(stub_service.score_calls) == 1
+
+
+async def test_overlap_inconclusive_proceeds(mcp, stub_service: StubService) -> None:
+    stub_service.overlap_count = None  # Ensembl unavailable -> never a false fast-fail
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    assert "headline" in data
+    assert len(stub_service.score_calls) == 1

@@ -67,3 +67,39 @@ def test_provenance_has_versioned_sources() -> None:
     assert "documented" in p["note"].lower()
     p37 = prediction_provenance("GRCh37")
     assert "lift37" in p37["transcript_annotation"]
+
+
+async def test_predict_splicing_carries_provenance(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    assert "v44" in data["provenance"]["transcript_annotation"]
+
+
+async def test_minimal_omits_provenance(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "minimal"}
+        )
+    )
+    assert "provenance" not in data
+
+
+async def test_predict_spliceai_carries_provenance(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    assert "v44" in data["provenance"]["transcript_annotation"]
+
+
+async def test_predict_pangolin_carries_provenance(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_pangolin", {"variant": "chr8-140300616-T-G"}))
+    assert "v44" in data["provenance"]["transcript_annotation"]
+
+
+async def test_batch_envelope_carries_provenance(mcp) -> None:
+    data = structured(
+        await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
+    )
+    assert "v44" in data["_meta"]["provenance"]["transcript_annotation"]
+
+
+def test_capabilities_data_sources_versioned() -> None:
+    ds = get_capabilities_resource()["data_sources"]
+    assert "v44" in ds["transcript_annotation"]

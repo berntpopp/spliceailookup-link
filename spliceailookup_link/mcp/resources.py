@@ -10,16 +10,12 @@ from typing import Any
 from mcp.types import LATEST_PROTOCOL_VERSION as MCP_PROTOCOL_VERSION
 
 from spliceailookup_link.config import settings
+from spliceailookup_link.mcp.provenance import data_sources as _data_sources
 
 RESEARCH_USE_NOTICE = (
     "Research use only; not for clinical decision support. Splice predictions are "
     "computational and must be interpreted alongside orthogonal evidence."
 )
-
-# Upstream model provenance surfaced in every response's _meta.
-SPLICEAI_MODEL = "SpliceAI (Illumina) via Broad SpliceAI Lookup"
-PANGOLIN_MODEL = "Pangolin (Tongji/Invitae) via Broad SpliceAI Lookup"
-SAI10K_MODEL = "SpliceAI-10k calculator (consequence prediction)"
 
 
 def _server_version() -> str:
@@ -352,12 +348,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             "spliceailookup://research-use": "research-use-only notice",
             "spliceailookup://citations": "SpliceAI / Pangolin / SAI-10k / Ensembl citations",
         },
-        "data_sources": {
-            "spliceai": SPLICEAI_MODEL,
-            "pangolin": PANGOLIN_MODEL,
-            "sai10k": SAI10K_MODEL,
-            "resolver": "Ensembl VEP REST",
-        },
+        "data_sources": _data_sources(),
     }
     version_hash, chars = _capabilities_version(doc)
     doc["capabilities_version"] = version_hash

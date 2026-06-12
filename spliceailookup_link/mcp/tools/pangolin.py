@@ -13,6 +13,7 @@ from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import cmd
+from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.shaping import shape_pangolin
 from spliceailookup_link.mcp.tools._common import (
     mask_to_int,
@@ -160,6 +161,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     meta["cache_age_s"] = tele.cache_age_s
                 if prepared.resolution is not None:
                     meta["resolved_from"] = prepared.resolution.get("raw_input")
+            if response_mode != "minimal":
+                shaped["provenance"] = prediction_provenance(genome_build)
             shaped["_meta"] = meta
             return shaped
 

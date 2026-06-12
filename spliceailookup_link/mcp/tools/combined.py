@@ -12,6 +12,7 @@ from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import for_combined
+from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.tools._common import see_also_for
 from spliceailookup_link.mcp.tools._predict import predict_one
 from spliceailookup_link.services import SpliceService
@@ -100,6 +101,8 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 ctx=ctx,
             )
             tel = result.pop("_telemetry")
+            if response_mode != "minimal":
+                result["provenance"] = prediction_provenance(genome_build)
             meta: dict[str, Any] = {}
             if include_hints:
                 meta["next_commands"] = for_combined(result["variant_id"], genome_build)

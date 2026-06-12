@@ -10,6 +10,7 @@ from pydantic import Field
 
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import run_mcp_tool
+from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.tools._batch_runner import run_batch
 from spliceailookup_link.mcp.tools._common import running_as_task
 from spliceailookup_link.services import SpliceService
@@ -50,7 +51,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
 
         async def call() -> dict[str, Any]:
             service = service_factory()
-            return await run_batch(
+            out = await run_batch(
                 service,
                 variants=variants,
                 genome_build=genome_build,
@@ -68,5 +69,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                 ctx=ctx,
                 max_items=_MAX_BATCH,
             )
+            out["_meta"]["provenance"] = prediction_provenance(genome_build)
+            return out
 
         return await run_mcp_tool("predict_splicing_batch", call)

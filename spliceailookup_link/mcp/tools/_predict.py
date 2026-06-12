@@ -183,6 +183,13 @@ async def predict_one(
                 gene = pang_top.get("gene")
         result["pangolin"] = shaped_pang
 
+    # F13: threshold_basis is a static glossary string; emit it once (top-level
+    # combined_interpretation). Keep each sub-block's decision-relevant band.
+    for sub in ("spliceai", "pangolin"):
+        interp = (result.get(sub) or {}).get("interpretation")
+        if interp:
+            interp.pop("threshold_basis", None)
+
     identity = _lift_identity(sai_top, pang_top)
     if identity:
         result["transcript"] = identity

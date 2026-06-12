@@ -45,6 +45,15 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         transcripts: Annotated[Literal["mane", "all"], Field()] = "mane",
         response_mode: Annotated[Literal["compact", "full", "minimal"], Field()] = "compact",
         cross_build_check: Annotated[bool, Field()] = True,
+        correlation_id: Annotated[
+            str | None,
+            Field(
+                default=None,
+                max_length=128,
+                description="Optional client trace id echoed into _meta.correlation_id (on "
+                "success and error) so a multi-step workflow is traceable as one unit.",
+            ),
+        ] = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         """Score a list of variants in ONE call. The server fans out under its concurrency cap and returns a single envelope with per-variant results (+ per-item errors that do not fail the batch) and a summary. Use this for gene panels instead of N predict_splicing calls. Accepts 1-25 variants (more than max_items=25 returns validation_failed, not a truncated result); each item returns about one compact predict_splicing result, so a full batch is ~25x a single compact response, and _meta echoes items_submitted and max_items. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
@@ -72,4 +81,6 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
             out["_meta"]["provenance"] = prediction_provenance(genome_build)
             return out
 
-        return await run_mcp_tool("predict_splicing_batch", call)
+        return await run_mcp_tool(
+            "predict_splicing_batch", call, correlation_id=correlation_id
+        )

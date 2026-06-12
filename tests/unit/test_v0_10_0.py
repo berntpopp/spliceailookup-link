@@ -103,3 +103,44 @@ async def test_batch_envelope_carries_provenance(mcp) -> None:
 def test_capabilities_data_sources_versioned() -> None:
     ds = get_capabilities_resource()["data_sources"]
     assert "v44" in ds["transcript_annotation"]
+
+
+# ---------------- W8: client-supplied correlation_id ----------------
+
+
+async def test_correlation_id_echoed_on_success(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-140300616-T-G", "correlation_id": "trace-123"}
+        )
+    )
+    assert data["_meta"]["correlation_id"] == "trace-123"
+
+
+async def test_correlation_id_echoed_on_error(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-zzz-T-G", "correlation_id": "trace-err"}
+        )
+    )
+    assert data["error_code"] == "invalid_input"
+    assert data["_meta"]["correlation_id"] == "trace-err"
+
+
+async def test_no_correlation_id_means_no_field(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    assert "correlation_id" not in data["_meta"]
+
+
+async def test_correlation_id_on_resolve_and_batch(mcp) -> None:
+    res = structured(
+        await mcp.call_tool("resolve_variant", {"variant": "chr8-140300616-T-G", "correlation_id": "c1"})
+    )
+    assert res["_meta"]["correlation_id"] == "c1"
+    batch = structured(
+        await mcp.call_tool(
+            "predict_splicing_batch",
+            {"variants": ["chr8-140300616-T-G"], "correlation_id": "c2"},
+        )
+    )
+    assert batch["_meta"]["correlation_id"] == "c2"

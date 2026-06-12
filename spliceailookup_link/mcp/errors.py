@@ -274,7 +274,7 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
     if fallback_tool and fallback_args:
         next_commands.append({"tool": fallback_tool, "arguments": fallback_args})
     next_commands.append({"tool": _FALLBACK_TOOL, "arguments": {}})
-    payload = {
+    payload: dict[str, Any] = {
         "success": False,
         "error_code": error_code,
         "message": _envelope_message(exc, error_code),

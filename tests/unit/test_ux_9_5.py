@@ -38,3 +38,43 @@ async def test_standalone_single_model_keeps_request_echo(mcp) -> None:
     assert data["variant_id"] == "8-140300616-T-G"
     assert data["genome_build"] == "GRCh38"
     assert data["max_distance"] == 500
+
+
+async def test_include_see_also_false_keeps_next_commands(mcp) -> None:
+    res = await mcp.call_tool(
+        "predict_splicing", {"variant": "chr8-140300616-T-G", "include_see_also": False}
+    )
+    data = structured(res)
+    assert "headline" in data, "must be a success envelope, not validation_failed"
+    meta = data["_meta"]
+    assert "next_commands" in meta
+    assert "see_also" not in meta
+
+
+async def test_default_keeps_see_also(mcp) -> None:
+    meta = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))[
+        "_meta"
+    ]
+    assert "see_also" in meta and "next_commands" in meta
+
+
+async def test_include_hints_false_drops_both(mcp) -> None:
+    meta = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-140300616-T-G", "include_hints": False}
+        )
+    )["_meta"]
+    assert "next_commands" not in meta
+    assert "see_also" not in meta
+
+
+async def test_spliceai_include_see_also_false(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "chr8-140300616-T-G", "include_see_also": False}
+        )
+    )
+    assert "headline" in data, "must be a success envelope, not validation_failed"
+    meta = data["_meta"]
+    assert "next_commands" in meta
+    assert "see_also" not in meta

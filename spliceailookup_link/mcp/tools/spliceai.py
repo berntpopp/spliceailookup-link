@@ -82,6 +82,14 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 "set false to trim tokens once you know the workflow)."
             ),
         ] = True,
+        include_see_also: Annotated[
+            bool,
+            Field(
+                description="Include _meta.see_also cross-server hints (default true; independent "
+                "of include_hints -- set false to keep next_commands but drop the 4 cross-server "
+                "entries)."
+            ),
+        ] = True,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         """ONE model only (SpliceAI); use predict_splicing for BOTH models with an agreement verdict. Use this for the SpliceAI delta scores (acceptor/donor gain/loss, each 0-1 with a position) of a single variant, optionally with the SpliceAI-10k consequence prediction (exon skipping / intron retention / frameshift). For a quick raw-vs-masked or single-model question; use predict_splicing to also get Pangolin. Δ>=0.5 is high-confidence. Returns ~1-4kB (full/all larger). Note: cold calls take 10-30s. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
@@ -141,7 +149,7 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 meta["next_commands"] = [
                     cmd("predict_pangolin", variant=prepared.variant_id, genome_build=genome_build)
                 ]
-                if response_mode != "minimal":
+                if include_see_also and response_mode != "minimal":
                     meta["see_also"] = see_also_for(
                         prepared.variant_id, genome_build, gene, response_mode
                     )

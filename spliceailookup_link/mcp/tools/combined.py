@@ -71,6 +71,14 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 "set false to trim tokens once you know the workflow)."
             ),
         ] = True,
+        include_see_also: Annotated[
+            bool,
+            Field(
+                description="Include _meta.see_also cross-server hints (default true; independent "
+                "of include_hints -- set false to keep next_commands but drop the 4 cross-server "
+                "entries)."
+            ),
+        ] = True,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         """BOTH models (SpliceAI + Pangolin) in one call -- the default "what does this variant do to splicing?" answer. Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls). Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
@@ -95,7 +103,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             meta: dict[str, Any] = {}
             if include_hints:
                 meta["next_commands"] = for_combined(result["variant_id"], genome_build)
-                if response_mode != "minimal":
+                if include_see_also and response_mode != "minimal":
                     meta["see_also"] = see_also_for(
                         result["variant_id"], genome_build, tel["gene"], response_mode
                     )

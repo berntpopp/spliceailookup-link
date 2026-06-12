@@ -78,6 +78,14 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 "set false to trim tokens once you know the workflow)."
             ),
         ] = True,
+        include_see_also: Annotated[
+            bool,
+            Field(
+                description="Include _meta.see_also cross-server hints (default true; independent "
+                "of include_hints -- set false to keep next_commands but drop the 4 cross-server "
+                "entries)."
+            ),
+        ] = True,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         """ONE model only (Pangolin); use predict_splicing for BOTH models with an agreement verdict. Use this for the Pangolin splice gain/loss scores of a single variant. Pangolin is an independent splice model; agreement with SpliceAI strengthens a prediction, disagreement warrants caution. Use predict_splicing to get both models in one call. Returns ~1-3kB. Note: cold calls take 10-30s. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
@@ -132,7 +140,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 meta["next_commands"] = [
                     cmd("predict_spliceai", variant=prepared.variant_id, genome_build=genome_build)
                 ]
-                if response_mode != "minimal":
+                if include_see_also and response_mode != "minimal":
                     meta["see_also"] = see_also_for(
                         prepared.variant_id, genome_build, gene, response_mode
                     )

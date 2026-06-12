@@ -457,3 +457,100 @@ offline; a live re-exercise is recommended once v0.4.0 is deployed.
 
 *Research use only; not for clinical decision support. Splice predictions are
 computational and must be interpreted alongside orthogonal evidence.*
+
+---
+
+## Part 7 -- Fresh live black-box re-test of the deployed v0.4.0
+
+**Date:** 2026-06-12 · **Server:** spliceailookup-link **v0.4.0** (deployed)
+**Basis:** an independent LLM-consumer + senior-tester pass run against the *live*
+server (not offline). 7/7 tools and 5/5 resources exercised; 3/7 error codes
+triggered live (`invalid_input`, `not_found`, `build_mismatch`); cross-tool
+numeric consistency checked. This is the live re-exercise Part 6 said was pending.
+
+### Reconciliation with the Part 6 projection
+
+Part 6 projected ~9.5 on both axes *offline*. This fresh live pass lands honestly
+at **~9.0 / ~9.0** -- the same "independent re-test scores below the maintainer's
+projection" gap seen at Part 3 -> Part 4. The reason is not a regression: the
+v0.3.0/v0.4.0 fixes (F1-F10, G1/G2, the minimal crash) all hold up live and the
+numbers are clean. The drag is a cluster Parts 1-6 never scoped -- the **batch
+path is a second-class citizen** relative to the single-call path, plus static-
+string duplication and a few null/observability gaps. New findings F11-F17.
+
+### 7a. LLM-consumer experience (re-rated, live v0.4.0)
+
+| Dimension | Score | Evidence |
+|---|---|---|
+| Correctness / consistency | 10 | `predict_splicing` SpliceAI (0.83) + Pangolin (0.85) sub-scores byte-identical to the standalone tools; verdicts accurate |
+| Error handling (standalone) | 10 | invalid/not_found/build_mismatch all typed, retryable-flagged, with pre-filled `fallback_args`; `build_mismatch` *infers* the correct build |
+| Observability | 9 | `request_id`/`timing`/`cache`(hit\|miss\|partial)/`cache_age_s`/`upstream_elapsed_ms` per call; no live rate budget |
+| Discoverability | 9 | 6.85kB capabilities + `capabilities_version` hash; 5 annotated resources |
+| Schema / decision-completeness | 9 | enums/defaults/examples; flexible variant input; `molecular_consequence` (G2) present |
+| Composability / chaining | 9 | `next_commands` on success *and* error; 4-sibling `see_also` (G1) |
+| Response design | 9 | headline-first, bands, concordance verdicts, stable paths |
+| Safety / scoping | 9 | research-use + `unsafe_for_clinical_use` everywhere; clean delegation |
+| Token efficiency | 8 | tiered modes + transcript collapse, but `threshold_basis` triplicated (F13); null SAI-10k sub-fields (F14) |
+| Speed / latency | 8 | 24h cache (hit=0ms), warmup, background tasks; upstream-bound ceiling |
+
+**Overall: 9.0 / 10.** Standalone paths are essentially 10; the deductions are
+token duplication and the upstream-bound latency ceiling.
+
+New consumer asks (additive, not bugs):
+
+- **#C1** -- live rate-limit budget in `_meta` (e.g. `rate_budget:{remaining,
+  window_s}`), at least on `rate_limited`, so a panel-runner paces itself instead
+  of discovering the cap by hitting it.
+- **#C2** -- pre-call cache visibility (a `cached` boolean, e.g. from
+  `resolve_variant`) so a client can choose sync vs background for cold calls.
+- **#C3** -- a `lite` capabilities tier (~1kB: tools + workflows + version hash);
+  the full 6.85kB doc largely duplicates the tool schemas on cold load.
+
+### 7b. Senior-tester report (live v0.4.0)
+
+Coverage: `get_server_capabilities`, `resolve_variant` (rsID-ambiguous / HGVS /
+loose coord), `predict_spliceai` (compact/minimal/full/masked/transcripts=all/
+GRCh37/not_found/invalid), `predict_pangolin`, `predict_splicing`,
+`predict_splicing_batch` (valid+valid+invalid), `warmup`, all 5 resources.
+
+Verified strengths (evidence, not assumption): cross-tool score identity;
+`build_mismatch` infers the correct build into `fallback_args`; `rs6025` flagged
+`ambiguous:true` with both alleles + a `next_commands` per allele; `mask=masked`
+zeroed the unannotated-site loss (0.62->0) and emptied `consequence.aberrations`
+per contract; agreement logic tested on a *real* disagreement (ABCA3 SpliceAI 0.21
+/ Pangolin 0.05 -> `discordant`); batch isolates a bad item while staying
+`success:true` with an accurate `summary`.
+
+Findings:
+
+| ID | Sev | Finding |
+|---|---|---|
+| F11 | MED | Batch per-item errors are second-class: they carry only `{variant, error_code, message, retryable}` -- the standalone error's `recovery_action`/`fallback_tool`/`fallback_args`/`recovery`/`next_commands` scaffold is dropped, exactly where a panel-runner needs it most. |
+| F12 | LOW-MED | Batch loses per-item observability: only one aggregate `_meta`; no per-item `cache`/`cache_age_s`/`upstream_elapsed_ms`, so warm-vs-cold items are indistinguishable. |
+| F13 | LOW | `interpretation.threshold_basis` (a static string) is emitted 3x per `predict_splicing` payload (spliceai + pangolin + top-level); pure dead weight, compounded across a batch. |
+| F14 | INVESTIGATE | `consequence.aberrations[].status` / `size_is_coding` / `introduces_stop_codon` were `null` even in `full` mode for a high-confidence exon-skip -- confirm whether they ever populate; omit-when-null or document. |
+| F15 | LOW | `mask=masked` silently empties `consequence.aberrations` while `max_delta_score` is unchanged (0.83 both modes); a consumer keying on the score sees no signal the aberration vanished. Add an in-payload note when masking suppresses a raw-mode aberration. |
+| F16 | LOW | `resolve_variant` does no ref-allele check on coordinate input (`source:"direct"`, 0ms passthrough); a wrong ref passes resolution and only fails at prediction. Document the caveat. |
+| F17 | ERGONOMIC | `predict_spliceai` vs `predict_splicing` collide on one letter for a single-vs-both-models choice; batch items also carry redundant `variant` + `variant_id`. |
+
+Per-tool ratings:
+
+| Tool | Score | Note |
+|---|---|---|
+| `get_server_capabilities` | 9.5 | comprehensive; F17 naming |
+| `resolve_variant` | 9 | excellent ambiguity handling; F16 minor |
+| `predict_spliceai` | 9 | F15 masking note |
+| `predict_pangolin` | 9 | clean |
+| `predict_splicing` | 9 | F13 duplication |
+| `predict_splicing_batch` | 7.5 | **F11 + F12** -- the one tool with real gaps |
+| `warmup` | 9 | clean |
+
+Projected tester mean: (9.5+9+9+9+9+7.5+9)/7 ~= **8.86**. The single actionable
+theme: **make `predict_splicing_batch` a first-class citizen** (same error
+envelope, same observability as single calls). F11-F13 together lift the batch
+tool 7.5 -> ~9 and token efficiency 8 -> 9, moving both axes to ~9.2.
+
+Design + scoped fixes: `docs/superpowers/specs/2026-06-12-eval-improvements-3-design.md` (target v0.5.0).
+
+*Research use only; not for clinical decision support. Splice predictions are
+computational and must be interpreted alongside orthogonal evidence.*

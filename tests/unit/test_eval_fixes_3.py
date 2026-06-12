@@ -294,3 +294,24 @@ async def test_inv_no_null_leaf_in_full_mode(mcp) -> None:
         }
     ]
     assert nulls == [], f"unexpected null leaves in full mode: {nulls}"
+
+
+async def test_caps_document_new_contracts(mcp) -> None:
+    caps = structured(await mcp.call_tool("get_server_capabilities", {}))
+    blob = json.dumps(caps).lower()
+    # F17 which-tool guidance
+    assert "which tool" in blob or ("both models" in blob and "one model" in blob)
+    # F16 caveat
+    assert "normalized, not validated" in blob
+    # #C1 concurrency unit (never a fabricated window)
+    assert "concurrent_requests" in blob
+    assert "window_s" not in blob
+    # F14 aberration sub-field note
+    assert "size_is_coding" in blob
+
+
+async def test_caps_version_changes_and_is_stable(mcp) -> None:
+    a = structured(await mcp.call_tool("get_server_capabilities", {}))
+    b = structured(await mcp.call_tool("get_server_capabilities", {}))
+    assert a["capabilities_version"] == b["capabilities_version"]  # stable
+    assert isinstance(a["capabilities_version"], str) and len(a["capabilities_version"]) >= 8

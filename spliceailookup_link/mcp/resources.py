@@ -65,6 +65,8 @@ def get_capabilities_resource() -> dict[str, Any]:
             "Pangolin only -> predict_pangolin",
             "Many variants (gene panel) -> predict_splicing_batch (one envelope, fans out server-side)",
             "Before a burst -> warmup (pre-warm the cold upstream containers)",
+            "Which tool? predict_splicing = BOTH models (default); "
+            "predict_spliceai / predict_pangolin = ONE model only.",
         ],
         "parameters": {
             "variant": "CHROM-POS-REF-ALT (chr optional), HGVS, or rsID. resolve_variant normalizes it.",
@@ -100,6 +102,18 @@ def get_capabilities_resource() -> dict[str, Any]:
                 "consequence.aberrations is the stable path in every response_mode (it may be an "
                 "empty list under mask='masked', which zeroes the relevant site, even when raw "
                 "mode predicts an aberration); full mode adds consequence.transcript_info."
+            ),
+            "aberration_fields": (
+                "consequence.aberrations[].status / size_is_coding / introduces_stop_codon "
+                "are SAI-10k coding-impact fields, populated only for coding-relevant "
+                "aberration classes; absent keys mean upstream did not compute them (not "
+                "'false'). Under mask='masked' an empty aberrations list with a non-trivial "
+                "delta carries a consequence.note that mask='raw' may reveal a suppressed "
+                "aberration."
+            ),
+            "resolve_caveat": (
+                "Coordinate inputs are normalized, not validated: a wrong REF allele passes "
+                "resolution and only fails at prediction time."
             ),
         },
         "error_codes": [
@@ -157,6 +171,13 @@ def get_capabilities_resource() -> dict[str, Any]:
                 "Fan out at most max_concurrent_requests scoring calls at once; excess calls wait "
                 "up to queue_wait_seconds then return a retryable rate_limited error. Results are "
                 "cached, so repeat queries are free."
+            ),
+            "rate_budget": (
+                "On a rate_limited error, _meta.rate_budget reports "
+                "{limit, remaining, unit:'concurrent_requests'} -- a LOCAL concurrency cap, "
+                "not a time-windowed rate limit; there is no reset interval to wait out, so "
+                "reduce concurrent calls. (remaining=0 is exact for local saturation; for an "
+                "upstream 429 it is a conservative floor.)"
             ),
         },
         "background_execution": {

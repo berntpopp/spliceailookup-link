@@ -35,6 +35,21 @@ def _capabilities_version(doc: dict[str, Any]) -> tuple[str, int]:
     return digest, len(serialized)
 
 
+_CAPABILITIES_VERSION: str | None = None
+
+
+def get_capabilities_version() -> str:
+    """The full capabilities doc's content hash, computed once and cached.
+
+    Echoed into every response `_meta` so a warm client compares the hash and
+    skips re-fetching the capabilities document until it actually changes.
+    """
+    global _CAPABILITIES_VERSION
+    if _CAPABILITIES_VERSION is None:
+        _CAPABILITIES_VERSION = get_capabilities_resource()["capabilities_version"]
+    return _CAPABILITIES_VERSION
+
+
 def get_capabilities_resource() -> dict[str, Any]:
     doc: dict[str, Any] = {
         "server": "spliceailookup-link",

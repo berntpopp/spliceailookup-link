@@ -26,6 +26,7 @@ from spliceailookup_link.api import (
     UpstreamInputError,
 )
 from spliceailookup_link.config import settings
+from spliceailookup_link.mcp.resources import get_capabilities_version
 from spliceailookup_link.variant import VariantParseError
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,7 @@ class AmbiguousVariantError(ValueError):
 
 
 def _provenance_meta() -> dict[str, Any]:
-    return dict(_BASE_META)
+    return {**_BASE_META, "capabilities_version": get_capabilities_version()}
 
 
 def _safe_message(exc: BaseException) -> str:

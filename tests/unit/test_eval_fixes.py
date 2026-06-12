@@ -178,3 +178,17 @@ async def test_single_predict_ambiguous_rsid_does_not_silently_score(mcp, stub_s
     data = structured(await mcp.call_tool("predict_splicing", {"variant": "rs6025"}))
     assert data["error_code"] == "ambiguous"
     assert stub_service.score_calls == []
+
+
+from spliceailookup_link.mcp.resources import get_capabilities_version
+
+
+async def test_capabilities_version_echoed_on_success(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    assert data["_meta"]["capabilities_version"] == get_capabilities_version()
+
+
+async def test_capabilities_version_echoed_on_error(mcp, stub_service) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "not a variant!!"}))
+    assert data["error_code"] == "invalid_input"
+    assert data["_meta"]["capabilities_version"] == get_capabilities_version()

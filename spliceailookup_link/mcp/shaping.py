@@ -215,15 +215,29 @@ def _shape_spliceai_transcript(raw: dict[str, Any], mode: ResponseMode) -> dict[
                 "alt": _to_float(raw.get("DS_DL_ALT")),
             },
         }
+        starts = raw.get("EXON_STARTS")
+        ends = raw.get("EXON_ENDS")
         out["exon_model"] = {
-            "exon_starts": raw.get("EXON_STARTS"),
-            "exon_ends": raw.get("EXON_ENDS"),
+            "tx_start": min(starts) if starts else None,
+            "tx_end": max(ends) if ends else None,
+            "exon_starts": starts,
+            "exon_ends": ends,
             "cds_start": raw.get("CDS_START"),
             "cds_end": raw.get("CDS_END"),
         }
         if raw.get("SCORES_FOR_INSERTED_BASES"):
             out["scores_for_inserted_bases"] = raw["SCORES_FOR_INSERTED_BASES"]
     return out
+
+
+def _tx_bounds(scores: list[dict[str, Any]]) -> tuple[int | None, int | None]:
+    """Genomic transcript bounds from the MANE/top scored transcript's exons."""
+    if not scores:
+        return None, None
+    top = next((s for s in scores if str(s.get("t_priority")) in ("MS", "MP")), scores[0])
+    starts = top.get("EXON_STARTS")
+    ends = top.get("EXON_ENDS")
+    return (min(starts) if starts else None, max(ends) if ends else None)
 
 
 def _shape_consequence(
@@ -254,7 +268,16 @@ def _shape_consequence(
     ]
     if mode == "full" and isinstance(sai, dict):
         if sai.get("transcript_info") is not None:
-            out["transcript_info"] = sai["transcript_info"]
+            ti = dict(sai["transcript_info"])
+            # D5: upstream leaves tx_start/tx_end null; derive them from the
+            # scored transcript's exon arrays (never overwrite a non-null value).
+            if ti.get("tx_start") is None or ti.get("tx_end") is None:
+                tx_start, tx_end = _tx_bounds(payload.get("scores") or [])
+                if ti.get("tx_start") is None and tx_start is not None:
+                    ti["tx_start"] = tx_start
+                if ti.get("tx_end") is None and tx_end is not None:
+                    ti["tx_end"] = tx_end
+            out["transcript_info"] = ti
         extras = {k: v for k, v in sai.items() if k not in {"aberrations", "transcript_info"}}
         if extras:
             out["raw_extras"] = extras

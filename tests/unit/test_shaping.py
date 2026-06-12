@@ -57,7 +57,12 @@ def test_consequence_aberrations_is_stable_path_when_empty() -> None:
 def test_full_mode_adds_transcript_info_as_sibling() -> None:
     out = shape_spliceai(SPLICEAI_MASKED_EMPTY_ABERR, response_mode="full")
     assert "aberrations" in out["consequence"]
-    assert out["consequence"]["transcript_info"] == {"strand": "-", "exon_count": 23}
+    ti = out["consequence"]["transcript_info"]
+    assert ti["strand"] == "-"
+    assert ti["exon_count"] == 23
+    # D5: tx bounds derived from the scored transcript's exon arrays.
+    assert ti["tx_start"] == 139727725
+    assert ti["tx_end"] == 140300614
 
 
 def test_populated_aberrations_unchanged() -> None:

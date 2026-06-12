@@ -102,3 +102,29 @@ async def test_served_warm_true_on_cache_hit(mcp, stub_service: StubService) -> 
     await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})  # warms cache
     res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})
     assert structured(res)["_meta"]["served_warm"] is True
+
+
+# --- D5: tx_start / tx_end ----------------------------------------------------
+
+from spliceailookup_link.mcp.shaping import shape_spliceai  # noqa: E402
+from tests.fixtures.api_responses import (  # noqa: E402
+    SPLICEAI_MASKED_EMPTY_ABERR,
+    SPLICEAI_TRAPPC9,
+)
+
+
+def test_exon_model_carries_tx_bounds() -> None:
+    shaped = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="full")
+    exon = shaped["transcripts"][0]["exon_model"]
+    assert exon["tx_start"] == 139727725  # min(EXON_STARTS)
+    assert exon["tx_end"] == 140300614  # max(EXON_ENDS)
+
+
+def test_transcript_info_tx_bounds_filled_when_null() -> None:
+    # SAI-10k transcript_info carries strand/exon_count but null tx bounds; fill
+    # them from the exon arrays in the scored transcript.
+    shaped = shape_spliceai(SPLICEAI_MASKED_EMPTY_ABERR, response_mode="full")
+    ti = shaped["consequence"]["transcript_info"]
+    assert ti["tx_start"] == 139727725
+    assert ti["tx_end"] == 140300614
+    assert ti["strand"] == "-"  # upstream fields preserved

@@ -10,15 +10,15 @@ from pydantic import Field
 
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from spliceailookup_link.mcp.errors import BuildMismatchError, McpErrorContext, run_mcp_tool
+from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import cmd
 from spliceailookup_link.mcp.shaping import shape_spliceai
 from spliceailookup_link.mcp.tools._common import (
-    cross_build_probe,
     mask_to_int,
     prepare_variant,
     see_also_for,
 )
+from spliceailookup_link.mcp.tools._diagnose import diagnose_coordinate_failure
 from spliceailookup_link.services import SpliceService
 
 
@@ -94,23 +94,16 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     raw=variant,
                     consequence=prepared.consequence,
                 )
-            except DataNotFoundError as nf:
+            except DataNotFoundError:
                 if cross_build_check and prepared.resolution is None:
-                    other = await cross_build_probe(
+                    await diagnose_coordinate_failure(
                         service,
-                        model="spliceai",
-                        requested_build=genome_build,
                         variant_id=prepared.variant_id,
+                        requested_build=genome_build,
                         distance=max_distance,
                         mask=mask_to_int(mask),
                         gene_set=gene_set,
                     )
-                    if other:
-                        raise BuildMismatchError(
-                            variant_id=prepared.variant_id,
-                            inferred_build=other,
-                            requested_build=genome_build,
-                        ) from nf
                 raise
             shaped = shape_spliceai(
                 payload,

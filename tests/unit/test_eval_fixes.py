@@ -149,3 +149,26 @@ async def test_out_of_range_max_distance_is_validation_failed(mcp) -> None:
     )
     assert data["success"] is False
     assert data["error_code"] == "validation_failed"
+
+
+async def test_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> None:
+    from tests.conftest import DataNotFoundError
+
+    stub_service.score_error = DataNotFoundError("did not return any scores")
+    stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}  # REF 'A' matches neither
+    data = structured(
+        await mcp.call_tool("predict_splicing", {"variant": "8-140300616-A-G"})
+    )
+    assert data["error_code"] == "ref_mismatch"
+    assert data["fallback_tool"] == "resolve_variant"
+
+
+async def test_spliceai_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> None:
+    from tests.conftest import DataNotFoundError
+
+    stub_service.score_error = DataNotFoundError("did not return any scores")
+    stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
+    data = structured(
+        await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-A-G"})
+    )
+    assert data["error_code"] == "ref_mismatch"

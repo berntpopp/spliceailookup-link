@@ -13,7 +13,6 @@ from typing import Any, Literal
 
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.config import GenomeBuild
-from spliceailookup_link.mcp.errors import BuildMismatchError
 from spliceailookup_link.mcp.shaping import (
     ResponseMode,
     Transcripts,
@@ -21,10 +20,10 @@ from spliceailookup_link.mcp.shaping import (
     shape_spliceai,
 )
 from spliceailookup_link.mcp.tools._common import (
-    cross_build_probe,
     mask_to_int,
     prepare_variant,
 )
+from spliceailookup_link.mcp.tools._diagnose import diagnose_coordinate_failure
 from spliceailookup_link.mcp.tools._predict_shape import (
     assess_agreement,
     combined_headline,
@@ -119,21 +118,16 @@ async def predict_one(
             and prepared.resolution is None
             and isinstance(sai_res, DataNotFoundError)
         ):
-            other = await cross_build_probe(
+            # Cheap Ensembl reference check: raises BuildMismatchError or
+            # RefMismatchError when applicable, else returns (genuine not_found).
+            await diagnose_coordinate_failure(
                 service,
-                model="spliceai",
-                requested_build=genome_build,
                 variant_id=prepared.variant_id,
+                requested_build=genome_build,
                 distance=max_distance,
                 mask=mask_to_int(mask),
                 gene_set=gene_set,
             )
-            if other:
-                raise BuildMismatchError(
-                    variant_id=prepared.variant_id,
-                    inferred_build=other,
-                    requested_build=genome_build,
-                ) from sai_res
         raise sai_res
 
     if ctx is not None:

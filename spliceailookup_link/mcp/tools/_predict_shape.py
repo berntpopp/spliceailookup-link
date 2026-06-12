@@ -21,6 +21,7 @@ _VERDICT_CLAUSE = {
     "concordant_moderate": "models agree (both moderate)",
     "concordant_low": "models agree (both low/none)",
     "discordant": "models disagree",
+    "discordant_subthreshold": "models differ on a weak signal (neither >=0.5)",
 }
 _INCOMPLETE_CLAUSE = "only one model scored"
 
@@ -32,14 +33,25 @@ def assess_agreement(sai_max: float | None, pang_max: float | None) -> dict[str,
     both_high = sai_max >= _HIGH and pang_max >= _HIGH
     both_low = sai_max < _LOW and pang_max < _LOW
     both_moderate = (_LOW <= sai_max < _HIGH) and (_LOW <= pang_max < _HIGH)
+    either_high = sai_max >= _HIGH or pang_max >= _HIGH
     if both_high:
         verdict, detail = "concordant_high", "both models predict a strong splicing effect"
     elif both_low:
         verdict, detail = "concordant_low", "both models predict little or no splicing effect"
     elif both_moderate:
         verdict, detail = "concordant_moderate", "both models predict a moderate splicing effect"
+    elif either_high:
+        verdict, detail = (
+            "discordant",
+            "one model predicts a high-confidence effect and the other does not; "
+            "interpret with caution",
+        )
     else:
-        verdict, detail = "discordant", "models disagree on the magnitude; interpret with caution"
+        verdict, detail = (
+            "discordant_subthreshold",
+            "the models differ in magnitude but neither crosses the high-confidence "
+            "threshold (delta>=0.5); treat as a weak/uncertain signal, not a strong conflict",
+        )
     return {
         "verdict": verdict,
         "detail": detail,

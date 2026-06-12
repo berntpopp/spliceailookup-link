@@ -123,6 +123,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                 "concordant_moderate": 0,
                 "concordant_low": 0,
                 "discordant": 0,
+                "discordant_subthreshold": 0,
                 "incomplete": 0,
             }
             top: dict[str, Any] | None = None

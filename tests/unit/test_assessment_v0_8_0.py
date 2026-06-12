@@ -5,8 +5,8 @@ from __future__ import annotations
 from spliceailookup_link.mcp.build_check import out_of_range
 from tests.conftest import StubService, structured
 
-
 # ---------------- F1: out-of-range coordinate ----------------
+
 
 def test_out_of_range_helper_detects_beyond_both_builds() -> None:
     assert out_of_range("chr1", 260_000_000) == (248_956_422, 249_250_621)
@@ -35,6 +35,7 @@ async def test_out_of_range_returns_invalid_input_without_scoring(
 
 
 # ---------------- F2: ref_mismatch fallback is actionable, never a loop ----------------
+
 
 async def test_ref_mismatch_wrong_ref_falls_back_to_capabilities(
     mcp, stub_service: StubService
@@ -75,6 +76,7 @@ async def test_ref_mismatch_swap_suggests_swapped_variant(mcp, stub_service: Stu
 
 
 # ---------------- F3: stable summary keys across modes ----------------
+
 
 async def test_spliceai_top_present_in_all_modes(mcp) -> None:
     for mode in ("minimal", "compact", "full"):
@@ -117,6 +119,7 @@ async def test_combined_maxes_in_agreement_all_modes(mcp) -> None:
 
 # ---------------- F6: threshold_basis only in full ----------------
 
+
 async def test_threshold_basis_only_in_full_single_model(mcp) -> None:
     compact = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
     assert "threshold_basis" not in compact["interpretation"]
@@ -142,6 +145,7 @@ async def test_threshold_basis_only_in_full_combined(mcp) -> None:
 
 # ---------------- P1#1: capabilities_version not duplicated ----------------
 
+
 async def test_capabilities_version_not_duplicated_in_meta(mcp) -> None:
     data = structured(await mcp.call_tool("get_server_capabilities", {}))
     assert "capabilities_version" in data  # top-level (the document's own hash)
@@ -155,6 +159,7 @@ async def test_prediction_still_carries_version_in_meta(mcp) -> None:
 
 
 # ---------------- P1#2: proactive rate budget ----------------
+
 
 async def test_success_carries_rate_budget(mcp) -> None:
     for tool in ("predict_spliceai", "predict_pangolin", "predict_splicing"):
@@ -196,6 +201,7 @@ async def test_batch_envelope_carries_rate_budget(mcp) -> None:
 
 # ---------------- F4: gtex see_also uses the gencode id ----------------
 
+
 async def test_gtex_see_also_uses_gene_id_in_full(mcp) -> None:
     data = structured(
         await mcp.call_tool(
@@ -218,6 +224,7 @@ async def test_gtex_see_also_uses_gene_id_combined_full(mcp) -> None:
 
 
 # ---------------- F5a: symbol-less lncRNA headline ----------------
+
 
 def test_gene_label_marks_ensembl_only_genes() -> None:
     from spliceailookup_link.mcp.shaping import _gene_label
@@ -245,6 +252,7 @@ def test_spliceai_headline_uses_gene_label() -> None:
 
 # ---------------- F5b: batch per-item request_id ----------------
 
+
 async def test_batch_items_have_request_id(mcp) -> None:
     data = structured(
         await mcp.call_tool(
@@ -260,11 +268,12 @@ async def test_batch_items_have_request_id(mcp) -> None:
     err = next(r for r in data["results"] if r.get("error_code"))
     assert isinstance(err["request_id"], str) and len(err["request_id"]) == 12
     # request_ids are unique across items
-    all_ids = ids + [err["request_id"]]
+    all_ids = [*ids, err["request_id"]]
     assert len(set(all_ids)) == len(all_ids)
 
 
 # ---------------- docs: capabilities reflect the new contract ----------------
+
 
 def test_capabilities_document_v0_9_contract() -> None:
     from spliceailookup_link.mcp.resources import (

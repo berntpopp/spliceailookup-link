@@ -214,7 +214,11 @@ def _see_also_full(
         else:
             gtex_example = {"tool": "search_gtex_genes", "arguments": {"query": gene}}
         hints.append(
-            {"server": "gtex-link", "hint": f"tissue expression for {gene}", "example": gtex_example}
+            {
+                "server": "gtex-link",
+                "hint": f"tissue expression for {gene}",
+                "example": gtex_example,
+            }
         )
         hints.append(
             {

@@ -105,7 +105,11 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 meta["next_commands"] = for_combined(result["variant_id"], genome_build)
                 if include_see_also and response_mode != "minimal":
                     meta["see_also"] = see_also_for(
-                        result["variant_id"], genome_build, tel["gene"], response_mode
+                        result["variant_id"],
+                        genome_build,
+                        tel["gene"],
+                        response_mode,
+                        gene_id=tel.get("gene_id"),
                     )
             if tel["cache"]:
                 meta["cache"] = tel["cache"]

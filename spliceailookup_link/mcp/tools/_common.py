@@ -171,18 +171,19 @@ def see_also_for(
     genome_build: GenomeBuild,
     gene: str | None,
     response_mode: str = "compact",
+    gene_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Cross-server hints. minimal -> []; compact -> {server,hint}; full -> + example args."""
     if response_mode == "minimal":
         return []
-    full = _see_also_full(variant_id, genome_build, gene)
+    full = _see_also_full(variant_id, genome_build, gene, gene_id)
     if response_mode == "full":
         return full
     return [{"server": h["server"], "hint": h["hint"]} for h in full]
 
 
 def _see_also_full(
-    variant_id: str, genome_build: GenomeBuild, gene: str | None
+    variant_id: str, genome_build: GenomeBuild, gene: str | None, gene_id: str | None = None
 ) -> list[dict[str, Any]]:
     """Cross-server follow-up hints (sibling -link MCP servers). Not callable here."""
     dataset = "gnomad_r4" if genome_build == "GRCh38" else "gnomad_r2_1"
@@ -204,15 +205,16 @@ def _see_also_full(
                 "example": {"tool": "search_passages", "arguments": {"q": gene}},
             }
         )
-        hints.append(
-            {
-                "server": "gtex-link",
-                "hint": f"tissue expression for {gene}",
-                "example": {
-                    "tool": "get_median_expression_levels",
-                    "arguments": {"gencode_id": [gene]},
-                },
+        if gene_id:
+            # F4: gtex expects an Ensembl/GENCODE id, not a gene symbol.
+            gtex_example = {
+                "tool": "get_median_expression_levels",
+                "arguments": {"gencode_id": [gene_id]},
             }
+        else:
+            gtex_example = {"tool": "search_gtex_genes", "arguments": {"query": gene}}
+        hints.append(
+            {"server": "gtex-link", "hint": f"tissue expression for {gene}", "example": gtex_example}
         )
         hints.append(
             {

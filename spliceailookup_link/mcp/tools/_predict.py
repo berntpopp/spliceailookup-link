@@ -172,7 +172,7 @@ async def predict_one(
         "gene_set": gene_set,
     }
     teles: list[CallTelemetry] = []
-    gene = sai_max = pang_max = consequence = None
+    gene = gene_id = sai_max = pang_max = consequence = None
     sai_top = pang_top = None
     partial: list[str] = []
 
@@ -191,6 +191,7 @@ async def predict_one(
         if shaped_sai.get("transcripts"):
             sai_top = shaped_sai["transcripts"][0]
             gene = sai_top.get("gene")
+            gene_id = sai_top.get("gene_id")
         result["spliceai"] = shaped_sai
 
     if isinstance(pang_res, BaseException):
@@ -206,6 +207,8 @@ async def predict_one(
             pang_top = shaped_pang["transcripts"][0]
             if gene is None:
                 gene = pang_top.get("gene")
+            if gene_id is None:
+                gene_id = pang_top.get("gene_id")
         result["pangolin"] = shaped_pang
 
     # F13: threshold_basis is a static glossary string; emit it once (top-level
@@ -258,6 +261,7 @@ async def predict_one(
         "cache_age_s": age_s,
         "cache_ttl_s": ttl_s,
         "gene": gene,
+        "gene_id": gene_id,
         "partial": partial,
         "resolution": prepared.resolution,
         "resolved_consequence": prepared.consequence,

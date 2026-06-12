@@ -134,6 +134,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             if prepared.consequence:
                 shaped["molecular_consequence"] = prepared.consequence
             gene = shaped.get("gene") or (shaped.get("transcripts") or [{}])[0].get("gene")
+            gene_id = (shaped.get("transcripts") or [{}])[0].get("gene_id")
             meta: dict[str, Any] = {
                 "cache": tele.cache,
                 "served_warm": is_served_warm(
@@ -148,7 +149,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 ]
                 if include_see_also and response_mode != "minimal":
                     meta["see_also"] = see_also_for(
-                        prepared.variant_id, genome_build, gene, response_mode
+                        prepared.variant_id, genome_build, gene, response_mode, gene_id=gene_id
                     )
             if not lean:
                 if tele.upstream_elapsed_ms is not None:

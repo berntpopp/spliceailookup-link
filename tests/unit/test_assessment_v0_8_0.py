@@ -192,3 +192,26 @@ async def test_batch_envelope_carries_rate_budget(mcp) -> None:
         await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
     )
     assert data["_meta"]["rate_budget"]["min_interval_ms"] == 12000
+
+
+# ---------------- F4: gtex see_also uses the gencode id ----------------
+
+async def test_gtex_see_also_uses_gene_id_in_full(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+        )
+    )
+    gtex = next(h for h in data["_meta"]["see_also"] if h["server"] == "gtex-link")
+    assert gtex["example"]["tool"] == "get_median_expression_levels"
+    assert gtex["example"]["arguments"]["gencode_id"] == ["ENSG00000167632.19"]
+
+
+async def test_gtex_see_also_uses_gene_id_combined_full(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+        )
+    )
+    gtex = next(h for h in data["_meta"]["see_also"] if h["server"] == "gtex-link")
+    assert gtex["example"]["arguments"]["gencode_id"] == ["ENSG00000167632.19"]

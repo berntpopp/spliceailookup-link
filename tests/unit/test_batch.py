@@ -17,7 +17,8 @@ async def test_batch_scores_each_variant_once_envelope(mcp) -> None:
     assert len(data["results"]) == 2
     assert "see_also" not in data["_meta"]  # batch-level see_also is misleading for a panel
     assert data["_meta"]["next_commands"][0]["tool"] == "predict_splicing"
-    assert all("_meta" not in r for r in data["results"])  # per-item _meta suppressed
+    # F12: each success item now carries a slim per-item _meta (cache visibility).
+    assert all(r["_meta"]["cache"] in ("hit", "miss") for r in data["results"])
 
 
 async def test_batch_partial_failure_does_not_fail_batch(mcp, stub_service: StubService) -> None:

@@ -76,8 +76,15 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                         response_mode=response_mode,
                         cross_build_check=cross_build_check,
                     )
-                    one.pop("_telemetry")
+                    tele = one.pop("_telemetry")
                     one["variant"] = variant
+                    item_meta: dict[str, Any] = {
+                        "cache": tele.get("cache"),
+                        "upstream_elapsed_ms": tele.get("upstream_elapsed_ms"),
+                    }
+                    if tele.get("cache_age_s") is not None:
+                        item_meta["cache_age_s"] = tele["cache_age_s"]
+                    one["_meta"] = item_meta
                     results.append(one)
                     ok += 1
                 except Exception as exc:  # capture per-item, never fail the batch

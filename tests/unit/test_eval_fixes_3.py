@@ -150,3 +150,21 @@ async def test_f11_batch_error_matches_standalone(mcp, stub_service: StubService
     for key in ("error_code", "retryable", "recovery_action", "fallback_tool", "recovery"):
         assert item[key] == standalone[key], f"scaffold mismatch on {key}"
     assert item["next_commands"] == standalone["_meta"]["next_commands"]
+
+
+async def test_f12_batch_items_carry_slim_meta(mcp) -> None:
+    # Same string twice (batch does not dedup): item 0 misses, item 1 hits cache.
+    res = await mcp.call_tool(
+        "predict_splicing_batch",
+        {"variants": ["8-140300616-T-G", "8-140300616-T-G"]},
+    )
+    data = structured(res)
+    first, second = data["results"][0], data["results"][1]
+    assert first["_meta"]["cache"] == "miss"
+    assert second["_meta"]["cache"] == "hit"
+    assert first["_meta"]["upstream_elapsed_ms"] is not None
+    # Slim only: the verbose fields stay out of per-item _meta.
+    assert "gene" not in first["_meta"]
+    assert "resolution" not in first["_meta"]
+    # Aggregate envelope _meta is unchanged (next_commands present).
+    assert data["_meta"]["next_commands"][0]["tool"] == "predict_splicing"

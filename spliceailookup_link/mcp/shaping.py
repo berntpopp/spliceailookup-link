@@ -86,6 +86,23 @@ def _priority_label(priority: Any) -> str:
     return _PRIORITY_LABELS.get(str(priority), str(priority) if priority else "unknown")
 
 
+def _coerce_score_strings(value: Any) -> Any:
+    """Recursively coerce numeric-looking strings to floats (D3).
+
+    Pangolin's allNonZeroScores arrives with stringified scores ("0.92") while
+    every other emitted score is a float. Leaves ints (e.g. pos) and genuinely
+    non-numeric strings untouched.
+    """
+    if isinstance(value, list):
+        return [_coerce_score_strings(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _coerce_score_strings(v) for k, v in value.items()}
+    if isinstance(value, str):
+        coerced = _to_float(value)
+        return coerced if coerced is not None else value
+    return value
+
+
 _ENSEMBL_VERSIONED_RE = re.compile(r"^(ENS[A-Z]+\d+\.\d+)_\d+$")
 
 
@@ -442,7 +459,7 @@ def shape_pangolin(
         result["all_non_zero_scores"] = {
             "transcript_id": payload.get("allNonZeroScoresTranscriptId"),
             "strand": payload.get("allNonZeroScoresStrand"),
-            "scores": payload.get("allNonZeroScores"),
+            "scores": _coerce_score_strings(payload.get("allNonZeroScores")),
         }
     result["headline"] = pangolin_headline(result)
     if response_mode == "minimal":

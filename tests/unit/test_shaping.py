@@ -219,3 +219,13 @@ def test_f20_grch38_clean_ids_untouched():
     t = out["transcripts"][0]
     assert t["gene_id"] == "ENSG00000198734.13"
     assert "gencode_id" not in t
+
+
+def test_pangolin_all_non_zero_scores_are_numeric() -> None:
+    out = shape_pangolin(PANGOLIN_TRAPPC9, response_mode="full")
+    scores = out["all_non_zero_scores"]["scores"]
+    assert scores, "fixture should have at least one all-non-zero entry"
+    assert all(isinstance(s["SL_REF"], float) for s in scores)
+    assert all(isinstance(s["SL_ALT"], float) for s in scores)
+    assert scores[0]["SL_REF"] == 0.92
+    assert scores[0]["pos"] == 140300469  # int positions untouched

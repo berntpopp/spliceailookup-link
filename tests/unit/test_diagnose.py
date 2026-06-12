@@ -29,13 +29,17 @@ async def test_ref_mismatch_when_ref_matches_neither_build() -> None:
     assert svc.score_calls == []  # no slow scoring cross-build probe
 
 
-async def test_build_mismatch_when_ref_matches_other_build() -> None:
+async def test_ref_mismatch_with_secondary_hint_when_ref_matches_other_build() -> None:
+    # D1: a wrong REF that coincidentally matches the OTHER build's base is a
+    # ref_mismatch (the requested-build coordinate is valid), NOT a build_mismatch.
     svc = StubService()
-    svc.ref_bases = {"GRCh38": "T", "GRCh37": "A"}  # REF 'A' matches GRCh37 only
-    with pytest.raises(BuildMismatchError) as ei:
-        await _run(svc, "8-140300616-A-G", build="GRCh38")
-    assert ei.value.inferred_build == "GRCh37"
-    assert svc.score_calls == []
+    svc.ref_bases = {"GRCh38": "T", "GRCh37": "C"}  # REF 'C' matches GRCh37 only
+    with pytest.raises(RefMismatchError) as ei:
+        await _run(svc, "8-140300616-C-A", build="GRCh38")
+    assert ei.value.reference_base == "T"
+    assert ei.value.other_build_hint is not None
+    assert ei.value.other_build_hint["build"] == "GRCh37"
+    assert svc.score_calls == []  # no slow scoring probe
 
 
 async def test_genuine_not_found_when_ref_matches_requested_build() -> None:

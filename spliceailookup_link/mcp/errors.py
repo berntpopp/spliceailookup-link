@@ -88,11 +88,13 @@ class RefMismatchError(ValueError):
         build: str,
         chrom: str,
         pos: int,
+        other_build_hint: dict[str, str] | None = None,
     ):
         self.variant_id = variant_id
         self.observed_ref = observed_ref
         self.reference_base = reference_base
         self.build = build
+        self.other_build_hint = other_build_hint
         super().__init__(
             f"REF allele '{observed_ref}' does not match the {build} reference base "
             f"'{reference_base}' at {chrom}:{pos}."
@@ -376,6 +378,11 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
             {"tool": "predict_splicing", "arguments": {"variant": c, "genome_build": build}}
             for c in exc.candidates
         ] + payload["_meta"]["next_commands"]
+    if isinstance(exc, RefMismatchError) and exc.other_build_hint:
+        # D1: a wrong REF that coincidentally matches the other build's base stays a
+        # ref_mismatch; the other-build possibility is a secondary hint, not a redirect.
+        payload["other_build_hint"] = exc.other_build_hint
+        payload["recovery"] = f"{payload['recovery']} {exc.other_build_hint['note']}"
     if error_code == "rate_limited":
         # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a
         # time window -- IETF qu=concurrent-requests, no window_s (no bucket to

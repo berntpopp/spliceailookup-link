@@ -65,13 +65,20 @@ class PreparedVariant:
 
 
 async def prepare_variant(
-    service: SpliceService, raw_variant: str, genome_build: GenomeBuild
+    service: SpliceService,
+    raw_variant: str,
+    genome_build: GenomeBuild,
+    *,
+    cross_build_check: bool = True,
 ) -> PreparedVariant:
     """Normalize any input to a CHROM-POS-REF-ALT id, resolving HGVS/rsID via VEP.
 
-    Raises VariantParseError (-> invalid_input) for uninterpretable input and
-    BuildMismatchError (-> build_mismatch) when a coordinate clearly belongs to the
-    other build, so a slow scoring call is never wasted on the wrong build.
+    Raises VariantParseError (-> invalid_input) for uninterpretable input,
+    BuildMismatchError (-> build_mismatch) when a coordinate's position cannot
+    belong to the requested build, and RefMismatchError (-> ref_mismatch) when a
+    coordinate's REF does not match the requested-build reference base -- both
+    before any slow scoring call. The pre-flight ref check is gated by
+    cross_build_check and settings.PREFLIGHT_REF_CHECK_ENABLED.
     """
     parsed = parse_variant_input(raw_variant)
     if parsed.kind == "coordinate":
@@ -82,6 +89,13 @@ async def prepare_variant(
                 variant_id=parsed.value,
                 inferred_build=inferred,
                 requested_build=genome_build,
+            )
+        if cross_build_check and settings.PREFLIGHT_REF_CHECK_ENABLED:
+            # Local import avoids a module cycle (_diagnose imports _common).
+            from spliceailookup_link.mcp.tools._diagnose import preflight_ref_mismatch
+
+            await preflight_ref_mismatch(
+                service, variant_id=parsed.value, requested_build=genome_build
             )
         return PreparedVariant(
             variant_id=parsed.value,

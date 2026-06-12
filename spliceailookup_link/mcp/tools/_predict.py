@@ -94,7 +94,9 @@ async def predict_one(
 ) -> dict[str, Any]:
     if ctx is not None:
         await ctx.report_progress(progress=0, total=3, message="resolving variant")
-    prepared = await prepare_variant(service, variant, genome_build)
+    prepared = await prepare_variant(
+        service, variant, genome_build, cross_build_check=cross_build_check
+    )
     common: dict[str, Any] = {
         "build": prepared.genome_build,
         "variant_id": prepared.variant_id,

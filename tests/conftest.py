@@ -30,6 +30,8 @@ class StubService:
         self.pangolin_error: Exception | None = None
         self.only_build: str | None = None  # when set, score() not_founds in the other build
         self._seen_keys: set[tuple[Any, ...]] = set()
+        self.ref_bases: dict[str, str] = {}  # build -> base at the test locus
+        self.refbase_calls: list[tuple[str, int, int, str]] = []
 
     async def score(self, *, model: str, build: str, variant_id: str, **kwargs: Any):
         from spliceailookup_link.services.telemetry import CallTelemetry
@@ -100,6 +102,10 @@ class StubService:
             "consequence": rec["most_severe_consequence"],
             "raw_input": text,
         }
+
+    async def reference_base(self, chrom: str, pos: int, length: int, build: str):
+        self.refbase_calls.append((chrom, pos, length, build))
+        return self.ref_bases.get(build)
 
     async def warmup(self, build: str) -> dict[str, Any]:
         return {

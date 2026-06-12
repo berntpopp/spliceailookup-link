@@ -197,6 +197,12 @@ def test_capabilities_documents_new_codes_and_verdict() -> None:
     ref = get_reference_resource()
     assert "ref_mismatch" in ref["error_taxonomy"]["codes"]
     assert "ambiguous" in ref["error_taxonomy"]["codes"]
+    # New doc sections must be pinned so a refactor can't silently drop them.
+    assert "warmth" in doc
+    assert "prediction_deadline" in doc
+    assert str(settings.PREDICT_SOFT_DEADLINE_SECONDS) in doc["prediction_deadline"]
+    assert "lean" in doc["response_fields"]["capabilities_version"]
+    assert "_meta" in doc["response_fields"]["capabilities_version"]
 
 
 async def test_capabilities_version_echoed_on_success(mcp) -> None:

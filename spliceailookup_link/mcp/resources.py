@@ -71,6 +71,13 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "trusted client to auto-approve."
             ),
         },
+        "token_tips": (
+            "Once the workflow is known, set include_hints=false on predict_*/"
+            "resolve_variant to drop next_commands, see_also, AND the static "
+            "capabilities_version from _meta. Use response_mode='minimal' for just the "
+            "headline + one decision number (provenance is omitted in minimal). "
+            "include_see_also=false keeps next_commands but drops the cross-server hints."
+        ),
         "tools": [
             "get_server_capabilities",
             "resolve_variant",

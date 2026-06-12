@@ -80,7 +80,8 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             bool,
             Field(
                 description="Include _meta.next_commands + see_also chaining hints (default true; "
-                "set false to trim tokens once you know the workflow)."
+                "set false to trim tokens once you know the workflow; also drops the static "
+                "capabilities_version from _meta)."
             ),
         ] = True,
         include_see_also: Annotated[

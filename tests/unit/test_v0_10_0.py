@@ -253,3 +253,21 @@ async def test_not_found_without_nearest_is_unchanged(mcp, stub_service) -> None
     data = structured(await mcp.call_tool("predict_splicing", {"variant": "1-50000-A-G"}))
     assert data["error_code"] == "not_found"
     assert "nearest_transcript" not in data
+
+
+# ---------------- W6: surface the _meta token-trim guidance ----------------
+
+
+async def test_include_hints_false_drops_capabilities_version(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-140300616-T-G", "include_hints": False}
+        )
+    )
+    assert "capabilities_version" not in data["_meta"]
+    assert "next_commands" not in data["_meta"]
+
+
+def test_capabilities_has_token_tips() -> None:
+    tips = str(get_capabilities_resource()["token_tips"]).lower()
+    assert "include_hints" in tips and "capabilities_version" in tips

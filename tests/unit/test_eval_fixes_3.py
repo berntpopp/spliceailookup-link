@@ -200,3 +200,97 @@ async def test_f17_descriptions_disambiguate_one_vs_both(mcp) -> None:
     assert "BOTH models" in tools["predict_splicing"]
     assert "ONE model" in tools["predict_spliceai"]
     assert "ONE model" in tools["predict_pangolin"]
+
+
+# ---------------- §8 durability invariants ----------------
+
+
+async def test_inv_batch_item_matches_single_call(mcp) -> None:
+    """§8.1 success parity: a batch item == standalone result minus outer envelope."""
+    single = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    batch = structured(
+        await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
+    )
+    item = batch["results"][0]
+    shared = ("agreement", "interpretation", "consequence", "transcript", "headline")
+    for key in shared:
+        if key in single:
+            assert item.get(key) == single[key], f"batch/single divergence on {key}"
+    if "molecular_consequence" in single:
+        assert item.get("molecular_consequence") == single["molecular_consequence"]
+
+
+async def test_inv_cross_tool_error_envelope_parity(mcp, stub_service: StubService) -> None:
+    """§8.2: every resolve/predict tool emits the same error key set."""
+    stub_service.score_error = DataNotFoundError("no overlap")
+    stub_service.resolve_error = DataNotFoundError("no overlap")
+    required = {
+        "error_code",
+        "message",
+        "retryable",
+        "recovery_action",
+        "fallback_tool",
+        "fallback_args",
+        "recovery",
+    }
+    for tool in ("predict_spliceai", "predict_pangolin", "predict_splicing", "resolve_variant"):
+        data = structured(await mcp.call_tool(tool, {"variant": "8-140300616-T-G"}))
+        assert data["success"] is False
+        assert required <= set(data), f"{tool} dropped error keys: {required - set(data)}"
+        assert "next_commands" in data["_meta"]
+    batch = structured(
+        await mcp.call_tool("predict_splicing_batch", {"variants": ["8-140300616-T-G"]})
+    )
+    item = batch["results"][0]
+    assert (required - {"message"}) <= set(item)
+
+
+async def test_inv_no_duplicated_threshold_basis(mcp) -> None:
+    """§8.3: the static THRESHOLD_BASIS string appears at most once per payload."""
+    combined = structured(
+        await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"})
+    )
+    assert json.dumps(combined).count(THRESHOLD_BASIS) <= 1
+    batch = structured(
+        await mcp.call_tool(
+            "predict_splicing_batch",
+            {"variants": ["chr8-140300616-T-G", "8-140300616-T-G"]},
+        )
+    )
+    for item in batch["results"]:
+        assert json.dumps(item).count(THRESHOLD_BASIS) <= 1
+
+
+async def test_inv_no_null_leaf_in_full_mode(mcp) -> None:
+    """§8.4: full-mode payloads omit-when-null rather than ship null leaves."""
+
+    def walk(node: object, path: str = "") -> list[str]:
+        bad: list[str] = []
+        if isinstance(node, dict):
+            for k, v in node.items():
+                bad += walk(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                bad += walk(v, f"{path}[{i}]")
+        elif node is None:
+            bad.append(path)
+        return bad
+
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+        )
+    )
+    nulls = [
+        p
+        for p in walk(data)
+        if p.rsplit(".", 1)[-1]
+        not in {
+            "fallback_tool",
+            "fallback_args",
+            "cache_age_s",
+            "upstream_elapsed_ms",
+            "signed_score",
+        }
+    ]
+    assert nulls == [], f"unexpected null leaves in full mode: {nulls}"

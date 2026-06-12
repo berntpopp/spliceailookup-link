@@ -178,7 +178,13 @@ async def run_batch(
         "retried": retried_count,
         **verdict_counts,
     }
-    meta: dict[str, Any] = {"items_submitted": total, "max_items": max_items}
+    from spliceailookup_link.mcp.errors import rate_budget_snapshot
+
+    meta: dict[str, Any] = {
+        "items_submitted": total,
+        "max_items": max_items,
+        "rate_budget": rate_budget_snapshot(saturated=False),
+    }
     if top is not None:
         meta["next_commands"] = [
             {

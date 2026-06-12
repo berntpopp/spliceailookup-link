@@ -192,10 +192,15 @@ async def test_c1_rate_limited_carries_concurrency_budget(mcp, stub_service: Stu
     assert "window_s" not in budget  # never fabricate a window we don't enforce
 
 
-async def test_c1_success_envelope_has_no_rate_budget(mcp) -> None:
+async def test_c1_success_envelope_rate_budget_is_proactive(mcp) -> None:
+    # P1#2: success now carries a proactive pacing budget (min_interval_ms) but no
+    # fabricated remaining/retry_after_s -- those appear only on a rate_limited error.
     data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
     assert data["success"] is True
-    assert "rate_budget" not in data["_meta"]
+    rb = data["_meta"]["rate_budget"]
+    assert rb["min_interval_ms"] == 12000
+    assert "remaining" not in rb
+    assert "retry_after_s" not in rb
 
 
 async def test_f16_resolve_description_states_ref_check_contract(mcp) -> None:

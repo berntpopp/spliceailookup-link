@@ -11,7 +11,7 @@ from pydantic import Field
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
+from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import cmd
 from spliceailookup_link.mcp.shaping import shape_pangolin
 from spliceailookup_link.mcp.tools._common import (
@@ -139,6 +139,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 "served_warm": is_served_warm(
                     tele.cache, tele.upstream_elapsed_ms, settings.WARM_THRESHOLD_MS
                 ),
+                # P1#2: proactive pacing signal, kept even on the lean/minimal path.
+                "rate_budget": rate_budget_snapshot(saturated=False),
             }
             if include_hints:
                 meta["next_commands"] = [

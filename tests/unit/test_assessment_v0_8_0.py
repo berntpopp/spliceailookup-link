@@ -152,3 +152,43 @@ async def test_prediction_still_carries_version_in_meta(mcp) -> None:
     data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
     assert "capabilities_version" not in data  # no top-level on predictions
     assert "capabilities_version" in data["_meta"]  # provenance lives in _meta here
+
+
+# ---------------- P1#2: proactive rate budget ----------------
+
+async def test_success_carries_rate_budget(mcp) -> None:
+    for tool in ("predict_spliceai", "predict_pangolin", "predict_splicing"):
+        data = structured(await mcp.call_tool(tool, {"variant": "chr8-140300616-T-G"}))
+        rb = data["_meta"]["rate_budget"]
+        assert rb["limit"] == 2
+        assert rb["unit"] == "concurrent_requests"
+        assert rb["min_interval_ms"] == 12000
+        assert "remaining" not in rb  # success: no fabricated remaining
+
+
+async def test_rate_budget_present_on_minimal(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": "minimal"}
+        )
+    )
+    assert data["_meta"]["rate_budget"]["min_interval_ms"] == 12000
+
+
+async def test_rate_limited_error_carries_retry_after(mcp, stub_service: StubService) -> None:
+    from spliceailookup_link.api import RateLimitedError
+
+    stub_service.score_error = RateLimitedError("saturated")
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    assert data["error_code"] == "rate_limited"
+    rb = data["_meta"]["rate_budget"]
+    assert rb["limit"] == 2
+    assert rb["remaining"] == 0
+    assert rb["retry_after_s"] == 12
+
+
+async def test_batch_envelope_carries_rate_budget(mcp) -> None:
+    data = structured(
+        await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
+    )
+    assert data["_meta"]["rate_budget"]["min_interval_ms"] == 12000

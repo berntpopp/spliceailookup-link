@@ -132,6 +132,24 @@ def _provenance_meta() -> dict[str, Any]:
     return {**_BASE_META, "capabilities_version": get_capabilities_version()}
 
 
+def rate_budget_snapshot(*, saturated: bool) -> dict[str, Any]:
+    """The advertised concurrency budget + soft client-pacing interval.
+
+    The cap is a LOCAL asyncio.Semaphore (MAX_CONCURRENCY), not a tracked time-window
+    quota. On success we advertise the soft min spacing for cache-miss calls; on a
+    rate_limited failure we add remaining=0 and a retry_after_s for immediate backoff.
+    """
+    snap: dict[str, Any] = {
+        "limit": settings.MAX_CONCURRENCY,
+        "unit": "concurrent_requests",
+        "min_interval_ms": settings.RATE_BUDGET_MIN_INTERVAL_MS,
+    }
+    if saturated:
+        snap["remaining"] = 0
+        snap["retry_after_s"] = max(1, round(settings.RATE_BUDGET_MIN_INTERVAL_MS / 1000))
+    return snap
+
+
 def _safe_message(exc: BaseException) -> str:
     text = str(exc) or exc.__class__.__name__
     return text[:300]
@@ -443,15 +461,11 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
                 "likely cause is a REF/ALT swap; the fallback re-runs with REF/ALT swapped."
             )
     if error_code == "rate_limited":
-        # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a
-        # time window -- IETF qu=concurrent-requests, no window_s (no bucket to
-        # reset). remaining=0 is exact for local saturation; for an upstream HTTP
-        # 429 (also RateLimitedError) it is a conservative floor, not upstream quota.
-        payload["_meta"]["rate_budget"] = {
-            "limit": settings.MAX_CONCURRENCY,
-            "remaining": 0,
-            "unit": "concurrent_requests",
-        }
+        # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a time
+        # window. remaining=0 is exact for local saturation; for an upstream HTTP 429 (also
+        # RateLimitedError) it is a conservative floor. retry_after_s gives an actionable
+        # backoff per current MCP rate-limit guidance.
+        payload["_meta"]["rate_budget"] = rate_budget_snapshot(saturated=True)
     return McpToolError(payload)
 
 

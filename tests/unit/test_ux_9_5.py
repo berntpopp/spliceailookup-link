@@ -130,3 +130,12 @@ async def test_overlap_inconclusive_proceeds(mcp, stub_service: StubService) -> 
     data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
     assert "headline" in data
     assert len(stub_service.score_calls) == 1
+
+
+def test_capabilities_document_new_fields() -> None:
+    from spliceailookup_link.mcp.resources import get_capabilities_resource
+
+    full = get_capabilities_resource(detail="full")
+    blob = str(full).lower()
+    assert "include_see_also" in blob
+    assert "ref_validated" in blob or "ref_warning" in blob

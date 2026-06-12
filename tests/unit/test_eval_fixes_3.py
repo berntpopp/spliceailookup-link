@@ -190,11 +190,15 @@ async def test_c1_success_envelope_has_no_rate_budget(mcp) -> None:
     assert "rate_budget" not in data["_meta"]
 
 
-async def test_f16_resolve_description_states_normalized_not_validated(mcp) -> None:
+async def test_f16_resolve_description_states_ref_check_contract(mcp) -> None:
+    # v0.8.0 (D1): resolve now checks the REF by default and warns on mismatch,
+    # rather than silently passing a wrong REF. The docstring must say so.
     tools = await mcp.list_tools()
     desc = next(t.description for t in tools if t.name == "resolve_variant")
     low = desc.lower()
-    assert "normalized" in low and "not validated" in low
+    assert "normalized" in low
+    assert "ref_warning" in low or "ref base is also checked" in low
+    assert "not validated" not in low  # the old, now-incorrect wording is gone
 
 
 async def test_f17_descriptions_disambiguate_one_vs_both(mcp) -> None:

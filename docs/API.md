@@ -129,6 +129,25 @@ and `spliceailookup://reference`. Key facade behaviors:
 - **`resolve_variant` ambiguity.** When an input maps to multiple ALT alleles, the
   singular `variant_id` is `null` (so a caller cannot silently pick one); the candidates
   are in `variant_ids[]` with one `next_commands` entry per allele.
+- **`resolve_variant` REF check (v0.8.0).** Coordinate inputs are validated against the
+  requested build by default (`check_ref=true`, one Ensembl lookup): `ref_validated:true`
+  on a match, `ref_validated:false` + a `ref_warning` on mismatch (still returning the
+  normalized `variant_id` — `resolve` normalizes, it does not block). Set `check_ref=false`
+  to skip the lookup. HGVS/rsIDs are resolved and validated via VEP.
+- **Lean combined shape (v0.8.0, breaking).** `predict_splicing` carries the request
+  params (`variant_id`/`genome_build`/`gene_set`/`max_distance`/`mask`) on the **envelope
+  only**; the `spliceai{}`/`pangolin{}` sub-blocks no longer repeat them, and per-model
+  headlines appear only in `response_mode=full`. Standalone `predict_spliceai` /
+  `predict_pangolin` keep the request params. `include_see_also` (default true) gates the
+  cross-server `see_also` hints independently of `include_hints`.
+- **Contig classification (v0.8.0).** A well-formed coordinate on a non-standard contig
+  (e.g. `chr99`, `chr0`, `chr23`) returns `unsupported_contig`, not `invalid_input`.
+- **Fast-fail `not_found` (v0.8.0).** A coordinate with no transcript overlapping
+  `[pos-max_distance, pos+max_distance]` (Ensembl overlap pre-check) returns `not_found`
+  in <0.5 s instead of a ~20 s cold round-trip. Conservative: any inconclusive/non-zero
+  overlap falls through to real scoring, so the pre-check never invents a `not_found`.
+- **Numeric scores (v0.8.0).** Pangolin `all_non_zero_scores` values are floats (were
+  strings). Pangolin `signed_score` preserves the original negative magnitude.
 - **`tx_start`/`tx_end`.** In `response_mode=full`, `transcripts[].exon_model` and
   `consequence.transcript_info` carry `tx_start`/`tx_end` derived from the exon arrays
   (`min(EXON_STARTS)` / `max(EXON_ENDS)`) when upstream leaves them null.

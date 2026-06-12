@@ -127,10 +127,13 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "aberration."
             ),
             "resolve_caveat": (
-                "Coordinate inputs are normalized locally; a wrong REF allele is caught "
-                "pre-flight (before the slow scoring call) via an Ensembl reference-base "
-                "check and returned as a fast ref_mismatch (not a misleading ~17s "
-                "not_found, and never a build_mismatch when the position is valid)."
+                "Coordinate inputs are normalized locally. In predict_*, a wrong REF allele is "
+                "caught pre-flight (before the slow scoring call) via an Ensembl reference-base "
+                "check and returned as a fast ref_mismatch (not a misleading ~17s not_found, and "
+                "never a build_mismatch when the position is valid). resolve_variant runs the same "
+                "REF check by default (check_ref=true) and returns ref_validated plus, on "
+                "mismatch, a ref_warning -- it normalizes (still returns variant_id) but no longer "
+                "silently passes a wrong REF; set check_ref=false to skip the lookup."
             ),
             "ensembl_id_normalization": (
                 "gene_id / transcript_id are normalized: the GRCh37 GENCODE re-version suffix "
@@ -168,6 +171,28 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "predict_* and resolve_variant accept include_hints (default true). Set false to "
                 "drop _meta.next_commands and see_also once you know the workflow -- trims the "
                 "per-call token overhead. predict_splicing_batch already omits per-item hints."
+            ),
+            "include_see_also": (
+                "predict_* accept include_see_also (default true), independent of include_hints: "
+                "set it false to KEEP the hot _meta.next_commands chaining path while dropping the "
+                "4 cross-server see_also entries -- the bigger per-call token cost."
+            ),
+            "ref_validated": (
+                "resolve_variant only: true when the coordinate REF matched the requested-build "
+                "Ensembl reference base; false (with a ref_warning) on mismatch; omitted when the "
+                "check was skipped (check_ref=false), inconclusive (Ensembl down), or N/A "
+                "(HGVS/rsID, ambiguous, non-nuclear contig)."
+            ),
+            "v0_8_0_shape": (
+                "predict_splicing carries the request params "
+                "(variant_id/genome_build/gene_set/max_distance/mask) on the ENVELOPE only; the "
+                "spliceai{} and pangolin{} sub-blocks no longer repeat them, and per-model "
+                "headlines appear only in response_mode='full'. Standalone predict_spliceai / "
+                "predict_pangolin keep the request params (they are the sole context there). "
+                "Well-formed non-standard contigs (e.g. chr99) now return unsupported_contig, not "
+                "invalid_input; a coordinate with no overlapping transcript fast-fails as "
+                "not_found in <0.5s. There is no warm_ttl_remaining_s: use served_warm plus the "
+                "rate_budget on a rate_limited error."
             ),
             "molecular_consequence": (
                 "the resolver's (Ensembl VEP) most-severe molecular consequence for HGVS/rsID "

@@ -75,6 +75,29 @@ class BuildMismatchError(ValueError):
         )
 
 
+class RefMismatchError(ValueError):
+    """Raised when a coordinate's REF allele does not match the genome reference."""
+
+    def __init__(
+        self,
+        *,
+        variant_id: str,
+        observed_ref: str,
+        reference_base: str,
+        build: str,
+        chrom: str,
+        pos: int,
+    ):
+        self.variant_id = variant_id
+        self.observed_ref = observed_ref
+        self.reference_base = reference_base
+        self.build = build
+        super().__init__(
+            f"REF allele '{observed_ref}' does not match the {build} reference base "
+            f"'{reference_base}' at {chrom}:{pos}."
+        )
+
+
 def _provenance_meta() -> dict[str, Any]:
     return dict(_BASE_META)
 
@@ -109,6 +132,9 @@ def _classify(
             context.tool_name,
             {"variant": exc.variant_id, "genome_build": exc.inferred_build},
         )
+    if isinstance(exc, RefMismatchError):
+        tool, args = _fallback_for(context)
+        return "ref_mismatch", False, tool, args
     if isinstance(exc, DataNotFoundError):
         tool, args = _fallback_for(context)
         return "not_found", False, tool, args
@@ -127,7 +153,7 @@ def _classify(
 def _recovery_action(error_code: str, retryable: bool) -> str:
     if retryable:
         return "retry_backoff"
-    if error_code in {"invalid_input", "validation_failed"}:
+    if error_code in {"invalid_input", "validation_failed", "ref_mismatch", "ambiguous"}:
         return "reformulate_input"
     if error_code == "build_mismatch":
         return "switch_tool"
@@ -166,11 +192,18 @@ def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
         )
     if error_code == "validation_failed":
         return "Inputs failed validation. Check the tool schema and call get_server_capabilities."
+    if error_code == "ref_mismatch":
+        return (
+            "The REF allele does not match the genome reference at this position "
+            "(likely a swapped REF/ALT, the opposite strand, or the wrong build). "
+            "Fix the REF allele, or pass an HGVS/rsID to resolve_variant to get "
+            "canonical CHROM-POS-REF-ALT, then retry."
+        )
     return f"Unexpected failure. Call {fallback_tool} for a safe entry point."
 
 
 def _envelope_message(exc: BaseException, error_code: str) -> str:
-    if error_code in {"build_mismatch", "invalid_input", "not_found"}:
+    if error_code in {"build_mismatch", "invalid_input", "not_found", "ref_mismatch"}:
         # These carry developer-authored or upstream guidance safe to surface.
         return _safe_message(exc)
     if error_code == "validation_failed":

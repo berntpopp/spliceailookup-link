@@ -11,6 +11,7 @@ from spliceailookup_link.api import (
 from spliceailookup_link.mcp.errors import (
     BuildMismatchError,
     McpErrorContext,
+    RefMismatchError,
     mcp_tool_error,
     run_mcp_tool,
 )
@@ -91,3 +92,23 @@ async def test_run_mcp_tool_returns_envelope_on_exception() -> None:
     )
     assert out["success"] is False
     assert out["error_code"] == "not_found"
+
+
+def test_ref_mismatch_classifies_and_routes_to_resolve() -> None:
+    exc = RefMismatchError(
+        variant_id="8-140300616-A-G",
+        observed_ref="A",
+        reference_base="T",
+        build="GRCh38",
+        chrom="8",
+        pos=140300616,
+    )
+    env = mcp_tool_error(
+        exc, McpErrorContext(tool_name="predict_splicing", variant="8-140300616-A-G")
+    ).payload
+    assert env["error_code"] == "ref_mismatch"
+    assert env["retryable"] is False
+    assert env["recovery_action"] == "reformulate_input"
+    assert env["fallback_tool"] == "resolve_variant"
+    assert "does not match" in env["message"]
+    assert "T" in env["message"]

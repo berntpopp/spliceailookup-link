@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from spliceailookup_link.api import RateLimitedError, SpliceApiError
+from spliceailookup_link.mcp.shaping import shape_spliceai
 from tests.conftest import StubService, structured
-
+from tests.fixtures.api_responses import SPLICEAI_MASKED_EMPTY_ABERR, SPLICEAI_TRAPPC9
 
 # --- D1 + D2: pre-flight reference-base check ---------------------------------
+
 
 async def test_preflight_ref_mismatch_skips_scoring(mcp, stub_service: StubService) -> None:
     # D2: a wrong REF is rejected as ref_mismatch BEFORE any scoring call.
@@ -38,9 +41,7 @@ async def test_preflight_proceeds_when_ref_matches(mcp, stub_service: StubServic
     assert stub_service.score_calls  # scoring proceeded
 
 
-async def test_preflight_proceeds_when_ensembl_unavailable(
-    mcp, stub_service: StubService
-) -> None:
+async def test_preflight_proceeds_when_ensembl_unavailable(mcp, stub_service: StubService) -> None:
     stub_service.ref_bases = {}  # reference_base returns None -> inconclusive
     res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-A-G"})
     data = structured(res)
@@ -49,6 +50,7 @@ async def test_preflight_proceeds_when_ensembl_unavailable(
 
 
 # --- D3: ambiguous resolve consistency ---------------------------------------
+
 
 async def test_resolve_ambiguous_nulls_singular_id(mcp) -> None:
     res = await mcp.call_tool("resolve_variant", {"variant": "rs6025"})
@@ -62,6 +64,7 @@ async def test_resolve_ambiguous_nulls_singular_id(mcp) -> None:
 
 
 # --- D4 + C4: lean _meta and served_warm -------------------------------------
+
 
 async def test_meta_full_provenance_in_compact(mcp) -> None:
     res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})
@@ -106,12 +109,6 @@ async def test_served_warm_true_on_cache_hit(mcp, stub_service: StubService) -> 
 
 # --- D5: tx_start / tx_end ----------------------------------------------------
 
-from spliceailookup_link.mcp.shaping import shape_spliceai  # noqa: E402
-from tests.fixtures.api_responses import (  # noqa: E402
-    SPLICEAI_MASKED_EMPTY_ABERR,
-    SPLICEAI_TRAPPC9,
-)
-
 
 def test_exon_model_carries_tx_bounds() -> None:
     shaped = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="full")
@@ -132,6 +129,7 @@ def test_transcript_info_tx_bounds_filled_when_null() -> None:
 
 # --- C3: batch size contract --------------------------------------------------
 
+
 async def test_batch_envelope_self_describes_size_contract(mcp) -> None:
     res = await mcp.call_tool(
         "predict_splicing_batch", {"variants": ["8-140300616-T-G", "8-140300616-T-G"]}
@@ -142,9 +140,7 @@ async def test_batch_envelope_self_describes_size_contract(mcp) -> None:
 
 
 async def test_batch_rejects_over_cap(mcp) -> None:
-    res = await mcp.call_tool(
-        "predict_splicing_batch", {"variants": ["8-140300616-T-G"] * 26}
-    )
+    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["8-140300616-T-G"] * 26})
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "validation_failed"
@@ -158,6 +154,7 @@ async def test_batch_item_meta_has_served_warm(mcp) -> None:
 
 # --- C5: resources in lean capabilities --------------------------------------
 
+
 async def test_lean_capabilities_lists_resources(mcp) -> None:
     res = await mcp.call_tool("get_server_capabilities", {"detail": "lean"})
     data = structured(res)
@@ -166,8 +163,6 @@ async def test_lean_capabilities_lists_resources(mcp) -> None:
 
 
 # --- Rec #5: error-mapping coverage (deterministic, no live calls) -----------
-
-from spliceailookup_link.api import RateLimitedError, SpliceApiError  # noqa: E402
 
 
 async def test_comprehensive_503_maps_to_upstream_unavailable(
@@ -205,6 +200,7 @@ async def test_batch_per_item_rate_budget(mcp, stub_service: StubService) -> Non
 
 
 # --- Documentation contract ---------------------------------------------------
+
 
 def test_capabilities_documents_served_warm_and_batch_cap() -> None:
     from spliceailookup_link.mcp.resources import get_capabilities_resource

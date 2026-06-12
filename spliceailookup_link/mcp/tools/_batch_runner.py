@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -48,12 +49,13 @@ def _result_max_delta(r: dict[str, Any]) -> float | None:
     return max(vals) if vals else None
 
 
-def _success_item(one: dict[str, Any], variant: str) -> dict[str, Any]:
+def _success_item(one: dict[str, Any], variant: str, request_id: str) -> dict[str, Any]:
     from spliceailookup_link.services.telemetry import is_served_warm
 
     tele = one.pop("_telemetry")
     one["variant"] = variant
     item_meta: dict[str, Any] = {
+        "request_id": request_id,
         "cache": tele.get("cache"),
         "served_warm": is_served_warm(tele.get("cache"), tele.get("upstream_elapsed_ms")),
     }
@@ -65,7 +67,9 @@ def _success_item(one: dict[str, Any], variant: str) -> dict[str, Any]:
     return one
 
 
-def _error_item(exc: BaseException, variant: str, genome_build: str) -> tuple[dict[str, Any], str]:
+def _error_item(
+    exc: BaseException, variant: str, genome_build: str, request_id: str
+) -> tuple[dict[str, Any], str]:
     """Return (per-item error dict, error_code). Mirrors the single-call envelope."""
     env = mcp_tool_error(
         exc,
@@ -73,6 +77,7 @@ def _error_item(exc: BaseException, variant: str, genome_build: str) -> tuple[di
     ).payload
     item: dict[str, Any] = {
         "variant": variant,
+        "request_id": request_id,
         "error_code": env["error_code"],
         "message": env["message"],
         "retryable": env["retryable"],
@@ -104,12 +109,13 @@ async def _run_item(
     Returns (item, kind, retried) where kind is 'ok' | 'terminal' | 'retryable'.
     """
     retried = False
+    request_id = uuid.uuid4().hex[:12]
     while True:
         try:
             one = await predict_fn(service, variant=variant, genome_build=genome_build, **params)
-            return _success_item(one, variant), "ok", retried
+            return _success_item(one, variant, request_id), "ok", retried
         except Exception as exc:  # boundary: classify every per-item fault into an envelope
-            item, code = _error_item(exc, variant, genome_build)
+            item, code = _error_item(exc, variant, genome_build, request_id)
             if code in _RETRYABLE_CODES and not retried:
                 retried = True
                 if retry_backoff_s:

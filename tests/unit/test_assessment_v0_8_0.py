@@ -241,3 +241,24 @@ def test_spliceai_headline_uses_gene_label() -> None:
         ],
     }
     assert "ENSG00000241860 (no gene symbol)" in spliceai_headline(shaped)
+
+
+# ---------------- F5b: batch per-item request_id ----------------
+
+async def test_batch_items_have_request_id(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing_batch",
+            {"variants": ["chr8-140300616-T-G", "chr1-260000000-A-G"]},
+        )
+    )
+    # success items carry request_id in _meta
+    ids = [r["_meta"]["request_id"] for r in data["results"] if "_meta" in r]
+    assert all(isinstance(i, str) and len(i) == 12 for i in ids)
+    assert ids, "at least one success item expected"
+    # error items carry request_id at top level
+    err = next(r for r in data["results"] if r.get("error_code"))
+    assert isinstance(err["request_id"], str) and len(err["request_id"]) == 12
+    # request_ids are unique across items
+    all_ids = ids + [err["request_id"]]
+    assert len(set(all_ids)) == len(all_ids)

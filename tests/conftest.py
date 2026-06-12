@@ -107,7 +107,7 @@ class StubService:
         self.refbase_calls.append((chrom, pos, length, build))
         return self.ref_bases.get(build)
 
-    async def warmup(self, build: str) -> dict[str, Any]:
+    async def warmup(self, build: str, mask: int = 0) -> dict[str, Any]:
         return {
             "spliceai": {"status": "ok", "elapsed_ms": 3},
             "pangolin": {"status": "ok", "elapsed_ms": 4},

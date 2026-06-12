@@ -121,6 +121,14 @@ async def test_warmup_pings_both_models(mcp, stub_service: StubService) -> None:
     assert {"spliceai", "pangolin"} <= set(data["detail"])
 
 
+async def test_warmup_reports_coverage_and_accepts_mask(mcp) -> None:
+    data = structured(await mcp.call_tool("warmup", {"genome_build": "GRCh38", "mask": "masked"}))
+    assert data["warmed"] is True
+    assert data["coverage"]["mask"] == "masked"
+    assert data["coverage"]["gene_set"] == "basic"
+    assert "cold-start" in data["note"]
+
+
 async def test_invalid_variant_returns_invalid_input(mcp, stub_service: StubService) -> None:
     from spliceailookup_link.variant import VariantParseError
 

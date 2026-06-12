@@ -49,14 +49,34 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             Literal["GRCh37", "GRCh38"],
             Field(description="Build whose scoring containers to warm. GRCh38 default."),
         ] = "GRCh38",
+        mask: Annotated[
+            Literal["raw", "masked"],
+            Field(description="Which mask path to warm (raw default; warm masked if you'll use it)."),
+        ] = "raw",
     ) -> dict[str, Any]:
-        """Pre-warm the SpliceAI + Pangolin Cloud Run containers before a burst so the first real call does not eat the 10-40s cold start. Returns per-model elapsed_ms. Fast when already warm. Returns <1kB."""
+        """Pre-warm the SpliceAI + Pangolin Cloud Run containers before a burst so the first real call does not eat the 10-40s cold start. Warms the (basic gene_set, chosen mask) path per model; Cloud Run scales per-instance, so other param combos or concurrent calls may still cold-start and warmth decays after minutes idle. Returns per-model elapsed_ms + coverage. Returns <1kB."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()
-            detail = await service.warmup(genome_build)
+            mask_int = 1 if mask == "masked" else 0
+            detail = await service.warmup(genome_build, mask_int)
             warmed = all(d["status"] == "ok" for d in detail.values())
-            return {"warmed": warmed, "genome_build": genome_build, "detail": detail}
+            return {
+                "warmed": warmed,
+                "genome_build": genome_build,
+                "detail": detail,
+                "coverage": {
+                    "models": ["spliceai", "pangolin"],
+                    "mask": mask,
+                    "gene_set": "basic",
+                },
+                "note": (
+                    "Warms only this (mask, basic gene_set) path per model. Cloud Run "
+                    "autoscales per-instance: subsequent calls with other params or under "
+                    "concurrency may still cold-start, and warmth decays after minutes idle. "
+                    "For a guaranteed-cold first call, prefer a background task."
+                ),
+            }
 
         return await run_mcp_tool("warmup", call)
 

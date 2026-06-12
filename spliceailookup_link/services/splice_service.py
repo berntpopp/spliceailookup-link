@@ -119,8 +119,13 @@ class SpliceService:
             cache_ttl_s=self._ttl_seconds,
         )
 
-    async def warmup(self, build: GenomeBuild) -> dict[str, Any]:
-        """Wake the upstream Cloud Run containers with a known-good sentinel call."""
+    async def warmup(self, build: GenomeBuild, mask: int = 0) -> dict[str, Any]:
+        """Wake the upstream Cloud Run containers with a known-good sentinel call.
+
+        Warms only the (basic gene_set, given mask) path per model; Cloud Run scales
+        per-instance, so other param combinations or concurrent calls may still
+        cold-start, and warmth decays after minutes of idle.
+        """
         sentinel = "8-140300616-T-G"
         detail: dict[str, Any] = {}
         for model in ("spliceai", "pangolin"):
@@ -132,7 +137,7 @@ class SpliceService:
                     build=build,
                     variant=sentinel,
                     distance=50,
-                    mask=0,
+                    mask=mask,
                     gene_set="basic",
                     raw=None,
                     variant_consequence=None,

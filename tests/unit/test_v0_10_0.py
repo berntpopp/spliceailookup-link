@@ -24,7 +24,7 @@ async def test_all_tools_serialize_readonly_annotations() -> None:
     mcp = create_spliceai_mcp(service_factory=lambda: StubService())
     tools = await mcp.list_tools()
     seen = {t.name for t in tools}
-    assert _TOOLS <= seen, f"missing tools: {_TOOLS - seen}"
+    assert seen >= _TOOLS, f"missing tools: {_TOOLS - seen}"
     for t in tools:
         ann = t.annotations
         assert ann is not None, f"{t.name} has no annotations"
@@ -134,7 +134,9 @@ async def test_no_correlation_id_means_no_field(mcp) -> None:
 
 async def test_correlation_id_on_resolve_and_batch(mcp) -> None:
     res = structured(
-        await mcp.call_tool("resolve_variant", {"variant": "chr8-140300616-T-G", "correlation_id": "c1"})
+        await mcp.call_tool(
+            "resolve_variant", {"variant": "chr8-140300616-T-G", "correlation_id": "c1"}
+        )
     )
     assert res["_meta"]["correlation_id"] == "c1"
     batch = structured(

@@ -81,6 +81,4 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
             out["_meta"]["provenance"] = prediction_provenance(genome_build)
             return out
 
-        return await run_mcp_tool(
-            "predict_splicing_batch", call, correlation_id=correlation_id
-        )
+        return await run_mcp_tool("predict_splicing_batch", call, correlation_id=correlation_id)

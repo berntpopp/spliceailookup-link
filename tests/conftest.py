@@ -115,9 +115,7 @@ class StubService:
         self.overlap_calls.append((chrom, pos, build, window))
         return self.overlap_count
 
-    async def nearest_transcript(
-        self, chrom: str, pos: int, build: str, max_window: int = 100_000
-    ):
+    async def nearest_transcript(self, chrom: str, pos: int, build: str, max_window: int = 100_000):
         self.nearest_calls.append((chrom, pos, build))
         return self.nearest
 

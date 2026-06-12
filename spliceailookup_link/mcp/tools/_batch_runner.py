@@ -17,7 +17,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from spliceailookup_link.config import settings
+from spliceailookup_link.config import GenomeBuild, settings
 from spliceailookup_link.mcp.errors import McpErrorContext, mcp_tool_error
 from spliceailookup_link.mcp.tools._batch_dedup import build_dedup_plan
 from spliceailookup_link.mcp.tools._predict import predict_one
@@ -131,7 +131,7 @@ async def run_batch(
     service: SpliceService,
     *,
     variants: list[str],
-    genome_build: str,
+    genome_build: GenomeBuild,
     params: dict[str, Any],
     ctx: Any = None,
     predict_fn: PredictFn = predict_one,

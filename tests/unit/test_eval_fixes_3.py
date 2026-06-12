@@ -60,3 +60,23 @@ def test_f14_null_aberration_fields_are_omitted_not_null() -> None:
     assert "status" not in ab  # omitted, not null
     assert "size_is_coding" not in ab
     assert "introduces_stop_codon" not in ab
+
+
+def test_f14_falsy_aberration_fields_are_kept_not_omitted() -> None:
+    payload = {
+        **SPLICEAI_TRAPPC9,
+        "sai10kPredictions": {
+            "aberrations": [
+                {
+                    "aberration_type": "intron_retention",
+                    "size_is_coding": False,
+                    "introduces_stop_codon": False,
+                }
+            ]
+        },
+    }
+    shaped = shape_spliceai(payload, response_mode="full")
+    ab = shaped["consequence"]["aberrations"][0]
+    assert ab["size_is_coding"] is False  # falsy but not None -> kept
+    assert ab["introduces_stop_codon"] is False
+    assert "status" not in ab  # genuinely absent -> omitted

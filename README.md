@@ -117,7 +117,8 @@ predict_splicing(variant="chr8-140300616-T-G")
 All environment variables are prefixed `SPLICEAILOOKUP_LINK_` (see `.env.example`).
 Key knobs: the scoring/Ensembl host templates, `REQUEST_TIMEOUT` (default 90s),
 `MAX_CONCURRENCY` (default 2 — the upstream is rate-limited), `CACHE_TTL_MINUTES`
-(default 1440), and `MCP_TRANSPORT`/`MCP_HOST`/`MCP_PORT`/`MCP_PATH`.
+(default 1440), `RATE_BUDGET_MIN_INTERVAL_MS` (default 12000 — the soft client-pacing
+interval surfaced as `_meta.rate_budget`), and `MCP_TRANSPORT`/`MCP_HOST`/`MCP_PORT`/`MCP_PATH`.
 
 Background tasks use FastMCP's Docket backend. `DOCKET_URL` defaults to
 `memory://` (in-process, correct for the single-process unified host); set

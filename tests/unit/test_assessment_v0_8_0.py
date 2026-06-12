@@ -262,3 +262,28 @@ async def test_batch_items_have_request_id(mcp) -> None:
     # request_ids are unique across items
     all_ids = ids + [err["request_id"]]
     assert len(set(all_ids)) == len(all_ids)
+
+
+# ---------------- docs: capabilities reflect the new contract ----------------
+
+def test_capabilities_document_v0_9_contract() -> None:
+    from spliceailookup_link.mcp.resources import (
+        get_capabilities_resource,
+        get_reference_resource,
+    )
+
+    full = get_capabilities_resource(detail="full")
+    blob = str(full).lower()
+    assert "hint_lifecycle" in full["response_fields"]
+    assert "v0_9_0_shape" in full["response_fields"]
+    assert "min_interval_ms" in blob
+    assert "retry_after_s" in blob
+    # F1 doc correction: out-of-range is invalid_input
+    ref = str(get_reference_resource()).lower()
+    assert "out of range" in ref or "exceeds the chromosome length" in ref
+
+
+def test_version_is_0_9_0() -> None:
+    from spliceailookup_link import __version__
+
+    assert __version__ == "0.9.0"

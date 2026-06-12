@@ -43,6 +43,25 @@ _IDENTITY_KEYS = (
     "strand",
 )
 
+_ENVELOPE_ECHO_KEYS = ("variant_id", "genome_build", "gene_set", "max_distance", "mask")
+
+
+def _dedup_subblock(block: dict[str, Any], *, drop_headline: bool) -> None:
+    """Strip envelope-owned redundancy from a combined sub-block (C1/C2/C3).
+
+    The combined envelope already carries the five request params, so the per-model
+    copies are pure redundancy. The per-model headline is subsumed by the combined
+    headline in compact (kept in full). A single-transcript sub-block's
+    per-transcript max_delta_score equals the model-level value, so drop the copy.
+    """
+    for key in _ENVELOPE_ECHO_KEYS:
+        block.pop(key, None)
+    if drop_headline:
+        block.pop("headline", None)
+    txs = block.get("transcripts")
+    if isinstance(txs, list) and len(txs) == 1 and isinstance(txs[0], dict):
+        txs[0].pop("max_delta_score", None)
+
 
 def _aggregate_cache(
     teles: list[CallTelemetry],
@@ -200,6 +219,14 @@ async def predict_one(
             if block and block.get("transcripts"):
                 for k in _IDENTITY_KEYS:
                     block["transcripts"][0].pop(k, None)
+
+    # C1/C2/C3: the combined envelope already carries the request echo; strip the
+    # redundant copies (and per-model headlines in compact) from the sub-blocks.
+    drop_headline = response_mode == "compact"
+    for sub in ("spliceai", "pangolin"):
+        block = result.get(sub)
+        if block:
+            _dedup_subblock(block, drop_headline=drop_headline)
 
     if consequence is not None:
         result["consequence"] = consequence

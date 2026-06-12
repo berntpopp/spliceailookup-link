@@ -78,3 +78,33 @@ async def test_spliceai_include_see_also_false(mcp) -> None:
     meta = data["_meta"]
     assert "next_commands" in meta
     assert "see_also" not in meta
+
+
+async def test_resolve_wrong_ref_warns_but_still_returns_id(mcp, stub_service: StubService) -> None:
+    stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "T"}
+    data = structured(await mcp.call_tool("resolve_variant", {"variant": "chr8-140300616-A-G"}))
+    assert data["variant_id"] == "8-140300616-A-G"  # still normalized
+    assert data["ref_validated"] is False
+    assert "does not match" in data["ref_warning"]
+
+
+async def test_resolve_correct_ref_is_validated(mcp, stub_service: StubService) -> None:
+    stub_service.ref_bases = {"GRCh38": "T"}
+    data = structured(await mcp.call_tool("resolve_variant", {"variant": "chr8-140300616-T-G"}))
+    assert data["ref_validated"] is True
+    assert "ref_warning" not in data
+
+
+async def test_resolve_check_ref_false_makes_no_ensembl_call(
+    mcp, stub_service: StubService
+) -> None:
+    stub_service.ref_bases = {"GRCh38": "T"}
+    data = structured(
+        await mcp.call_tool(
+            "resolve_variant", {"variant": "chr8-140300616-A-G", "check_ref": False}
+        )
+    )
+    assert data["variant_id"] == "8-140300616-A-G", "must be a success envelope"
+    assert "ref_validated" not in data
+    assert "ref_warning" not in data
+    assert stub_service.refbase_calls == []

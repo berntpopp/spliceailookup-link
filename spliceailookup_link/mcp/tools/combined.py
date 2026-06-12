@@ -62,6 +62,13 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             bool,
             Field(description="On not_found, probe the other build to detect a build_mismatch."),
         ] = True,
+        include_hints: Annotated[
+            bool,
+            Field(
+                description="Include _meta.next_commands + see_also chaining hints (default true; "
+                "set false to trim tokens once you know the workflow)."
+            ),
+        ] = True,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
         """BOTH models (SpliceAI + Pangolin) in one call -- the default "what does this variant do to splicing?" answer. Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls). Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
@@ -81,13 +88,13 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 ctx=ctx,
             )
             tel = result.pop("_telemetry")
-            meta: dict[str, Any] = {
-                "next_commands": for_combined(result["variant_id"], genome_build),
-            }
-            if response_mode != "minimal":
-                meta["see_also"] = see_also_for(
-                    result["variant_id"], genome_build, tel["gene"], response_mode
-                )
+            meta: dict[str, Any] = {}
+            if include_hints:
+                meta["next_commands"] = for_combined(result["variant_id"], genome_build)
+                if response_mode != "minimal":
+                    meta["see_also"] = see_also_for(
+                        result["variant_id"], genome_build, tel["gene"], response_mode
+                    )
             if tel["cache"]:
                 meta["cache"] = tel["cache"]
             if tel["upstream_elapsed_ms"] is not None:

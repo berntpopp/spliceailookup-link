@@ -27,7 +27,7 @@ from spliceailookup_link.api import (
 )
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.resources import get_capabilities_version
-from spliceailookup_link.variant import VariantParseError
+from spliceailookup_link.variant import UnsupportedContigError, VariantParseError
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,8 @@ def _classify(
     if isinstance(exc, DataNotFoundError):
         tool, args = _fallback_for(context)
         return "not_found", False, tool, args
+    if isinstance(exc, UnsupportedContigError):
+        return "unsupported_contig", False, _FALLBACK_TOOL, None
     if isinstance(exc, (UpstreamInputError, VariantParseError)):
         tool, args = _fallback_for(context)
         return "invalid_input", False, tool, args
@@ -175,7 +177,7 @@ def _recovery_action(error_code: str, retryable: bool) -> str:
     return "switch_tool"
 
 
-def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
+def _recovery_text(error_code: str, fallback_tool: str | None, *, tool_name: str) -> str:
     if error_code == "not_found":
         return (
             "The variant is well-formed but the model returned no scores -- it likely does not "
@@ -183,6 +185,14 @@ def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
             "max_distance, or confirm the coordinates/build with resolve_variant."
         )
     if error_code == "invalid_input":
+        if tool_name == "resolve_variant":
+            # Already inside the resolver: do not tell the caller to call it again.
+            return (
+                "The input could not be parsed into any supported variant form. Do not "
+                "retry unchanged. Provide CHROM-POS-REF-ALT (chr optional), transcript or "
+                "genomic HGVS (e.g. NM_000123.4:c.10A>T), or an rsID (e.g. rs6025); call "
+                "get_server_capabilities for accepted formats and examples."
+            )
         return (
             "The variant could not be parsed or the upstream rejected it. Do not retry "
             "unchanged. Call resolve_variant to normalize HGVS / rsIDs / loose coordinates into "
@@ -222,11 +232,25 @@ def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
             "variant_id (see variant_ids / next_commands, one prediction per allele) "
             "and retry, or call resolve_variant to review the candidates."
         )
+    if error_code == "unsupported_contig":
+        return (
+            "This contig is outside the SpliceAI/Pangolin nuclear scope (chr1-22, X, Y). "
+            "Do not retry unchanged. For mitochondrial variants, use gnomad-link "
+            "get_mitochondrial_variant; otherwise confirm the variant is on a nuclear "
+            "chromosome and re-submit."
+        )
     return f"Unexpected failure. Call {fallback_tool} for a safe entry point."
 
 
 def _envelope_message(exc: BaseException, error_code: str) -> str:
-    if error_code in {"build_mismatch", "invalid_input", "not_found", "ref_mismatch", "ambiguous"}:
+    if error_code in {
+        "build_mismatch",
+        "invalid_input",
+        "not_found",
+        "ref_mismatch",
+        "ambiguous",
+        "unsupported_contig",
+    }:
         # These carry developer-authored or upstream guidance safe to surface.
         return _safe_message(exc)
     if error_code == "validation_failed":
@@ -338,7 +362,7 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
         "recovery_action": _recovery_action(error_code, retryable),
         "fallback_tool": fallback_tool,
         "fallback_args": fallback_args,
-        "recovery": _recovery_text(error_code, fallback_tool),
+        "recovery": _recovery_text(error_code, fallback_tool, tool_name=context.tool_name),
         "_meta": {
             "tool": context.tool_name,
             "next_commands": next_commands,

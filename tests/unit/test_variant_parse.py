@@ -77,3 +77,26 @@ def test_split_variant_id() -> None:
 def test_split_variant_id_malformed() -> None:
     with pytest.raises(VariantParseError):
         split_variant_id("8-140300616-T")
+
+
+# --- F19: unsupported (non-nuclear) contig fast-fail ---
+from spliceailookup_link.variant import (  # noqa: E402
+    UnsupportedContigError,
+    unsupported_contig_reason,
+)
+
+
+def test_unsupported_contig_reason_flags_mt():
+    assert unsupported_contig_reason("MT-3243-A-G") is not None
+    assert "Mitochondrial" in unsupported_contig_reason("MT-3243-A-G")
+    assert unsupported_contig_reason("chrM-100-A-G") is not None
+
+
+def test_unsupported_contig_reason_allows_nuclear():
+    assert unsupported_contig_reason("1-169549811-C-A") is None
+    assert unsupported_contig_reason("chrX-100-A-G") is None
+    assert unsupported_contig_reason("Y-100-A-G") is None
+
+
+def test_unsupported_contig_error_is_parse_error_subclass():
+    assert issubclass(UnsupportedContigError, Exception)

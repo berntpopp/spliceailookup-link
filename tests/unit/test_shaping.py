@@ -159,3 +159,58 @@ def test_interpretation_band_absent_threshold_in_minimal() -> None:
     out = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="minimal")
     assert out["interpretation"]["band"] == "high"
     assert "threshold_basis" not in out["interpretation"]
+
+
+# --- F20: GRCh37 GENCODE _NN id normalization ---
+def _grch37_payload() -> dict:
+    return {
+        "variant": "1-169519049-T-C",
+        "hg": "37",
+        "distance": 500,
+        "mask": 0,
+        "bc": "basic",
+        "scores": [
+            {
+                "g_name": "F5",
+                "g_id": "ENSG00000198734.13_12",
+                "t_id": "ENST00000367797.9_9",
+                "t_priority": "MS",
+                "DS_AG": 0.1,
+                "DP_AG": -5,
+                "DS_AL": 0.0,
+                "DP_AL": 1,
+                "DS_DG": 0.0,
+                "DP_DG": 2,
+                "DS_DL": 0.0,
+                "DP_DL": 3,
+            }
+        ],
+    }
+
+
+def test_f20_grch37_gencode_ids_are_normalized():
+    out = shape_spliceai(_grch37_payload(), transcripts="all", response_mode="compact")
+    t = out["transcripts"][0]
+    assert t["gene_id"] == "ENSG00000198734.13"
+    assert t["transcript_id"] == "ENST00000367797.9"
+
+
+def test_f20_full_mode_preserves_raw_gencode_id():
+    out = shape_spliceai(_grch37_payload(), transcripts="all", response_mode="full")
+    t = out["transcripts"][0]
+    assert t["gene_id"] == "ENSG00000198734.13"
+    assert t["gencode_id"] == {
+        "gene_id": "ENSG00000198734.13_12",
+        "transcript_id": "ENST00000367797.9_9",
+    }
+
+
+def test_f20_grch38_clean_ids_untouched():
+    payload = _grch37_payload()
+    payload["hg"] = "38"
+    payload["scores"][0]["g_id"] = "ENSG00000198734.13"
+    payload["scores"][0]["t_id"] = "ENST00000367797.9"
+    out = shape_spliceai(payload, transcripts="all", response_mode="full")
+    t = out["transcripts"][0]
+    assert t["gene_id"] == "ENSG00000198734.13"
+    assert "gencode_id" not in t

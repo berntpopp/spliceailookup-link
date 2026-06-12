@@ -9,6 +9,7 @@ deltas, default), full (adds REF/ALT raw scores + exon model + allNonZeroScores)
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 ResponseMode = Literal["minimal", "compact", "full"]
@@ -83,6 +84,21 @@ def _to_int(value: Any) -> int | None:
 
 def _priority_label(priority: Any) -> str:
     return _PRIORITY_LABELS.get(str(priority), str(priority) if priority else "unknown")
+
+
+_ENSEMBL_VERSIONED_RE = re.compile(r"^(ENS[A-Z]+\d+\.\d+)_\d+$")
+
+
+def _normalize_ensembl_id(value: Any) -> Any:
+    """Strip the GRCh37 GENCODE re-version suffix (ENSG...13_12 -> ENSG...13).
+
+    Leaves clean GRCh38 ids and any non-matching value untouched so cross-build
+    joins line up. Returns the input unchanged for non-string / non-matching values.
+    """
+    if not isinstance(value, str):
+        return value
+    m = _ENSEMBL_VERSIONED_RE.match(value)
+    return m.group(1) if m else value
 
 
 def _delta(score: Any, pos: Any) -> dict[str, Any]:
@@ -163,10 +179,14 @@ def _shape_spliceai_transcript(raw: dict[str, Any], mode: ResponseMode) -> dict[
     deltas = {name: _delta(raw.get(ds), raw.get(dp)) for name, ds, dp in _SPLICEAI_CLASSES}
     scores = [d["score"] for d in deltas.values() if d["score"] is not None]
     max_score = max(scores) if scores else None
+    raw_gid = raw.get("g_id")
+    raw_tid = raw.get("t_id")
+    gene_id = _normalize_ensembl_id(raw_gid)
+    transcript_id = _normalize_ensembl_id(raw_tid)
     out: dict[str, Any] = {
         "gene": raw.get("g_name"),
-        "gene_id": raw.get("g_id"),
-        "transcript_id": raw.get("t_id"),
+        "gene_id": gene_id,
+        "transcript_id": transcript_id,
         "transcript_priority": _priority_label(raw.get("t_priority")),
         "refseq_ids": raw.get("t_refseq_ids"),
         "strand": raw.get("t_strand"),
@@ -174,6 +194,8 @@ def _shape_spliceai_transcript(raw: dict[str, Any], mode: ResponseMode) -> dict[
         "delta_scores": deltas,
         "max_delta_score": max_score,
     }
+    if mode == "full" and (gene_id != raw_gid or transcript_id != raw_tid):
+        out["gencode_id"] = {"gene_id": raw_gid, "transcript_id": raw_tid}
     if mode == "full":
         out["ref_alt_scores"] = {
             "acceptor_gain": {
@@ -334,16 +356,22 @@ def _shape_pangolin_transcript(raw: dict[str, Any], mode: ResponseMode) -> dict[
         deltas[name] = entry
         if entry["score"] is not None:
             abs_scores.append(entry["score"])
+    raw_gid = raw.get("g_id")
+    raw_tid = raw.get("t_id")
+    gene_id = _normalize_ensembl_id(raw_gid)
+    transcript_id = _normalize_ensembl_id(raw_tid)
     out: dict[str, Any] = {
         "gene": raw.get("g_name"),
-        "gene_id": raw.get("g_id"),
-        "transcript_id": raw.get("t_id"),
+        "gene_id": gene_id,
+        "transcript_id": transcript_id,
         "transcript_priority": _priority_label(raw.get("t_priority")),
         "refseq_ids": raw.get("t_refseq_ids"),
         "strand": raw.get("t_strand"),
         "delta_scores": deltas,
         "max_delta_score": max(abs_scores) if abs_scores else None,
     }
+    if mode == "full" and (gene_id != raw_gid or transcript_id != raw_tid):
+        out["gencode_id"] = {"gene_id": raw_gid, "transcript_id": raw_tid}
     if mode == "full":
         out["ref_alt_scores"] = {
             "splice_gain": {

@@ -132,6 +132,11 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "reference-base check and returned as ref_mismatch (not a misleading "
                 "not_found)."
             ),
+            "ensembl_id_normalization": (
+                "gene_id / transcript_id are normalized: the GRCh37 GENCODE re-version suffix "
+                "(e.g. ENSG00000198734.13_12 -> ENSG00000198734.13) is stripped so cross-build "
+                "joins line up; response_mode='full' preserves the raw value under gencode_id."
+            ),
         },
         "error_codes": [
             "invalid_input",
@@ -139,6 +144,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             "ref_mismatch",
             "ambiguous",
             "build_mismatch",
+            "unsupported_contig",
             "rate_limited",
             "validation_failed",
             "upstream_unavailable",
@@ -157,6 +163,11 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "uniprot-link for protein domains, features, and disease variants). "
                 "These are hints, not callable next_commands on this server. Omitted in minimal "
                 "mode; collapsed to {server, hint} in compact; full example args in full mode."
+            ),
+            "include_hints": (
+                "predict_* and resolve_variant accept include_hints (default true). Set false to "
+                "drop _meta.next_commands and see_also once you know the workflow -- trims the "
+                "per-call token overhead. predict_splicing_batch already omits per-item hints."
             ),
             "molecular_consequence": (
                 "the resolver's (Ensembl VEP) most-severe molecular consequence for HGVS/rsID "
@@ -200,6 +211,15 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "upstream 429 it is a conservative floor.)"
             ),
         },
+        "batch_semantics": (
+            "predict_splicing_batch runs items through the concurrency cap so a slow or failing "
+            "item never spuriously rate_limits its siblings, and retries a per-item "
+            "rate_limited/upstream_unavailable failure once. summary splits failures into "
+            "terminal_failed (invalid_input / not_found / ref_mismatch / build_mismatch / "
+            "ambiguous / unsupported_contig -- do not resubmit) and retryable_failed; the "
+            "variants in retryable_failed are listed in the top-level retry_variants array for "
+            "resubmission (ideally as a background task). summary.retried counts auto-retries."
+        ),
         "prediction_deadline": (
             "Foreground predict_* calls have a server soft deadline "
             f"({settings.PREDICT_SOFT_DEADLINE_SECONDS}s); exceeding it returns a retryable "
@@ -341,6 +361,11 @@ def get_reference_resource() -> dict[str, Any]:
                 "build_mismatch": {
                     "retryable": False,
                     "when": "coordinate clearly belongs to the other build; set genome_build correctly",
+                },
+                "unsupported_contig": {
+                    "retryable": False,
+                    "when": "variant is on a non-nuclear contig (MT or non-standard) the "
+                    "SpliceAI/Pangolin models do not score; use gnomad-link for MT variants",
                 },
                 "rate_limited": {
                     "retryable": True,

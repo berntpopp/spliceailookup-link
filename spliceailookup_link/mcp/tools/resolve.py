@@ -61,7 +61,7 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
             Field(description="Reference build for resolution and scoring. GRCh38 default."),
         ] = "GRCh38",
     ) -> dict[str, Any]:
-        """Use this when the caller's variant is HGVS, an rsID, or loosely formatted, and you need the canonical CHROM-POS-REF-ALT that the prediction tools require. Coordinate inputs are normalized locally; HGVS/rsIDs are resolved via Ensembl VEP, which also returns the most-severe consequence and gene symbol. Then call predict_splicing. Returns <1kB."""
+        """Use this when the caller's variant is HGVS, an rsID, or loosely formatted, and you need the canonical CHROM-POS-REF-ALT that the prediction tools require. Coordinate inputs are normalized locally; HGVS/rsIDs are resolved via Ensembl VEP, which also returns the most-severe consequence and gene symbol. Then call predict_splicing. Returns <1kB. Coordinate inputs are normalized, not validated: a wrong REF allele passes resolution and only fails at prediction time."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()

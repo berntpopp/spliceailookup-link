@@ -186,3 +186,10 @@ async def test_c1_success_envelope_has_no_rate_budget(mcp) -> None:
     data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
     assert data["success"] is True
     assert "rate_budget" not in data["_meta"]
+
+
+async def test_f16_resolve_description_states_normalized_not_validated(mcp) -> None:
+    tools = await mcp.list_tools()
+    desc = next(t.description for t in tools if t.name == "resolve_variant")
+    low = desc.lower()
+    assert "normalized" in low and "not validated" in low

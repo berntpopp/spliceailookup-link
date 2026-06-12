@@ -103,9 +103,7 @@ def test_ambiguous_lists_alleles_and_per_allele_next_commands() -> None:
     )
     env = mcp_tool_error(
         exc,
-        McpErrorContext(
-            tool_name="predict_splicing", variant="rs6025", genome_build="GRCh38"
-        ),
+        McpErrorContext(tool_name="predict_splicing", variant="rs6025", genome_build="GRCh38"),
     ).payload
     assert env["error_code"] == "ambiguous"
     assert env["retryable"] is False

@@ -185,9 +185,9 @@ async def test_reference_base_uses_grch37_host_for_grch37() -> None:
 
 @respx.mock
 async def test_reference_base_returns_none_on_upstream_error() -> None:
-    respx.get(
-        "https://rest.ensembl.org/sequence/region/human/8:999999999..999999999"
-    ).mock(return_value=httpx.Response(400, json={"error": "out of range"}))
+    respx.get("https://rest.ensembl.org/sequence/region/human/8:999999999..999999999").mock(
+        return_value=httpx.Response(400, json={"error": "out of range"})
+    )
     client = EnsemblVepClient()
     base = await client.reference_base("8", 999999999, 1, "GRCh38")
     await client.close()

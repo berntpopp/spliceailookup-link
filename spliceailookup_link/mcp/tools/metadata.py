@@ -33,7 +33,9 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
     async def get_server_capabilities(
         detail: Annotated[
             Literal["full", "lean"],
-            Field(description="full (default, complete doc) or lean (tool list + hash + glossary; params by reference)."),
+            Field(
+                description="full (default, complete doc) or lean (tool list + hash + glossary; params by reference)."
+            ),
         ] = "full",
     ) -> dict[str, Any]:
         """Use this first in a cold session to learn the tools, parameters, score glossary, recommended workflows, error codes, and limitations. detail='lean' returns a trimmed doc (tool list + verdicts + error codes + capabilities_version) that omits per-parameter prose already in the tool schemas. Full ~4kB, lean ~1-2kB."""
@@ -56,7 +58,9 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         ] = "GRCh38",
         mask: Annotated[
             Literal["raw", "masked"],
-            Field(description="Which mask path to warm (raw default; warm masked if you'll use it)."),
+            Field(
+                description="Which mask path to warm (raw default; warm masked if you'll use it)."
+            ),
         ] = "raw",
     ) -> dict[str, Any]:
         """Pre-warm the SpliceAI + Pangolin Cloud Run containers before a burst so the first real call does not eat the 10-40s cold start. Warms the (basic gene_set, chosen mask) path per model; Cloud Run scales per-instance, so other param combos or concurrent calls may still cold-start and warmth decays after minutes idle. Returns per-model elapsed_ms + coverage. Returns <1kB."""

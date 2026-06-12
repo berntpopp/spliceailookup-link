@@ -6,6 +6,11 @@ import asyncio
 import re
 
 from spliceailookup_link.config import settings
+from spliceailookup_link.mcp.resources import (
+    get_capabilities_resource,
+    get_capabilities_version,
+    get_reference_resource,
+)
 from tests.conftest import StubService, structured
 
 _COORD = re.compile(r"^[\dXYM]+-\d+-[ACGT]+-[ACGT]+$")
@@ -158,9 +163,7 @@ async def test_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> None:
 
     stub_service.score_error = DataNotFoundError("did not return any scores")
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}  # REF 'A' matches neither
-    data = structured(
-        await mcp.call_tool("predict_splicing", {"variant": "8-140300616-A-G"})
-    )
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "8-140300616-A-G"}))
     assert data["error_code"] == "ref_mismatch"
     assert data["fallback_tool"] == "resolve_variant"
 
@@ -170,9 +173,7 @@ async def test_spliceai_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> Non
 
     stub_service.score_error = DataNotFoundError("did not return any scores")
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
-    data = structured(
-        await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-A-G"})
-    )
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-A-G"}))
     assert data["error_code"] == "ref_mismatch"
 
 
@@ -180,13 +181,6 @@ async def test_single_predict_ambiguous_rsid_does_not_silently_score(mcp, stub_s
     data = structured(await mcp.call_tool("predict_splicing", {"variant": "rs6025"}))
     assert data["error_code"] == "ambiguous"
     assert stub_service.score_calls == []
-
-
-from spliceailookup_link.mcp.resources import (
-    get_capabilities_resource,
-    get_capabilities_version,
-    get_reference_resource,
-)
 
 
 def test_capabilities_documents_new_codes_and_verdict() -> None:

@@ -127,10 +127,10 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "aberration."
             ),
             "resolve_caveat": (
-                "Coordinate inputs are normalized, not deeply validated up front, but a "
-                "wrong REF allele is now detected at prediction time via an Ensembl "
-                "reference-base check and returned as ref_mismatch (not a misleading "
-                "not_found)."
+                "Coordinate inputs are normalized locally; a wrong REF allele is caught "
+                "pre-flight (before the slow scoring call) via an Ensembl reference-base "
+                "check and returned as a fast ref_mismatch (not a misleading ~17s "
+                "not_found, and never a build_mismatch when the position is valid)."
             ),
             "ensembl_id_normalization": (
                 "gene_id / transcript_id are normalized: the GRCh37 GENCODE re-version suffix "
@@ -177,8 +177,13 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "intron_retention, frameshift, etc.)."
             ),
             "observability": (
-                "every _meta carries request_id and timing.elapsed_ms; prediction payloads add "
-                "cache ('hit'|'miss'|'partial') and upstream_elapsed_ms (on a miss)."
+                "every _meta carries request_id, timing.elapsed_ms, and served_warm "
+                "(true on a cache hit or a sub-cold-start upstream answer -- use it to "
+                "choose blocking vs a background task); prediction payloads add cache "
+                "('hit'|'miss'|'partial') and upstream_elapsed_ms (on a miss). On the lean "
+                "path (response_mode='minimal' or include_hints=false) the repetitive "
+                "capabilities_version and cache_ttl_s/cache_age_s are dropped to save tokens "
+                "(fetch capabilities_version from get_server_capabilities)."
             ),
             "capabilities_version": (
                 "stable content hash of this document (+ descriptor_chars), ALSO echoed in "
@@ -218,7 +223,11 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             "terminal_failed (invalid_input / not_found / ref_mismatch / build_mismatch / "
             "ambiguous / unsupported_contig -- do not resubmit) and retryable_failed; the "
             "variants in retryable_failed are listed in the top-level retry_variants array for "
-            "resubmission (ideally as a background task). summary.retried counts auto-retries."
+            "resubmission (ideally as a background task). summary.retried counts auto-retries. "
+            "predict_splicing_batch accepts max_items=25 variants; submitting more returns "
+            "validation_failed (the cap is enforced, not silently truncated). Each item returns "
+            "about one compact predict_splicing result, and the envelope _meta echoes "
+            "items_submitted and max_items."
         ),
         "prediction_deadline": (
             "Foreground predict_* calls have a server soft deadline "
@@ -351,8 +360,11 @@ def get_reference_resource() -> dict[str, Any]:
                 },
                 "ref_mismatch": {
                     "retryable": False,
-                    "when": "coordinate REF allele does not match the genome reference at that "
-                    "position/build (swapped REF/ALT, wrong strand, or wrong build)",
+                    "when": "the coordinate REF does not match the genome reference at that "
+                    "position/build (swapped REF/ALT, wrong strand, or a typo). Detected "
+                    "pre-flight via an Ensembl reference-base check (fast, before scoring). If "
+                    "the REF matches the other build, other_build_hint carries a secondary "
+                    "suggestion -- but this stays a ref_mismatch, not a build_mismatch redirect.",
                 },
                 "ambiguous": {
                     "retryable": False,
@@ -361,7 +373,10 @@ def get_reference_resource() -> dict[str, Any]:
                 },
                 "build_mismatch": {
                     "retryable": False,
-                    "when": "coordinate clearly belongs to the other build; set genome_build correctly",
+                    "when": "the coordinate cannot belong to the requested build -- its position "
+                    "is out of that build's chromosome range, or the variant only scores on the "
+                    "other build; set genome_build correctly. A wrong REF at an in-range position "
+                    "is ref_mismatch, not this.",
                 },
                 "unsupported_contig": {
                     "retryable": False,

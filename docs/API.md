@@ -101,3 +101,37 @@ Input normalization the site performs before scoring:
 All three task examples are **hg38**:
 `NM_001089.3(ABCA3):c.875A>T` → `16-2317763-T-A`; `chr8-140300616-T-G`;
 `6 31740453 G T` → `6-31740453-G-T`.
+
+## 4. MCP facade response contract (this server, not upstream)
+
+The sections above describe the *upstream* APIs. The MCP facade reshapes them; the
+authoritative facade contract is `get_server_capabilities` / `spliceailookup://capabilities`
+and `spliceailookup://reference`. Key facade behaviors:
+
+- **`_meta` observability.** Every envelope carries `request_id`, `timing.elapsed_ms`,
+  and `served_warm` (true on a cache hit or a sub-cold-start upstream answer —
+  `WARM_THRESHOLD_MS`, default 5 s — so a client can choose blocking vs a background
+  task without parsing `upstream_elapsed_ms`). Prediction payloads add
+  `cache` (`hit`|`miss`|`partial`) and, on a miss, `upstream_elapsed_ms`.
+- **Lean `_meta`.** When `response_mode=minimal` or `include_hints=false`, the
+  repetitive `capabilities_version`, `cache_ttl_s`, and `cache_age_s` are dropped to
+  save tokens; `request_id`, `timing`, `cache`, `served_warm`, and the
+  `unsafe_for_clinical_use` research-use flag are always kept. Fetch
+  `capabilities_version` from `get_server_capabilities` when needed.
+- **`ref_mismatch` is pre-flight and fast.** A coordinate whose REF does not match the
+  requested build's reference base is rejected as `ref_mismatch` *before* the slow
+  scoring dispatch (an Ensembl reference-base check, ~sub-second), instead of a
+  misleading ~17 s `not_found`. If the REF happens to match the other build's base,
+  the error carries a secondary `other_build_hint` but stays a `ref_mismatch` — it is
+  **not** redirected to `build_mismatch`. `build_mismatch` fires only when the position
+  cannot belong to the requested build (out of chromosome range, or the variant only
+  scores on the other build).
+- **`resolve_variant` ambiguity.** When an input maps to multiple ALT alleles, the
+  singular `variant_id` is `null` (so a caller cannot silently pick one); the candidates
+  are in `variant_ids[]` with one `next_commands` entry per allele.
+- **`tx_start`/`tx_end`.** In `response_mode=full`, `transcripts[].exon_model` and
+  `consequence.transcript_info` carry `tx_start`/`tx_end` derived from the exon arrays
+  (`min(EXON_STARTS)` / `max(EXON_ENDS)`) when upstream leaves them null.
+- **Batch size contract.** `predict_splicing_batch` accepts `max_items=25`; more returns
+  `validation_failed` (enforced, not truncated). The envelope `_meta` echoes
+  `items_submitted` and `max_items`; each item is ≈ one compact `predict_splicing` result.

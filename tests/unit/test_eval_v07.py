@@ -163,3 +163,52 @@ async def test_lean_capabilities_lists_resources(mcp) -> None:
     data = structured(res)
     assert "resources" in data
     assert "spliceailookup://reference" in data["resources"]
+
+
+# --- Rec #5: error-mapping coverage (deterministic, no live calls) -----------
+
+from spliceailookup_link.api import RateLimitedError, SpliceApiError  # noqa: E402
+
+
+async def test_comprehensive_503_maps_to_upstream_unavailable(
+    mcp, stub_service: StubService
+) -> None:
+    # A 5xx during a comprehensive gene_set call surfaces as retryable upstream_unavailable.
+    stub_service.score_error = SpliceApiError("Upstream HTTP 503")
+    res = await mcp.call_tool(
+        "predict_splicing",
+        {"variant": "8-140300616-T-G", "gene_set": "comprehensive"},
+    )
+    data = structured(res)
+    assert data["success"] is False
+    assert data["error_code"] == "upstream_unavailable"
+    assert data["retryable"] is True
+
+
+async def test_rate_limited_reports_rate_budget(mcp, stub_service: StubService) -> None:
+    stub_service.score_error = RateLimitedError("Local concurrency limit saturated")
+    res = await mcp.call_tool("predict_splicing", {"variant": "8-140300616-T-G"})
+    data = structured(res)
+    assert data["error_code"] == "rate_limited"
+    budget = data["_meta"]["rate_budget"]
+    assert budget["unit"] == "concurrent_requests"
+    assert budget["remaining"] == 0
+    assert "limit" in budget
+
+
+async def test_batch_per_item_rate_budget(mcp, stub_service: StubService) -> None:
+    stub_service.score_error = RateLimitedError("saturated")
+    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["8-140300616-T-G"]})
+    item = structured(res)["results"][0]
+    assert item["error_code"] == "rate_limited"
+    assert item["rate_budget"]["unit"] == "concurrent_requests"
+
+
+# --- Documentation contract ---------------------------------------------------
+
+def test_capabilities_documents_served_warm_and_batch_cap() -> None:
+    from spliceailookup_link.mcp.resources import get_capabilities_resource
+
+    doc = get_capabilities_resource("full")
+    assert "served_warm" in doc["response_fields"]["observability"]
+    assert "max_items" in doc["batch_semantics"] or "25" in doc["batch_semantics"]

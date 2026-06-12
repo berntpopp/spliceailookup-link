@@ -195,3 +195,27 @@ async def test_f19b_resolve_marks_mt_not_scoring_supported(mcp) -> None:
 async def test_f19b_resolve_nuclear_has_no_scoring_supported_flag(mcp) -> None:
     data = structured(await mcp.call_tool("resolve_variant", {"variant": "chr8-140300616-T-G"}))
     assert "scoring_supported" not in data  # additive: only set when NOT supported
+
+
+# --- F24: capabilities document the new code, batch semantics, include_hints ---
+from spliceailookup_link.mcp.resources import (  # noqa: E402
+    get_capabilities_resource,
+    get_reference_resource,
+)
+
+
+def test_f24_capabilities_documents_new_code_and_batch_semantics():
+    doc = get_capabilities_resource()
+    assert "unsupported_contig" in doc["error_codes"]
+    assert "batch_semantics" in doc
+    assert "retry_variants" in doc["batch_semantics"]
+    assert "include_hints" in doc["response_fields"]
+    ref = get_reference_resource()
+    assert "unsupported_contig" in ref["error_taxonomy"]["codes"]
+
+
+def test_f24_capabilities_version_stable_and_12_char():
+    a = get_capabilities_resource()
+    b = get_capabilities_resource()
+    assert a["capabilities_version"] == b["capabilities_version"]
+    assert len(a["capabilities_version"]) == 12

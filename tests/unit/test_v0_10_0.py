@@ -51,3 +51,19 @@ def test_basic_gene_set_documents_noncoding() -> None:
     text = doc["parameters"]["gene_set"].lower()
     assert "non-coding" in text or "noncoding" in text or "lncrna" in text
     assert "gencode" in text
+
+
+# ---------------- W3: model/build provenance ----------------
+
+
+def test_provenance_has_versioned_sources() -> None:
+    from spliceailookup_link.mcp.provenance import prediction_provenance
+
+    p = prediction_provenance("GRCh38")
+    assert "SpliceAI" in p["spliceai"]
+    assert "Pangolin" in p["pangolin"]
+    assert "v44" in p["transcript_annotation"]
+    assert "Ensembl" in p["resolver"]
+    assert "documented" in p["note"].lower()
+    p37 = prediction_provenance("GRCh37")
+    assert "lift37" in p37["transcript_annotation"]

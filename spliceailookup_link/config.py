@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     QUEUE_WAIT_TIMEOUT: int = 30
     MAX_RETRIES: int = 3
 
+    # predict_splicing_batch retries a per-item retryable failure (rate_limited /
+    # upstream_unavailable) once within the batch; this caps the jittered backoff.
+    # Tests set 0 for determinism.
+    BATCH_RETRY_BACKOFF_SECONDS: float = 1.0
+
     # Foreground prediction soft deadline (seconds). A comprehensive gene_set with a
     # large max_distance can exceed the client's MCP timeout; this returns a
     # structured upstream_unavailable before the client gives up. Set 0 to disable.

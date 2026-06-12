@@ -193,3 +193,10 @@ async def test_f16_resolve_description_states_normalized_not_validated(mcp) -> N
     desc = next(t.description for t in tools if t.name == "resolve_variant")
     low = desc.lower()
     assert "normalized" in low and "not validated" in low
+
+
+async def test_f17_descriptions_disambiguate_one_vs_both(mcp) -> None:
+    tools = {t.name: t.description for t in await mcp.list_tools()}
+    assert "BOTH models" in tools["predict_splicing"]
+    assert "ONE model" in tools["predict_spliceai"]
+    assert "ONE model" in tools["predict_pangolin"]

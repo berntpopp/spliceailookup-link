@@ -144,3 +144,19 @@ async def test_correlation_id_on_resolve_and_batch(mcp) -> None:
         )
     )
     assert batch["_meta"]["correlation_id"] == "c2"
+
+
+# ---------------- W7: warmup both masks + stay-warm estimate ----------------
+
+
+async def test_warmup_default_reports_stay_warm_estimate(mcp) -> None:
+    data = structured(await mcp.call_tool("warmup", {}))
+    assert data["stay_warm_estimate_s"] >= 1
+    assert data["coverage"]["mask"] == "raw"
+
+
+async def test_warmup_both_masks(mcp) -> None:
+    data = structured(await mcp.call_tool("warmup", {"mask": "both"}))
+    assert data["coverage"]["mask"] == "both"
+    assert "spliceai_raw" in data["detail"] and "spliceai_masked" in data["detail"]
+    assert "pangolin_raw" in data["detail"] and "pangolin_masked" in data["detail"]

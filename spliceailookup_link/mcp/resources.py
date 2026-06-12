@@ -64,6 +64,17 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
         ),
         "genome_builds": ["GRCh37", "GRCh38"],
         "default_genome_build": "GRCh38",
+        "tool_safety": {
+            "all_tools_read_only": True,
+            "idempotent": True,
+            "open_world": True,
+            "note": (
+                "All 7 tools are read-only, idempotent, and open-world "
+                "(readOnlyHint/idempotentHint/openWorldHint are also set on every tool "
+                "schema). They have no side effects on your data and are safe for a "
+                "trusted client to auto-approve."
+            ),
+        },
         "tools": [
             "get_server_capabilities",
             "resolve_variant",
@@ -357,6 +368,7 @@ def _lean_capabilities(full: dict[str, Any]) -> dict[str, Any]:
         "server_version": full["server_version"],
         "mcp_protocol_version": full["mcp_protocol_version"],
         "research_use_only": True,
+        "tool_safety": full["tool_safety"],
         "tools": full["tools"],
         "recommended_workflows": full["recommended_workflows"],
         "agreement_verdicts": full["agreement_verdicts"],

@@ -168,7 +168,8 @@ async def test_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> None:
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}  # REF 'A' matches neither
     data = structured(await mcp.call_tool("predict_splicing", {"variant": "8-140300616-A-G"}))
     assert data["error_code"] == "ref_mismatch"
-    assert data["fallback_tool"] == "resolve_variant"
+    # F2: wrong-REF on a coordinate (no other-build, no swap) no longer loops resolve_variant.
+    assert data["fallback_tool"] == "get_server_capabilities"
 
 
 async def test_spliceai_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> None:

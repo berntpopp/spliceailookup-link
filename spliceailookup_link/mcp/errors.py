@@ -88,12 +88,14 @@ class RefMismatchError(ValueError):
         build: str,
         chrom: str,
         pos: int,
+        alt: str = "",
         other_build_hint: dict[str, str] | None = None,
     ):
         self.variant_id = variant_id
         self.observed_ref = observed_ref
         self.reference_base = reference_base
         self.build = build
+        self.alt = alt
         self.other_build_hint = other_build_hint
         super().__init__(
             f"REF allele '{observed_ref}' does not match the {build} reference base "
@@ -144,6 +146,28 @@ def _fallback_for(context: McpErrorContext) -> tuple[str, dict[str, Any] | None]
     return _FALLBACK_TOOL, None
 
 
+def _ref_mismatch_fallback(
+    exc: RefMismatchError, context: McpErrorContext
+) -> tuple[str, dict[str, Any] | None]:
+    """An actionable fallback for a coordinate ref_mismatch (never the same-coord loop).
+
+    ref_mismatch only fires on coordinate inputs (HGVS/rsID resolve via VEP and never
+    reach the REF check), so re-sending the same coordinate to resolve_variant is a dead
+    end. Redirect to: the matching build, a REF/ALT swap, or get_server_capabilities.
+    """
+    tool = context.tool_name if context.tool_name in _PREDICTION_TOOLS else "predict_splicing"
+    if exc.other_build_hint:
+        return tool, {"variant": exc.variant_id, "genome_build": exc.other_build_hint["build"]}
+    ref, alt, base = exc.observed_ref, exc.alt, exc.reference_base
+    if ref and alt and base and len(ref) == len(alt) == len(base) and alt.upper() == base.upper():
+        try:
+            chrom, pos, r, a = exc.variant_id.split("-", 3)
+            return tool, {"variant": f"{chrom}-{pos}-{a}-{r}", "genome_build": exc.build}
+        except ValueError:
+            pass
+    return _FALLBACK_TOOL, None
+
+
 def _classify(
     exc: BaseException, context: McpErrorContext
 ) -> tuple[str, bool, str | None, dict[str, Any] | None]:
@@ -161,7 +185,7 @@ def _classify(
             {"variant": exc.variant_id, "genome_build": exc.inferred_build},
         )
     if isinstance(exc, RefMismatchError):
-        tool, args = _fallback_for(context)
+        tool, args = _ref_mismatch_fallback(exc, context)
         return "ref_mismatch", False, tool, args
     if isinstance(exc, AmbiguousVariantError):
         return "ambiguous", False, "resolve_variant", {"variant": exc.variant}
@@ -399,11 +423,25 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
             {"tool": "predict_splicing", "arguments": {"variant": c, "genome_build": build}}
             for c in exc.candidates
         ] + payload["_meta"]["next_commands"]
-    if isinstance(exc, RefMismatchError) and exc.other_build_hint:
-        # D1: a wrong REF that coincidentally matches the other build's base stays a
-        # ref_mismatch; the other-build possibility is a secondary hint, not a redirect.
-        payload["other_build_hint"] = exc.other_build_hint
-        payload["recovery"] = f"{payload['recovery']} {exc.other_build_hint['note']}"
+    if isinstance(exc, RefMismatchError):
+        if exc.other_build_hint:
+            # D1: a wrong REF that coincidentally matches the other build's base stays a
+            # ref_mismatch; the other-build possibility is a secondary hint, not a redirect.
+            payload["other_build_hint"] = exc.other_build_hint
+            payload["recovery"] = f"{payload['recovery']} {exc.other_build_hint['note']}"
+        elif (
+            exc.observed_ref
+            and exc.alt
+            and exc.reference_base
+            and exc.alt.upper() == exc.reference_base.upper()
+            and len(exc.observed_ref) == len(exc.alt) == len(exc.reference_base)
+        ):
+            # F2: the ALT base matches the reference here -> most likely a REF/ALT swap;
+            # the fallback re-runs with REF/ALT swapped rather than looping resolve_variant.
+            payload["recovery"] = (
+                f"{payload['recovery']} The ALT base matches the reference here, so the most "
+                "likely cause is a REF/ALT swap; the fallback re-runs with REF/ALT swapped."
+            )
     if error_code == "rate_limited":
         # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a
         # time window -- IETF qu=concurrent-requests, no window_s (no bucket to

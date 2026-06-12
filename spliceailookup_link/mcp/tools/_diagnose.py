@@ -99,6 +99,10 @@ def _ref_mismatch_error(
                 "CHROM-POS-REF-ALT."
             ),
         }
+    try:
+        _c, _p, _r, alt = split_variant_id(variant_id)
+    except VariantParseError:
+        alt = ""
     return RefMismatchError(
         variant_id=variant_id,
         observed_ref=check.observed_ref or "",
@@ -106,6 +110,7 @@ def _ref_mismatch_error(
         build=requested_build,
         chrom=check.chrom or "",
         pos=check.pos or 0,
+        alt=alt,
         other_build_hint=hint,
     )
 

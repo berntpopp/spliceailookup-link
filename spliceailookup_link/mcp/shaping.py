@@ -34,25 +34,35 @@ def band(score: float | None) -> str:
     return "none"
 
 
+def _top_delta(transcripts: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The single strongest {class, score, position} across the reported transcripts.
+
+    Emitted in every response_mode so a caller never has to detect the mode to find the
+    headline number (F3).
+    """
+    best_class = best_score = best_pos = None
+    for t in transcripts:
+        for name, d in (t.get("delta_scores") or {}).items():
+            s = (d or {}).get("score")
+            if s is not None and (best_score is None or s > best_score):
+                best_score, best_class, best_pos = s, name, (d or {}).get("position")
+    if best_class is None:
+        return None
+    return {"class": best_class, "score": best_score, "position": best_pos}
+
+
 def _minimal_single_model(result: dict[str, Any]) -> dict[str, Any]:
-    transcripts = result.get("transcripts") or []
-    top = transcripts[0] if transcripts else {}
-    best_class, best, pos = None, None, None
-    for name, d in (top.get("delta_scores") or {}).items():
-        s = (d or {}).get("score")
-        if s is not None and (best is None or s > best):
-            best, best_class, pos = s, name, (d or {}).get("position")
     out: dict[str, Any] = {
         "model": result["model"],
         "variant_id": result["variant_id"],
         "genome_build": result["genome_build"],
-        "gene": top.get("gene"),
+        "gene": (result.get("transcripts") or [{}])[0].get("gene"),
         "max_delta_score": result.get("max_delta_score"),
         "interpretation": {"band": band(result.get("max_delta_score"))},
         "headline": result["headline"],
     }
-    if best_class is not None:
-        out["top"] = {"class": best_class, "score": best, "position": pos}
+    if result.get("top") is not None:
+        out["top"] = result["top"]
     cons = result.get("consequence") or {}
     aberr = (cons.get("aberrations") or [{}])[0].get("type") if cons else None
     if aberr:
@@ -336,6 +346,9 @@ def shape_spliceai(
         "transcripts": shaped,
     }
     result["interpretation"] = {"band": band(max_overall), "threshold_basis": THRESHOLD_BASIS}
+    top = _top_delta(shaped)
+    if top is not None:
+        result["top"] = top
     if truncated is not None:
         result["transcripts_truncated"] = truncated
     if include_consequence:
@@ -453,6 +466,9 @@ def shape_pangolin(
         "transcripts": shaped,
     }
     result["interpretation"] = {"band": band(max_overall), "threshold_basis": THRESHOLD_BASIS}
+    top = _top_delta(shaped)
+    if top is not None:
+        result["top"] = top
     if truncated is not None:
         result["transcripts_truncated"] = truncated
     if response_mode == "full" and payload.get("allNonZeroScores"):

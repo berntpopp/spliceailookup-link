@@ -72,3 +72,28 @@ async def test_ref_mismatch_swap_suggests_swapped_variant(mcp, stub_service: Stu
     assert data["fallback_tool"] == "predict_spliceai"
     assert data["fallback_args"] == {"variant": "8-140300616-T-A", "genome_build": "GRCh38"}
     assert "swap" in data["recovery"].lower()
+
+
+# ---------------- F3: stable summary keys across modes ----------------
+
+async def test_spliceai_top_present_in_all_modes(mcp) -> None:
+    for mode in ("minimal", "compact", "full"):
+        data = structured(
+            await mcp.call_tool(
+                "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": mode}
+            )
+        )
+        assert data["top"] == {"class": "acceptor_loss", "score": 0.83, "position": -2}, mode
+        assert data["max_delta_score"] == 0.83, mode
+
+
+async def test_pangolin_top_present_in_all_modes(mcp) -> None:
+    for mode in ("minimal", "compact", "full"):
+        data = structured(
+            await mcp.call_tool(
+                "predict_pangolin", {"variant": "chr8-140300616-T-G", "response_mode": mode}
+            )
+        )
+        assert data["top"]["class"] == "splice_loss", mode
+        assert data["top"]["score"] == 0.85, mode
+        assert data["max_delta_score"] == 0.85, mode

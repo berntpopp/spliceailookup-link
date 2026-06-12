@@ -50,7 +50,7 @@ def get_capabilities_version() -> str:
     return _CAPABILITIES_VERSION
 
 
-def get_capabilities_resource() -> dict[str, Any]:
+def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
     doc: dict[str, Any] = {
         "server": "spliceailookup-link",
         "server_version": _server_version(),
@@ -252,7 +252,31 @@ def get_capabilities_resource() -> dict[str, Any]:
     version_hash, chars = _capabilities_version(doc)
     doc["capabilities_version"] = version_hash
     doc["descriptor_chars"] = chars
+    if detail == "lean":
+        return _lean_capabilities(doc)
     return doc
+
+
+def _lean_capabilities(full: dict[str, Any]) -> dict[str, Any]:
+    """SEP-1576-aligned lean view: tool list + verdicts + codes + hash, params by reference."""
+    return {
+        "server": full["server"],
+        "server_version": full["server_version"],
+        "mcp_protocol_version": full["mcp_protocol_version"],
+        "research_use_only": True,
+        "tools": full["tools"],
+        "recommended_workflows": full["recommended_workflows"],
+        "agreement_verdicts": full["agreement_verdicts"],
+        "interpretation_bands": full["interpretation_bands"],
+        "error_codes": full["error_codes"],
+        "params_by_reference": (
+            "Per-parameter docs live in each tool's input schema and "
+            "spliceailookup://reference; omitted here to avoid duplication (SEP-1576). "
+            "Call get_server_capabilities(detail='full') for the complete document."
+        ),
+        "capabilities_version": full["capabilities_version"],
+        "descriptor_chars": full["descriptor_chars"],
+    }
 
 
 def get_reference_resource() -> dict[str, Any]:

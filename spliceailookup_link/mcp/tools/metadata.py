@@ -30,11 +30,16 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"metadata"},
     )
-    async def get_server_capabilities() -> dict[str, Any]:
-        """Use this first in a cold session to learn the tools, parameters (genome_build, max_distance, mask, gene_set, transcripts, response_mode), score glossary, recommended workflows, error codes, and limitations. Returns ~4kB."""
+    async def get_server_capabilities(
+        detail: Annotated[
+            Literal["full", "lean"],
+            Field(description="full (default, complete doc) or lean (tool list + hash + glossary; params by reference)."),
+        ] = "full",
+    ) -> dict[str, Any]:
+        """Use this first in a cold session to learn the tools, parameters, score glossary, recommended workflows, error codes, and limitations. detail='lean' returns a trimmed doc (tool list + verdicts + error codes + capabilities_version) that omits per-parameter prose already in the tool schemas. Full ~4kB, lean ~1-2kB."""
 
         async def call() -> dict[str, Any]:
-            return get_capabilities_resource()
+            return get_capabilities_resource(detail=detail)
 
         return await run_mcp_tool("get_server_capabilities", call)
 

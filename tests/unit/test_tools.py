@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from spliceailookup_link.api import DataNotFoundError
+from spliceailookup_link.mcp.resources import get_capabilities_resource, get_capabilities_version
 from tests.conftest import StubService, structured
 
 
@@ -138,3 +139,19 @@ async def test_invalid_variant_returns_invalid_input(mcp, stub_service: StubServ
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "invalid_input"
+
+
+def test_lean_capabilities_omits_param_prose_keeps_hash() -> None:
+    lean = get_capabilities_resource(detail="lean")
+    full = get_capabilities_resource(detail="full")
+    assert "parameters" not in lean
+    assert "params_by_reference" in lean
+    assert lean["tools"] == full["tools"]
+    assert lean["capabilities_version"] == get_capabilities_version()
+    assert len(str(lean)) < len(str(full))
+
+
+async def test_capabilities_tool_detail_lean(mcp) -> None:
+    data = structured(await mcp.call_tool("get_server_capabilities", {"detail": "lean"}))
+    assert "parameters" not in data
+    assert data["error_codes"]

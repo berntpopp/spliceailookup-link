@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     CACHE_SIZE: int = 1024
     CACHE_TTL_MINUTES: int = 1440
 
+    # A response is "warm" if it was a cache hit or the upstream answered faster
+    # than this (cold Cloud Run starts are ~13s+; warm calls are sub-second).
+    # Surfaced as _meta.served_warm so a client can choose blocking vs background.
+    WARM_THRESHOLD_MS: int = 5000
+
+    # Validate the coordinate REF against the Ensembl reference base BEFORE the
+    # slow scoring dispatch (fast ref_mismatch instead of a ~17s not_found).
+    # Disable only if Ensembl sequence lookups are unavailable in an environment.
+    PREFLIGHT_REF_CHECK_ENABLED: bool = True
+
     # Background-task (FastMCP Tasks / Docket) backend. memory:// is in-process and
     # correct for the single-process unified host; set redis://... for multi-worker.
     DOCKET_URL: str = "memory://"

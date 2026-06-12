@@ -19,7 +19,7 @@ _OUTPUT_SCHEMA = relax_output_schema(
     {
         "type": "object",
         "properties": {
-            "variant_id": {"type": "string"},
+            "variant_id": {"type": ["string", "null"]},
             "genome_build": {"type": "string"},
             "input_kind": {"type": "string"},
             "source": {"type": "string"},
@@ -74,14 +74,20 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
         async def call() -> dict[str, Any]:
             service = service_factory()
             result = await service.resolve(variant, genome_build)
-            reason = unsupported_contig_reason(result["variant_id"])
+            # All candidates of an ambiguous result share a locus, so the contig
+            # check on the first id is representative (and never None).
+            ids = result.get("variant_ids") or [result["variant_id"]]
+            reason = unsupported_contig_reason(ids[0])
             if reason is not None:
                 result["scoring_supported"] = False
                 result["note"] = (
                     f"{reason} For mitochondrial variants, use gnomad-link "
                     "get_mitochondrial_variant."
                 )
-            ids = result.get("variant_ids") or [result["variant_id"]]
+            if result.get("ambiguous"):
+                # D3: force the caller to pick from variant_ids[] rather than
+                # silently inheriting the first allele via the singular variant_id.
+                result["variant_id"] = None
             result["_meta"] = (
                 {"next_commands": after_resolve_many(ids, genome_build)} if include_hints else {}
             )

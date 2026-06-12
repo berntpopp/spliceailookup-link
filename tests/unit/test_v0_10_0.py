@@ -223,3 +223,33 @@ async def test_batch_distinct_variants_not_deduped(stub_service) -> None:
     assert len(stub_service.score_calls) == 4
     assert out["summary"]["upstream_calls_saved"] == 0
     assert out["summary"]["unique_variants"] == 2
+
+
+# ---------------- W4: nearest-transcript distance on not_found ----------------
+
+
+async def test_not_found_includes_nearest_transcript(mcp, stub_service) -> None:
+    stub_service.overlap_count = 0  # force the not_found fast-fail
+    stub_service.nearest = {"distance_nt": 4200, "gene": "FOO", "transcript_id": "ENST123"}
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "1-50000-A-G"}))
+    assert data["error_code"] == "not_found"
+    nt = data["nearest_transcript"]
+    assert nt["distance_nt"] == 4200 and nt["gene"] == "FOO"
+    assert "4,200" in data["recovery"] or "4200" in data["recovery"]
+
+
+async def test_not_found_far_transcript_advises_intergenic(mcp, stub_service) -> None:
+    stub_service.overlap_count = 0
+    stub_service.nearest = {"distance_nt": 55000, "gene": "BAR", "transcript_id": "ENST9"}
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "1-50000-A-G"}))
+    assert data["error_code"] == "not_found"
+    assert data["nearest_transcript"]["distance_nt"] == 55000
+    assert "intergenic" in data["recovery"].lower()
+
+
+async def test_not_found_without_nearest_is_unchanged(mcp, stub_service) -> None:
+    stub_service.overlap_count = 0
+    stub_service.nearest = None  # Ensembl could not determine a nearest transcript
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "1-50000-A-G"}))
+    assert data["error_code"] == "not_found"
+    assert "nearest_transcript" not in data

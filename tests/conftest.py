@@ -34,6 +34,8 @@ class StubService:
         self.refbase_calls: list[tuple[str, int, int, str]] = []
         self.overlap_count: int | None = 1  # default: a transcript overlaps (no fast-fail)
         self.overlap_calls: list[tuple[str, int, str, int]] = []
+        self.nearest: dict[str, Any] | None = None  # canned nearest_transcript result
+        self.nearest_calls: list[tuple[str, int, str]] = []
 
     async def score(self, *, model: str, build: str, variant_id: str, **kwargs: Any):
         from spliceailookup_link.services.telemetry import CallTelemetry
@@ -112,6 +114,12 @@ class StubService:
     async def overlapping_transcripts(self, chrom: str, pos: int, build: str, window: int):
         self.overlap_calls.append((chrom, pos, build, window))
         return self.overlap_count
+
+    async def nearest_transcript(
+        self, chrom: str, pos: int, build: str, max_window: int = 100_000
+    ):
+        self.nearest_calls.append((chrom, pos, build))
+        return self.nearest
 
     async def warmup(self, build: str, mask: int = 0) -> dict[str, Any]:
         return {

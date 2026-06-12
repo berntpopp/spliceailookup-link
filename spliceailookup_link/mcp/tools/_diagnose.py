@@ -143,10 +143,19 @@ async def preflight_no_overlap(
         return
     count = await service.overlapping_transcripts(chrom, pos, requested_build, window)
     if count == 0:
-        raise DataNotFoundError(
+        err = DataNotFoundError(
             "No transcript overlaps the scan window for this coordinate; SpliceAI/Pangolin "
             "return no scores (fast-failed locally before dispatch)."
         )
+        # W4: best-effort distance to the nearest annotated transcript so a caller
+        # can decide whether widening max_distance would help. Any fault -> omit.
+        try:
+            nearest = await service.nearest_transcript(chrom, pos, requested_build)
+        except Exception:
+            nearest = None
+        if nearest is not None:
+            err.nearest_transcript = nearest  # type: ignore[attr-defined]
+        raise err
 
 
 async def diagnose_coordinate_failure(

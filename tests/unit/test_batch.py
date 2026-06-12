@@ -73,3 +73,19 @@ async def test_f10_batch_next_commands_targets_top_variant(mcp) -> None:
     nc = data["_meta"]["next_commands"][0]
     assert nc["tool"] == "predict_splicing"
     assert nc["arguments"]["response_mode"] == "full"
+
+
+async def test_batch_flags_ambiguous_rsid_not_silently_scored(mcp) -> None:
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing_batch",
+            {"variants": ["chr8-140300616-T-G", "rs6025"]},
+        )
+    )
+    by_variant = {r["variant"]: r for r in data["results"]}
+    amb = by_variant["rs6025"]
+    assert amb["error_code"] == "ambiguous"
+    assert amb["variant_ids"] == ["1-169549811-C-A", "1-169549811-C-T"]
+    assert "error_code" not in by_variant["chr8-140300616-T-G"]
+    assert data["summary"]["ok"] == 1
+    assert data["summary"]["failed"] == 1

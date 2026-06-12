@@ -9,6 +9,7 @@ from spliceailookup_link.api import (
     UpstreamInputError,
 )
 from spliceailookup_link.mcp.errors import (
+    AmbiguousVariantError,
     BuildMismatchError,
     McpErrorContext,
     RefMismatchError,
@@ -92,6 +93,29 @@ async def test_run_mcp_tool_returns_envelope_on_exception() -> None:
     )
     assert out["success"] is False
     assert out["error_code"] == "not_found"
+
+
+def test_ambiguous_lists_alleles_and_per_allele_next_commands() -> None:
+    exc = AmbiguousVariantError(
+        variant="rs6025",
+        candidates=["1-169549811-C-A", "1-169549811-C-T"],
+        note="rs6025 maps to 2 alleles at this locus; pick one variant_id.",
+    )
+    env = mcp_tool_error(
+        exc,
+        McpErrorContext(
+            tool_name="predict_splicing", variant="rs6025", genome_build="GRCh38"
+        ),
+    ).payload
+    assert env["error_code"] == "ambiguous"
+    assert env["retryable"] is False
+    assert env["variant_ids"] == ["1-169549811-C-A", "1-169549811-C-T"]
+    cmds = env["_meta"]["next_commands"]
+    assert cmds[0] == {
+        "tool": "predict_splicing",
+        "arguments": {"variant": "1-169549811-C-A", "genome_build": "GRCh38"},
+    }
+    assert cmds[1]["arguments"]["variant"] == "1-169549811-C-T"
 
 
 def test_ref_mismatch_classifies_and_routes_to_resolve() -> None:

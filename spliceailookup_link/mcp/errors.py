@@ -98,6 +98,18 @@ class RefMismatchError(ValueError):
         )
 
 
+class AmbiguousVariantError(ValueError):
+    """Raised when an input resolves to more than one ALT allele at the locus."""
+
+    def __init__(self, *, variant: str, candidates: list[str], note: str | None = None):
+        self.variant = variant
+        self.candidates = candidates
+        self.note = note
+        super().__init__(
+            note or f"{variant} resolves to {len(candidates)} alleles; pick one variant_id."
+        )
+
+
 def _provenance_meta() -> dict[str, Any]:
     return dict(_BASE_META)
 
@@ -135,6 +147,8 @@ def _classify(
     if isinstance(exc, RefMismatchError):
         tool, args = _fallback_for(context)
         return "ref_mismatch", False, tool, args
+    if isinstance(exc, AmbiguousVariantError):
+        return "ambiguous", False, "resolve_variant", {"variant": exc.variant}
     if isinstance(exc, DataNotFoundError):
         tool, args = _fallback_for(context)
         return "not_found", False, tool, args
@@ -199,11 +213,17 @@ def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
             "Fix the REF allele, or pass an HGVS/rsID to resolve_variant to get "
             "canonical CHROM-POS-REF-ALT, then retry."
         )
+    if error_code == "ambiguous":
+        return (
+            "This input maps to more than one ALT allele at the locus. Pick one "
+            "variant_id (see variant_ids / next_commands, one prediction per allele) "
+            "and retry, or call resolve_variant to review the candidates."
+        )
     return f"Unexpected failure. Call {fallback_tool} for a safe entry point."
 
 
 def _envelope_message(exc: BaseException, error_code: str) -> str:
-    if error_code in {"build_mismatch", "invalid_input", "not_found", "ref_mismatch"}:
+    if error_code in {"build_mismatch", "invalid_input", "not_found", "ref_mismatch", "ambiguous"}:
         # These carry developer-authored or upstream guidance safe to surface.
         return _safe_message(exc)
     if error_code == "validation_failed":
@@ -322,6 +342,13 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
             **_provenance_meta(),
         },
     }
+    if isinstance(exc, AmbiguousVariantError):
+        build = context.genome_build or "GRCh38"
+        payload["variant_ids"] = exc.candidates
+        payload["_meta"]["next_commands"] = [
+            {"tool": "predict_splicing", "arguments": {"variant": c, "genome_build": build}}
+            for c in exc.candidates
+        ] + payload["_meta"]["next_commands"]
     if error_code == "rate_limited":
         # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a
         # time window -- IETF qu=concurrent-requests, no window_s (no bucket to

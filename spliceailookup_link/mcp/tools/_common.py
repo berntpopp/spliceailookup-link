@@ -8,7 +8,7 @@ from typing import Any
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.config import GenomeBuild
 from spliceailookup_link.mcp.build_check import detect_build_mismatch
-from spliceailookup_link.mcp.errors import BuildMismatchError
+from spliceailookup_link.mcp.errors import AmbiguousVariantError, BuildMismatchError
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.variant import parse_variant_input
 
@@ -52,6 +52,12 @@ async def prepare_variant(
             resolution=None,
         )
     resolution = await service.resolve(raw_variant, genome_build)
+    if resolution.get("ambiguous"):
+        raise AmbiguousVariantError(
+            variant=raw_variant,
+            candidates=resolution.get("variant_ids") or [resolution["variant_id"]],
+            note=resolution.get("note"),
+        )
     return PreparedVariant(
         variant_id=resolution["variant_id"],
         genome_build=genome_build,

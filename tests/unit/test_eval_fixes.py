@@ -172,3 +172,9 @@ async def test_spliceai_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> Non
         await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-A-G"})
     )
     assert data["error_code"] == "ref_mismatch"
+
+
+async def test_single_predict_ambiguous_rsid_does_not_silently_score(mcp, stub_service) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "rs6025"}))
+    assert data["error_code"] == "ambiguous"
+    assert stub_service.score_calls == []

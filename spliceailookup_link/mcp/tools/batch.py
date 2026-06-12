@@ -93,21 +93,26 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                     # not the batch-context get_server_capabilities fallback.
                     env = mcp_tool_error(
                         exc,
-                        McpErrorContext(tool_name="predict_splicing", variant=variant),
+                        McpErrorContext(
+                            tool_name="predict_splicing",
+                            variant=variant,
+                            genome_build=genome_build,
+                        ),
                     ).payload
-                    results.append(
-                        {
-                            "variant": variant,
-                            "error_code": env["error_code"],
-                            "message": env["message"],
-                            "retryable": env["retryable"],
-                            "recovery_action": env["recovery_action"],
-                            "fallback_tool": env["fallback_tool"],
-                            "fallback_args": env["fallback_args"],
-                            "recovery": env["recovery"],
-                            "next_commands": env["_meta"]["next_commands"],
-                        }
-                    )
+                    item: dict[str, Any] = {
+                        "variant": variant,
+                        "error_code": env["error_code"],
+                        "message": env["message"],
+                        "retryable": env["retryable"],
+                        "recovery_action": env["recovery_action"],
+                        "fallback_tool": env["fallback_tool"],
+                        "fallback_args": env["fallback_args"],
+                        "recovery": env["recovery"],
+                        "next_commands": env["_meta"]["next_commands"],
+                    }
+                    if env.get("variant_ids"):
+                        item["variant_ids"] = env["variant_ids"]
+                    results.append(item)
                     failed += 1
                 if ctx is not None:
                     await ctx.report_progress(

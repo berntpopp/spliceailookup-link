@@ -78,10 +78,9 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                     )
                     tele = one.pop("_telemetry")
                     one["variant"] = variant
-                    item_meta: dict[str, Any] = {
-                        "cache": tele.get("cache"),
-                        "upstream_elapsed_ms": tele.get("upstream_elapsed_ms"),
-                    }
+                    item_meta: dict[str, Any] = {"cache": tele.get("cache")}
+                    if tele.get("upstream_elapsed_ms") is not None:
+                        item_meta["upstream_elapsed_ms"] = tele["upstream_elapsed_ms"]
                     if tele.get("cache_age_s") is not None:
                         item_meta["cache_age_s"] = tele["cache_age_s"]
                     one["_meta"] = item_meta

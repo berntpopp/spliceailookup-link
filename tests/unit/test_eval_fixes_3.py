@@ -164,6 +164,8 @@ async def test_f12_batch_items_carry_slim_meta(mcp) -> None:
     assert first["_meta"]["cache"] == "miss"
     assert second["_meta"]["cache"] == "hit"
     assert first["_meta"]["upstream_elapsed_ms"] is not None
+    # Cache hit has no upstream call -> field omitted, not null (omit-when-null).
+    assert "upstream_elapsed_ms" not in second["_meta"]
     # Slim only: the verbose fields stay out of per-item _meta.
     assert "gene" not in first["_meta"]
     assert "resolution" not in first["_meta"]
@@ -315,3 +317,33 @@ async def test_caps_version_changes_and_is_stable(mcp) -> None:
     b = structured(await mcp.call_tool("get_server_capabilities", {}))
     assert a["capabilities_version"] == b["capabilities_version"]  # stable
     assert isinstance(a["capabilities_version"], str) and len(a["capabilities_version"]) >= 8
+
+
+async def test_inv_no_null_leaf_in_batch_item(mcp) -> None:
+    """§8.4 (batch): full-mode batch items omit-when-null, same as single calls."""
+
+    def walk(node: object, path: str = "") -> list[str]:
+        bad: list[str] = []
+        if isinstance(node, dict):
+            for k, v in node.items():
+                bad += walk(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                bad += walk(v, f"{path}[{i}]")
+        elif node is None:
+            bad.append(path)
+        return bad
+
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing_batch",
+            {"variants": ["chr8-140300616-T-G"], "response_mode": "full"},
+        )
+    )
+    item = data["results"][0]
+    nulls = [
+        p
+        for p in walk(item)
+        if p.rsplit(".", 1)[-1] not in {"cache_age_s", "upstream_elapsed_ms", "signed_score"}
+    ]
+    assert nulls == [], f"unexpected null leaves in batch item: {nulls}"

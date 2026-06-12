@@ -113,3 +113,28 @@ async def test_combined_maxes_in_agreement_all_modes(mcp) -> None:
         # the divergent minimal-only names are gone
         assert "spliceai_max" not in data, mode
         assert "pangolin_max" not in data, mode
+
+
+# ---------------- F6: threshold_basis only in full ----------------
+
+async def test_threshold_basis_only_in_full_single_model(mcp) -> None:
+    compact = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    assert "threshold_basis" not in compact["interpretation"]
+    assert compact["interpretation"]["band"] == "high"
+    full = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+        )
+    )
+    assert "threshold_basis" in full["interpretation"]
+
+
+async def test_threshold_basis_only_in_full_combined(mcp) -> None:
+    compact = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    assert "threshold_basis" not in compact["interpretation"]
+    full = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+        )
+    )
+    assert "threshold_basis" in full["interpretation"]

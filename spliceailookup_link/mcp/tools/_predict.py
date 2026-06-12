@@ -238,6 +238,10 @@ async def predict_one(
         result["molecular_consequence"] = prepared.consequence
     result["agreement"] = assess_agreement(sai_max, pang_max)
     result["interpretation"] = combined_interpretation(sai_max, pang_max)
+    if response_mode != "full":
+        # F6: the static threshold glossary belongs only to full mode (it is in
+        # capabilities + the reference resource); the band stays in every mode.
+        result["interpretation"].pop("threshold_basis", None)
     result["headline"] = combined_headline(
         gene,
         genome_build,

@@ -345,7 +345,9 @@ def shape_spliceai(
         "max_delta_score": max_overall,
         "transcripts": shaped,
     }
-    result["interpretation"] = {"band": band(max_overall), "threshold_basis": THRESHOLD_BASIS}
+    result["interpretation"] = {"band": band(max_overall)}
+    if response_mode == "full":
+        result["interpretation"]["threshold_basis"] = THRESHOLD_BASIS
     top = _top_delta(shaped)
     if top is not None:
         result["top"] = top
@@ -465,7 +467,9 @@ def shape_pangolin(
         "max_delta_score": max_overall,
         "transcripts": shaped,
     }
-    result["interpretation"] = {"band": band(max_overall), "threshold_basis": THRESHOLD_BASIS}
+    result["interpretation"] = {"band": band(max_overall)}
+    if response_mode == "full":
+        result["interpretation"]["threshold_basis"] = THRESHOLD_BASIS
     top = _top_delta(shaped)
     if top is not None:
         result["top"] = top

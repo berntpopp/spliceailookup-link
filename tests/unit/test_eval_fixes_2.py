@@ -18,7 +18,8 @@ async def test_f6_headline_matches_verdict_concordant_high(mcp) -> None:
 async def test_interpretation_band_on_combined(mcp) -> None:
     data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
     assert data["interpretation"]["band"] == "high"
-    assert "threshold_basis" in data["interpretation"]
+    # F6: the static threshold_basis glossary is full-only now; the band stays in compact.
+    assert "threshold_basis" not in data["interpretation"]
 
 
 async def test_cache_ttl_and_age_in_meta(mcp) -> None:

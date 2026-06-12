@@ -5,6 +5,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+import httpx
+import respx
+
+from spliceailookup_link.api.ensembl_client import EnsemblVepClient
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.services.telemetry import CallTelemetry
 from tests.fixtures.api_responses import SPLICEAI_TRAPPC9, VEP_ABCA3, VEP_RS6025
@@ -149,3 +153,68 @@ async def test_cache_age_and_ttl_telemetry() -> None:
     assert t2.cache == "hit"
     assert isinstance(t2.cache_age_s, int) and t2.cache_age_s >= 0
     assert t2.cache_ttl_s == 3600
+
+
+# ---------------------------------------------------------------------------
+# EnsemblVepClient.reference_base (respx-mocked)
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+async def test_reference_base_returns_uppercase_seq() -> None:
+    respx.get("https://rest.ensembl.org/sequence/region/human/8:140300616..140300616").mock(
+        return_value=httpx.Response(200, json={"seq": "t", "id": "chromosome:GRCh38:8:..."})
+    )
+    client = EnsemblVepClient()
+    base = await client.reference_base("8", 140300616, 1, "GRCh38")
+    await client.close()
+    assert base == "T"
+
+
+@respx.mock
+async def test_reference_base_uses_grch37_host_for_grch37() -> None:
+    route = respx.get(
+        "https://grch37.rest.ensembl.org/sequence/region/human/8:140300616..140300616"
+    ).mock(return_value=httpx.Response(200, json={"seq": "a"}))
+    client = EnsemblVepClient()
+    base = await client.reference_base("8", 140300616, 1, "GRCh37")
+    await client.close()
+    assert base == "A"
+    assert route.called
+
+
+@respx.mock
+async def test_reference_base_returns_none_on_upstream_error() -> None:
+    respx.get(
+        "https://rest.ensembl.org/sequence/region/human/8:999999999..999999999"
+    ).mock(return_value=httpx.Response(400, json={"error": "out of range"}))
+    client = EnsemblVepClient()
+    base = await client.reference_base("8", 999999999, 1, "GRCh38")
+    await client.close()
+    assert base is None
+
+
+# ---------------------------------------------------------------------------
+# SpliceService.reference_base caching
+# ---------------------------------------------------------------------------
+
+
+class _RefStubEnsembl:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def reference_base(self, chrom: str, pos: int, length: int, build: str) -> str:
+        self.calls += 1
+        return "T"
+
+    async def close(self) -> None:  # pragma: no cover
+        return None
+
+
+async def test_service_reference_base_is_cached() -> None:
+    ens = _RefStubEnsembl()
+    svc = SpliceService(ensembl_client=ens)
+    a = await svc.reference_base("8", 140300616, 1, "GRCh38")
+    b = await svc.reference_base("8", 140300616, 1, "GRCh38")
+    assert a == b == "T"
+    assert ens.calls == 1  # second call served from cache

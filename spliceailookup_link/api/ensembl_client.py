@@ -15,6 +15,7 @@ from urllib.parse import quote
 from spliceailookup_link.api.base_client import (
     BaseHTTPClient,
     DataNotFoundError,
+    SpliceApiError,
     UpstreamInputError,
 )
 from spliceailookup_link.config import GenomeBuild, settings
@@ -52,3 +53,22 @@ class EnsemblVepClient(BaseHTTPClient):
     async def resolve_id(self, variant_id: str, build: GenomeBuild) -> dict[str, Any]:
         """Resolve a known-variant identifier (e.g. rsID like rs12345)."""
         return await self._vep(f"/vep/human/id/{quote(variant_id, safe='')}", build)
+
+    async def reference_base(
+        self, chrom: str, pos: int, length: int, build: GenomeBuild
+    ) -> str | None:
+        """Return the uppercase reference base(s) at chrom:pos..pos+length-1, or None.
+
+        Uses Ensembl REST sequence/region on the build-specific host. Returns None
+        on any upstream fault or empty sequence so callers can treat the check as
+        inconclusive and fall back, never regressing behavior.
+        """
+        c = chrom.removeprefix("chr").removeprefix("CHR").upper()
+        end = pos + max(1, length) - 1
+        url = f"{settings.ensembl_url(build)}/sequence/region/human/{c}:{pos}..{end}"
+        try:
+            payload = await self.get_json(url, {"content-type": "application/json"})
+        except SpliceApiError:
+            return None
+        seq = payload.get("seq") if isinstance(payload, dict) else None
+        return seq.upper() if isinstance(seq, str) and seq else None

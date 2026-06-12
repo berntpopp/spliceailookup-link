@@ -49,6 +49,9 @@ class SpliceService:
         self._resolve_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(
             self._resolve_uncached
         )
+        self._refbase_cached = alru_cache(maxsize=cache_size, ttl=ttl_seconds)(
+            self._refbase_uncached
+        )
         # Keys already computed once; used to report cache hit/miss telemetry.
         self._scored_keys: set[tuple[Any, ...]] = set()
         self._scored_at: dict[tuple[Any, ...], float] = {}
@@ -166,6 +169,17 @@ class SpliceService:
             }
         record = await self._resolve_cached(parsed.value, parsed.kind, build)
         return _normalize_vep_record(record, parsed, build, text)
+
+    async def _refbase_uncached(
+        self, chrom: str, pos: int, length: int, build: GenomeBuild
+    ) -> str | None:
+        return await self._ensembl.reference_base(chrom, pos, length, build)
+
+    async def reference_base(
+        self, chrom: str, pos: int, length: int, build: GenomeBuild
+    ) -> str | None:
+        """Cached reference-base lookup (used by the failure-path diagnostic)."""
+        return await self._refbase_cached(chrom, pos, length, build)
 
     # ---------------- lifecycle ----------------
 

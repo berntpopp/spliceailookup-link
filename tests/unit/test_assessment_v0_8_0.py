@@ -97,3 +97,19 @@ async def test_pangolin_top_present_in_all_modes(mcp) -> None:
         assert data["top"]["class"] == "splice_loss", mode
         assert data["top"]["score"] == 0.85, mode
         assert data["max_delta_score"] == 0.85, mode
+
+
+async def test_combined_maxes_in_agreement_all_modes(mcp) -> None:
+    for mode in ("minimal", "compact", "full"):
+        data = structured(
+            await mcp.call_tool(
+                "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": mode}
+            )
+        )
+        ag = data["agreement"]
+        assert ag["verdict"] == "concordant_high", mode
+        assert ag["spliceai_max_delta"] == 0.83, mode
+        assert ag["pangolin_max_delta"] == 0.85, mode
+        # the divergent minimal-only names are gone
+        assert "spliceai_max" not in data, mode
+        assert "pangolin_max" not in data, mode

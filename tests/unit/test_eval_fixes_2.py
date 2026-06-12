@@ -46,8 +46,10 @@ async def test_f8_combined_minimal_is_headline_tier(mcp) -> None:
     assert len(json.dumps(minimal)) < len(json.dumps(full))
     assert "spliceai" not in minimal and "pangolin" not in minimal
     assert minimal["agreement"]["verdict"] == "concordant_high"
-    assert minimal["spliceai_max"] == 0.83
-    assert minimal["pangolin_max"] == 0.85
+    # F3: per-model maxes live in agreement{} under the same names as compact/full.
+    assert minimal["agreement"]["spliceai_max_delta"] == 0.83
+    assert minimal["agreement"]["pangolin_max_delta"] == 0.85
+    assert "spliceai_max" not in minimal and "pangolin_max" not in minimal
     assert minimal["interpretation"]["band"] == "high"
     assert "TRAPPC9" in minimal["headline"]
 

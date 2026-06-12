@@ -37,11 +37,12 @@ _VERDICTS = (
 
 
 def _result_max_delta(r: dict[str, Any]) -> float | None:
+    agreement = r.get("agreement") or {}
     candidates = [
         (r.get("spliceai") or {}).get("max_delta_score"),
         (r.get("pangolin") or {}).get("max_delta_score"),
-        r.get("spliceai_max"),
-        r.get("pangolin_max"),
+        agreement.get("spliceai_max_delta"),
+        agreement.get("pangolin_max_delta"),
     ]
     vals = [c for c in candidates if isinstance(c, (int, float))]
     return max(vals) if vals else None

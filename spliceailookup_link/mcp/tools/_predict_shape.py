@@ -100,18 +100,21 @@ def combined_interpretation(sai_max: float | None, pang_max: float | None) -> di
 
 
 def minimal_combined(result: dict[str, Any], gene: str | None) -> dict[str, Any]:
-    """Headline-tier projection of a combined predict_splicing result."""
-    sai_sub: dict[str, Any] = result.get("spliceai") or {}
-    pang_sub: dict[str, Any] = result.get("pangolin") or {}
-    sai_max = sai_sub.get("max_delta_score")
-    pang_max = pang_sub.get("max_delta_score")
+    """Headline-tier projection of a combined predict_splicing result.
+
+    The per-model maxes live in agreement{} under the SAME names as compact/full
+    (spliceai_max_delta / pangolin_max_delta) so a caller never branches on mode (F3).
+    """
+    ag: dict[str, Any] = result.get("agreement") or {}
     out: dict[str, Any] = {
         "variant_id": result["variant_id"],
         "genome_build": result["genome_build"],
         "gene": gene,
-        "agreement": {"verdict": result["agreement"]["verdict"]},
-        "spliceai_max": sai_max,
-        "pangolin_max": pang_max,
+        "agreement": {
+            "verdict": ag.get("verdict"),
+            "spliceai_max_delta": ag.get("spliceai_max_delta"),
+            "pangolin_max_delta": ag.get("pangolin_max_delta"),
+        },
         "interpretation": {"band": result["interpretation"]["band"]},
         "headline": result["headline"],
     }

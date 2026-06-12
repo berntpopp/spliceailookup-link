@@ -135,3 +135,19 @@ async def test_f18_batch_retryable_item_goes_to_retry_variants(mcp, stub_service
     assert data["summary"]["retryable_failed"] == 1
     assert data["summary"]["terminal_failed"] == 0
     assert data["retry_variants"] == ["1-100-A-T"]
+
+
+# --- F21: resolve_variant recovery prose is not circular ---
+async def test_f21_resolve_invalid_input_recovery_is_not_circular(mcp) -> None:
+    data = structured(await mcp.call_tool("resolve_variant", {"variant": "totally not a variant"}))
+    assert data["success"] is False
+    assert data["error_code"] == "invalid_input"
+    # The bug: prose told you to "call resolve_variant" from inside resolve_variant.
+    assert "resolve_variant" not in data["recovery"]
+    assert "get_server_capabilities" in data["recovery"]
+
+
+async def test_f21_prediction_invalid_input_still_points_to_resolve(mcp) -> None:
+    data = structured(await mcp.call_tool("predict_splicing", {"variant": "totally not a variant"}))
+    assert data["error_code"] == "invalid_input"
+    assert "resolve_variant" in data["recovery"]  # unchanged for prediction tools

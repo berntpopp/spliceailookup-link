@@ -177,7 +177,7 @@ def _recovery_action(error_code: str, retryable: bool) -> str:
     return "switch_tool"
 
 
-def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
+def _recovery_text(error_code: str, fallback_tool: str | None, *, tool_name: str) -> str:
     if error_code == "not_found":
         return (
             "The variant is well-formed but the model returned no scores -- it likely does not "
@@ -185,6 +185,14 @@ def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
             "max_distance, or confirm the coordinates/build with resolve_variant."
         )
     if error_code == "invalid_input":
+        if tool_name == "resolve_variant":
+            # Already inside the resolver: do not tell the caller to call it again.
+            return (
+                "The input could not be parsed into any supported variant form. Do not "
+                "retry unchanged. Provide CHROM-POS-REF-ALT (chr optional), transcript or "
+                "genomic HGVS (e.g. NM_000123.4:c.10A>T), or an rsID (e.g. rs6025); call "
+                "get_server_capabilities for accepted formats and examples."
+            )
         return (
             "The variant could not be parsed or the upstream rejected it. Do not retry "
             "unchanged. Call resolve_variant to normalize HGVS / rsIDs / loose coordinates into "
@@ -354,7 +362,7 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
         "recovery_action": _recovery_action(error_code, retryable),
         "fallback_tool": fallback_tool,
         "fallback_args": fallback_args,
-        "recovery": _recovery_text(error_code, fallback_tool),
+        "recovery": _recovery_text(error_code, fallback_tool, tool_name=context.tool_name),
         "_meta": {
             "tool": context.tool_name,
             "next_commands": next_commands,

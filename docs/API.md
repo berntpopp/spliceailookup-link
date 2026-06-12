@@ -123,9 +123,9 @@ and `spliceailookup://reference`. Key facade behaviors:
   scoring dispatch (an Ensembl reference-base check, ~sub-second), instead of a
   misleading ~17 s `not_found`. If the REF happens to match the other build's base,
   the error carries a secondary `other_build_hint` but stays a `ref_mismatch` — it is
-  **not** redirected to `build_mismatch`. `build_mismatch` fires only when the position
-  cannot belong to the requested build (out of chromosome range, or the variant only
-  scores on the other build).
+  **not** redirected to `build_mismatch`. `build_mismatch` fires when the coordinate is
+  valid only on the *other* build (in range there and/or it scores there). A position out
+  of range in *every* build is `invalid_input` (v0.9.0), not `build_mismatch`.
 - **`resolve_variant` ambiguity.** When an input maps to multiple ALT alleles, the
   singular `variant_id` is `null` (so a caller cannot silently pick one); the candidates
   are in `variant_ids[]` with one `next_commands` entry per allele.
@@ -154,3 +154,24 @@ and `spliceailookup://reference`. Key facade behaviors:
 - **Batch size contract.** `predict_splicing_batch` accepts `max_items=25`; more returns
   `validation_failed` (enforced, not truncated). The envelope `_meta` echoes
   `items_submitted` and `max_items`; each item is ≈ one compact `predict_splicing` result.
+  Each item also carries a per-item `request_id` (success in `_meta`, error at top level).
+- **Consistent summary keys (v0.9.0, breaking).** Single-model results expose
+  `top:{class,score,position}` + `max_delta_score` in **every** `response_mode`
+  (minimal/compact/full). `predict_splicing` exposes
+  `agreement:{verdict, spliceai_max_delta, pangolin_max_delta}` in every mode; the older
+  minimal-only `spliceai_max`/`pangolin_max` are removed. `interpretation.threshold_basis`
+  is **full-only** (the `band` is always present; the glossary lives in
+  `spliceailookup://reference`).
+- **Out-of-range coordinate (v0.9.0).** A position beyond the chromosome length in **all**
+  builds returns `invalid_input` (with both lengths), rejected locally in <1 ms — not
+  `build_mismatch` (no build can score it, so a build switch would loop).
+- **Actionable `ref_mismatch` fallback (v0.9.0).** A coordinate `ref_mismatch` redirects to
+  the matching build (when the REF matches the other build), a REF/ALT swap (when the ALT
+  matches the reference base), or `get_server_capabilities` — never the same wrong
+  coordinate back into `resolve_variant`.
+- **Proactive `rate_budget` (v0.9.0).** Every prediction success carries
+  `_meta.rate_budget = {limit, unit, min_interval_ms}` — a soft client-pacing interval over
+  the local concurrency cap. A `rate_limited` error adds `remaining:0` + `retry_after_s`.
+- **gtex `see_also` (v0.9.0).** Uses the resolved Ensembl `gene_id`
+  (`get_median_expression_levels({gencode_id:[ENSG…]})`), falling back to
+  `search_gtex_genes({query:symbol})` when only a symbol is known.

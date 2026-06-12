@@ -170,7 +170,15 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             "include_hints": (
                 "predict_* and resolve_variant accept include_hints (default true). Set false to "
                 "drop _meta.next_commands and see_also once you know the workflow -- trims the "
-                "per-call token overhead. predict_splicing_batch already omits per-item hints."
+                "per-call token overhead. predict_splicing_batch already omits per-item hints. "
+                "See hint_lifecycle for the recommended per-session pattern."
+            ),
+            "hint_lifecycle": (
+                "next_commands and see_also are designed to be read once. After your first "
+                "successful predict_* call in a session, set include_hints=false (and "
+                "include_see_also=false) for the remaining calls to cut per-call tokens -- the "
+                "workflow does not change within a session. The server is stateless, so the flag "
+                "must be re-passed on each call (there is no sticky session default)."
             ),
             "include_see_also": (
                 "predict_* accept include_see_also (default true), independent of include_hints: "
@@ -183,16 +191,23 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "check was skipped (check_ref=false), inconclusive (Ensembl down), or N/A "
                 "(HGVS/rsID, ambiguous, non-nuclear contig)."
             ),
-            "v0_8_0_shape": (
-                "predict_splicing carries the request params "
-                "(variant_id/genome_build/gene_set/max_distance/mask) on the ENVELOPE only; the "
-                "spliceai{} and pangolin{} sub-blocks no longer repeat them, and per-model "
-                "headlines appear only in response_mode='full'. Standalone predict_spliceai / "
-                "predict_pangolin keep the request params (they are the sole context there). "
-                "Well-formed non-standard contigs (e.g. chr99) now return unsupported_contig, not "
-                "invalid_input; a coordinate with no overlapping transcript fast-fails as "
-                "not_found in <0.5s. There is no warm_ttl_remaining_s: use served_warm plus the "
-                "rate_budget on a rate_limited error."
+            "v0_9_0_shape": (
+                "Every prediction mode exposes the headline number consistently: single-model "
+                "results carry top:{class,score,position} + max_delta_score in minimal, compact, "
+                "AND full; predict_splicing carries agreement:{verdict, spliceai_max_delta, "
+                "pangolin_max_delta} in every mode (the older minimal-only spliceai_max/"
+                "pangolin_max names are removed). interpretation.threshold_basis appears only in "
+                "response_mode='full' (the band is always present; the glossary is in "
+                "spliceailookup://reference). predict_splicing still carries the request params on "
+                "the ENVELOPE only (sub-blocks omit them; per-model headlines are full-only); "
+                "standalone predict_spliceai / predict_pangolin keep them. A coordinate whose "
+                "position exceeds the chromosome length in ALL builds is invalid_input (not "
+                "build_mismatch -- no build can score it), rejected locally before any upstream "
+                "call. ref_mismatch fallbacks are actionable: the matching build, a REF/ALT swap, "
+                "or get_server_capabilities -- never the same wrong coordinate back into "
+                "resolve_variant. _meta.rate_budget appears on every prediction success (pacing) "
+                "and adds retry_after_s on a rate_limited error. There is no warm_ttl_remaining_s; "
+                "use served_warm."
             ),
             "molecular_consequence": (
                 "the resolver's (Ensembl VEP) most-severe molecular consequence for HGVS/rsID "
@@ -234,11 +249,14 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "cached, so repeat queries are free."
             ),
             "rate_budget": (
-                "On a rate_limited error, _meta.rate_budget reports "
-                "{limit, remaining, unit:'concurrent_requests'} -- a LOCAL concurrency cap, "
-                "not a time-windowed rate limit; there is no reset interval to wait out, so "
-                "reduce concurrent calls. (remaining=0 is exact for local saturation; for an "
-                "upstream 429 it is a conservative floor.)"
+                "_meta.rate_budget appears on every prediction success as "
+                "{limit, unit:'concurrent_requests', min_interval_ms} -- the cap is a LOCAL "
+                "concurrency semaphore (not a time-windowed quota), and min_interval_ms is the "
+                "recommended soft spacing between cache-miss scoring calls so you can pace a burst "
+                "instead of discovering the limit by hitting it. On a rate_limited error it adds "
+                "remaining:0 and retry_after_s for immediate backoff. Cached responses do not "
+                "consume the budget. (remaining=0 is exact for local saturation; for an upstream "
+                "429 it is a conservative floor.)"
             ),
         },
         "batch_semantics": (
@@ -377,7 +395,9 @@ def get_reference_resource() -> dict[str, Any]:
             "codes": {
                 "invalid_input": {
                     "retryable": False,
-                    "when": "variant could not be parsed / upstream rejected the input shape",
+                    "when": "variant could not be parsed / upstream rejected the input shape; "
+                    "also when a coordinate's position is out of range (exceeds the chromosome "
+                    "length in all supported builds), rejected locally before any upstream call",
                 },
                 "not_found": {
                     "retryable": False,
@@ -398,10 +418,10 @@ def get_reference_resource() -> dict[str, Any]:
                 },
                 "build_mismatch": {
                     "retryable": False,
-                    "when": "the coordinate cannot belong to the requested build -- its position "
-                    "is out of that build's chromosome range, or the variant only scores on the "
-                    "other build; set genome_build correctly. A wrong REF at an in-range position "
-                    "is ref_mismatch, not this.",
+                    "when": "the coordinate is valid only on the OTHER build -- in range there "
+                    "and/or it scores there; set genome_build correctly (the fallback carries the "
+                    "inferred build). A position out of range in EVERY build is invalid_input, not "
+                    "this; a wrong REF at an in-range position is ref_mismatch.",
                 },
                 "unsupported_contig": {
                     "retryable": False,

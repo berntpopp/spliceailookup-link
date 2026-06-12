@@ -11,7 +11,7 @@ from pydantic import Field
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
+from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import cmd
 from spliceailookup_link.mcp.shaping import shape_spliceai
 from spliceailookup_link.mcp.tools._common import (
@@ -143,11 +143,14 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             if prepared.consequence:
                 shaped["molecular_consequence"] = prepared.consequence
             gene = shaped.get("gene") or (shaped.get("transcripts") or [{}])[0].get("gene")
+            gene_id = (shaped.get("transcripts") or [{}])[0].get("gene_id")
             meta: dict[str, Any] = {
                 "cache": tele.cache,
                 "served_warm": is_served_warm(
                     tele.cache, tele.upstream_elapsed_ms, settings.WARM_THRESHOLD_MS
                 ),
+                # P1#2: proactive pacing signal, kept even on the lean/minimal path.
+                "rate_budget": rate_budget_snapshot(saturated=False),
             }
             if include_hints:
                 meta["next_commands"] = [
@@ -155,7 +158,7 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 ]
                 if include_see_also and response_mode != "minimal":
                     meta["see_also"] = see_also_for(
-                        prepared.variant_id, genome_build, gene, response_mode
+                        prepared.variant_id, genome_build, gene, response_mode, gene_id=gene_id
                     )
             if not lean:
                 if tele.upstream_elapsed_ms is not None:

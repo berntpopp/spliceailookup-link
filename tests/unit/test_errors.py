@@ -116,7 +116,9 @@ def test_ambiguous_lists_alleles_and_per_allele_next_commands() -> None:
     assert cmds[1]["arguments"]["variant"] == "1-169549811-C-T"
 
 
-def test_ref_mismatch_classifies_and_routes_to_resolve() -> None:
+def test_ref_mismatch_classifies_and_routes_to_capabilities() -> None:
+    # F2: a plain wrong-REF coordinate (no other-build, no REF/ALT swap) must NOT loop
+    # back into resolve_variant with the same bad coordinate -> capabilities entry point.
     exc = RefMismatchError(
         variant_id="8-140300616-A-G",
         observed_ref="A",
@@ -124,6 +126,7 @@ def test_ref_mismatch_classifies_and_routes_to_resolve() -> None:
         build="GRCh38",
         chrom="8",
         pos=140300616,
+        alt="G",
     )
     env = mcp_tool_error(
         exc, McpErrorContext(tool_name="predict_splicing", variant="8-140300616-A-G")
@@ -131,6 +134,7 @@ def test_ref_mismatch_classifies_and_routes_to_resolve() -> None:
     assert env["error_code"] == "ref_mismatch"
     assert env["retryable"] is False
     assert env["recovery_action"] == "reformulate_input"
-    assert env["fallback_tool"] == "resolve_variant"
+    assert env["fallback_tool"] == "get_server_capabilities"
+    assert env["fallback_args"] is None
     assert "does not match" in env["message"]
     assert "T" in env["message"]

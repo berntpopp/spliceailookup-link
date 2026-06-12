@@ -34,25 +34,35 @@ def band(score: float | None) -> str:
     return "none"
 
 
+def _top_delta(transcripts: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The single strongest {class, score, position} across the reported transcripts.
+
+    Emitted in every response_mode so a caller never has to detect the mode to find the
+    headline number (F3).
+    """
+    best_class = best_score = best_pos = None
+    for t in transcripts:
+        for name, d in (t.get("delta_scores") or {}).items():
+            s = (d or {}).get("score")
+            if s is not None and (best_score is None or s > best_score):
+                best_score, best_class, best_pos = s, name, (d or {}).get("position")
+    if best_class is None:
+        return None
+    return {"class": best_class, "score": best_score, "position": best_pos}
+
+
 def _minimal_single_model(result: dict[str, Any]) -> dict[str, Any]:
-    transcripts = result.get("transcripts") or []
-    top = transcripts[0] if transcripts else {}
-    best_class, best, pos = None, None, None
-    for name, d in (top.get("delta_scores") or {}).items():
-        s = (d or {}).get("score")
-        if s is not None and (best is None or s > best):
-            best, best_class, pos = s, name, (d or {}).get("position")
     out: dict[str, Any] = {
         "model": result["model"],
         "variant_id": result["variant_id"],
         "genome_build": result["genome_build"],
-        "gene": top.get("gene"),
+        "gene": (result.get("transcripts") or [{}])[0].get("gene"),
         "max_delta_score": result.get("max_delta_score"),
         "interpretation": {"band": band(result.get("max_delta_score"))},
         "headline": result["headline"],
     }
-    if best_class is not None:
-        out["top"] = {"class": best_class, "score": best, "position": pos}
+    if result.get("top") is not None:
+        out["top"] = result["top"]
     cons = result.get("consequence") or {}
     aberr = (cons.get("aberrations") or [{}])[0].get("type") if cons else None
     if aberr:
@@ -120,6 +130,16 @@ def _normalize_ensembl_id(value: Any) -> Any:
 
 def _delta(score: Any, pos: Any) -> dict[str, Any]:
     return {"score": _to_float(score), "position": _to_int(pos)}
+
+
+_ENSG_ONLY_RE = re.compile(r"^ENSG\d+")
+
+
+def _gene_label(gene: str | None) -> str:
+    """Human-facing gene label; flags symbol-less Ensembl-only genes (e.g. some lncRNAs)."""
+    if not gene:
+        return "unknown gene"
+    return f"{gene} (no gene symbol)" if _ENSG_ONLY_RE.match(gene) else gene
 
 
 def _strength(score: float | None) -> str:
@@ -335,7 +355,12 @@ def shape_spliceai(
         "max_delta_score": max_overall,
         "transcripts": shaped,
     }
-    result["interpretation"] = {"band": band(max_overall), "threshold_basis": THRESHOLD_BASIS}
+    result["interpretation"] = {"band": band(max_overall)}
+    if response_mode == "full":
+        result["interpretation"]["threshold_basis"] = THRESHOLD_BASIS
+    top = _top_delta(shaped)
+    if top is not None:
+        result["top"] = top
     if truncated is not None:
         result["transcripts_truncated"] = truncated
     if include_consequence:
@@ -354,7 +379,7 @@ def spliceai_headline(shaped: dict[str, Any]) -> str:
     if not transcripts:
         return f"SpliceAI ({build}): no transcript scores for {shaped.get('variant_id')}."
     top = transcripts[0]
-    gene = top.get("gene") or "unknown gene"
+    gene = _gene_label(top.get("gene"))
     best_class, best = None, -1.0
     for name, d in (top.get("delta_scores") or {}).items():
         s = d.get("score")
@@ -452,7 +477,12 @@ def shape_pangolin(
         "max_delta_score": max_overall,
         "transcripts": shaped,
     }
-    result["interpretation"] = {"band": band(max_overall), "threshold_basis": THRESHOLD_BASIS}
+    result["interpretation"] = {"band": band(max_overall)}
+    if response_mode == "full":
+        result["interpretation"]["threshold_basis"] = THRESHOLD_BASIS
+    top = _top_delta(shaped)
+    if top is not None:
+        result["top"] = top
     if truncated is not None:
         result["transcripts_truncated"] = truncated
     if response_mode == "full" and payload.get("allNonZeroScores"):
@@ -473,7 +503,7 @@ def pangolin_headline(shaped: dict[str, Any]) -> str:
     if not transcripts:
         return f"Pangolin ({build}): no transcript scores for {shaped.get('variant_id')}."
     top = transcripts[0]
-    gene = top.get("gene") or "unknown gene"
+    gene = _gene_label(top.get("gene"))
     best_class, best = None, -1.0
     for name, d in (top.get("delta_scores") or {}).items():
         s = d.get("score")

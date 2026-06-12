@@ -88,12 +88,14 @@ class RefMismatchError(ValueError):
         build: str,
         chrom: str,
         pos: int,
+        alt: str = "",
         other_build_hint: dict[str, str] | None = None,
     ):
         self.variant_id = variant_id
         self.observed_ref = observed_ref
         self.reference_base = reference_base
         self.build = build
+        self.alt = alt
         self.other_build_hint = other_build_hint
         super().__init__(
             f"REF allele '{observed_ref}' does not match the {build} reference base "
@@ -113,8 +115,39 @@ class AmbiguousVariantError(ValueError):
         )
 
 
+class CoordinateRangeError(ValueError):
+    """Raised when a coordinate's position exceeds the chromosome length in all builds."""
+
+    def __init__(self, *, chrom: str, pos: int, grch38_len: int, grch37_len: int):
+        self.chrom = chrom
+        self.pos = pos
+        super().__init__(
+            f"Position {pos:,} exceeds the length of chr{chrom.removeprefix('chr')} in all "
+            f"supported builds (GRCh38 {grch38_len:,}, GRCh37 {grch37_len:,}). Verify the "
+            "coordinate; if you have an HGVS/rsID, resolve_variant can derive valid coordinates."
+        )
+
+
 def _provenance_meta() -> dict[str, Any]:
     return {**_BASE_META, "capabilities_version": get_capabilities_version()}
+
+
+def rate_budget_snapshot(*, saturated: bool) -> dict[str, Any]:
+    """The advertised concurrency budget + soft client-pacing interval.
+
+    The cap is a LOCAL asyncio.Semaphore (MAX_CONCURRENCY), not a tracked time-window
+    quota. On success we advertise the soft min spacing for cache-miss calls; on a
+    rate_limited failure we add remaining=0 and a retry_after_s for immediate backoff.
+    """
+    snap: dict[str, Any] = {
+        "limit": settings.MAX_CONCURRENCY,
+        "unit": "concurrent_requests",
+        "min_interval_ms": settings.RATE_BUDGET_MIN_INTERVAL_MS,
+    }
+    if saturated:
+        snap["remaining"] = 0
+        snap["retry_after_s"] = max(1, round(settings.RATE_BUDGET_MIN_INTERVAL_MS / 1000))
+    return snap
 
 
 def _safe_message(exc: BaseException) -> str:
@@ -128,6 +161,28 @@ def _fallback_for(context: McpErrorContext) -> tuple[str, dict[str, Any] | None]
         return _FALLBACK_TOOL, None
     if context.tool_name in _PREDICTION_TOOLS and context.variant:
         return "resolve_variant", {"variant": context.variant}
+    return _FALLBACK_TOOL, None
+
+
+def _ref_mismatch_fallback(
+    exc: RefMismatchError, context: McpErrorContext
+) -> tuple[str, dict[str, Any] | None]:
+    """An actionable fallback for a coordinate ref_mismatch (never the same-coord loop).
+
+    ref_mismatch only fires on coordinate inputs (HGVS/rsID resolve via VEP and never
+    reach the REF check), so re-sending the same coordinate to resolve_variant is a dead
+    end. Redirect to: the matching build, a REF/ALT swap, or get_server_capabilities.
+    """
+    tool = context.tool_name if context.tool_name in _PREDICTION_TOOLS else "predict_splicing"
+    if exc.other_build_hint:
+        return tool, {"variant": exc.variant_id, "genome_build": exc.other_build_hint["build"]}
+    ref, alt, base = exc.observed_ref, exc.alt, exc.reference_base
+    if ref and alt and base and len(ref) == len(alt) == len(base) and alt.upper() == base.upper():
+        try:
+            chrom, pos, r, a = exc.variant_id.split("-", 3)
+            return tool, {"variant": f"{chrom}-{pos}-{a}-{r}", "genome_build": exc.build}
+        except ValueError:
+            pass
     return _FALLBACK_TOOL, None
 
 
@@ -148,10 +203,12 @@ def _classify(
             {"variant": exc.variant_id, "genome_build": exc.inferred_build},
         )
     if isinstance(exc, RefMismatchError):
-        tool, args = _fallback_for(context)
+        tool, args = _ref_mismatch_fallback(exc, context)
         return "ref_mismatch", False, tool, args
     if isinstance(exc, AmbiguousVariantError):
         return "ambiguous", False, "resolve_variant", {"variant": exc.variant}
+    if isinstance(exc, CoordinateRangeError):
+        return "invalid_input", False, _FALLBACK_TOOL, None
     if isinstance(exc, DataNotFoundError):
         tool, args = _fallback_for(context)
         return "not_found", False, tool, args
@@ -371,6 +428,12 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
             **_provenance_meta(),
         },
     }
+    if isinstance(exc, CoordinateRangeError):
+        payload["recovery"] = (
+            "The position is beyond the chromosome length in every supported build, so no "
+            "build can score it. Verify the coordinate against the reference. resolve_variant "
+            "cannot rescue a bad coordinate -- only an HGVS/rsID input."
+        )
     if isinstance(exc, AmbiguousVariantError):
         build = context.genome_build or "GRCh38"
         payload["variant_ids"] = exc.candidates
@@ -378,21 +441,31 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
             {"tool": "predict_splicing", "arguments": {"variant": c, "genome_build": build}}
             for c in exc.candidates
         ] + payload["_meta"]["next_commands"]
-    if isinstance(exc, RefMismatchError) and exc.other_build_hint:
-        # D1: a wrong REF that coincidentally matches the other build's base stays a
-        # ref_mismatch; the other-build possibility is a secondary hint, not a redirect.
-        payload["other_build_hint"] = exc.other_build_hint
-        payload["recovery"] = f"{payload['recovery']} {exc.other_build_hint['note']}"
+    if isinstance(exc, RefMismatchError):
+        if exc.other_build_hint:
+            # D1: a wrong REF that coincidentally matches the other build's base stays a
+            # ref_mismatch; the other-build possibility is a secondary hint, not a redirect.
+            payload["other_build_hint"] = exc.other_build_hint
+            payload["recovery"] = f"{payload['recovery']} {exc.other_build_hint['note']}"
+        elif (
+            exc.observed_ref
+            and exc.alt
+            and exc.reference_base
+            and exc.alt.upper() == exc.reference_base.upper()
+            and len(exc.observed_ref) == len(exc.alt) == len(exc.reference_base)
+        ):
+            # F2: the ALT base matches the reference here -> most likely a REF/ALT swap;
+            # the fallback re-runs with REF/ALT swapped rather than looping resolve_variant.
+            payload["recovery"] = (
+                f"{payload['recovery']} The ALT base matches the reference here, so the most "
+                "likely cause is a REF/ALT swap; the fallback re-runs with REF/ALT swapped."
+            )
     if error_code == "rate_limited":
-        # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a
-        # time window -- IETF qu=concurrent-requests, no window_s (no bucket to
-        # reset). remaining=0 is exact for local saturation; for an upstream HTTP
-        # 429 (also RateLimitedError) it is a conservative floor, not upstream quota.
-        payload["_meta"]["rate_budget"] = {
-            "limit": settings.MAX_CONCURRENCY,
-            "remaining": 0,
-            "unit": "concurrent_requests",
-        }
+        # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a time
+        # window. remaining=0 is exact for local saturation; for an upstream HTTP 429 (also
+        # RateLimitedError) it is a conservative floor. retry_after_s gives an actionable
+        # backoff per current MCP rate-limit guidance.
+        payload["_meta"]["rate_budget"] = rate_budget_snapshot(saturated=True)
     return McpToolError(payload)
 
 
@@ -441,7 +514,9 @@ async def run_mcp_tool(
             **existing,
             **_BASE_META,  # unsafe_for_clinical_use -- always present
         }
-        if not lean_meta:
+        if not lean_meta and "capabilities_version" not in envelope:
+            # P1#1: the capabilities document already carries capabilities_version at the
+            # top level; do not duplicate it in _meta on that one call.
             meta["capabilities_version"] = get_capabilities_version()
         envelope["_meta"] = meta
         return envelope

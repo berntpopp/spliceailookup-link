@@ -17,8 +17,12 @@ from tests.fixtures.api_responses import (
 
 
 async def test_f13_threshold_basis_emitted_once_in_combined(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
-    # Exactly one threshold_basis in the whole combined payload (top-level only).
+    # F6: threshold_basis is full-only; even in full it appears exactly once (top-level).
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+        )
+    )
     assert json.dumps(data).count("threshold_basis") == 1
     assert data["interpretation"]["threshold_basis"] == THRESHOLD_BASIS
     # Each model sub-block keeps its decision-relevant band but drops the static string.
@@ -29,8 +33,12 @@ async def test_f13_threshold_basis_emitted_once_in_combined(mcp) -> None:
 
 
 async def test_f13_single_model_still_has_one_threshold_basis(mcp) -> None:
-    # Standalone single-model tools are self-contained: they keep their one copy.
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    # F6: standalone single-model carries threshold_basis only in full mode (exactly once).
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+        )
+    )
     assert data["interpretation"]["threshold_basis"] == THRESHOLD_BASIS
     assert json.dumps(data).count("threshold_basis") == 1
 
@@ -184,10 +192,15 @@ async def test_c1_rate_limited_carries_concurrency_budget(mcp, stub_service: Stu
     assert "window_s" not in budget  # never fabricate a window we don't enforce
 
 
-async def test_c1_success_envelope_has_no_rate_budget(mcp) -> None:
+async def test_c1_success_envelope_rate_budget_is_proactive(mcp) -> None:
+    # P1#2: success now carries a proactive pacing budget (min_interval_ms) but no
+    # fabricated remaining/retry_after_s -- those appear only on a rate_limited error.
     data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
     assert data["success"] is True
-    assert "rate_budget" not in data["_meta"]
+    rb = data["_meta"]["rate_budget"]
+    assert rb["min_interval_ms"] == 12000
+    assert "remaining" not in rb
+    assert "retry_after_s" not in rb
 
 
 async def test_f16_resolve_description_states_ref_check_contract(mcp) -> None:

@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     # Surfaced as _meta.served_warm so a client can choose blocking vs background.
     WARM_THRESHOLD_MS: int = 5000
 
+    # Proactive client-pacing signal. The upstream is "several requests/min"; this is the
+    # recommended soft minimum spacing between cache-miss scoring calls so an autonomous
+    # caller paces a burst instead of discovering the limit by hitting it. Surfaced as
+    # _meta.rate_budget.min_interval_ms on success and retry_after_s on a rate_limited error.
+    RATE_BUDGET_MIN_INTERVAL_MS: int = 12000
+
     # Validate the coordinate REF against the Ensembl reference base BEFORE the
     # slow scoring dispatch (fast ref_mismatch instead of a ~17s not_found).
     # Disable only if Ensembl sequence lookups are unavailable in an environment.

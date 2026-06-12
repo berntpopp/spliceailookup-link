@@ -157,7 +157,10 @@ def test_no_scores_headline_safe() -> None:
 def test_interpretation_band_present_compact() -> None:
     out = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="compact")
     assert out["interpretation"]["band"] == "high"
-    assert "0.5" in out["interpretation"]["threshold_basis"]
+    # F6: threshold_basis is full-only; compact carries the band but not the glossary.
+    assert "threshold_basis" not in out["interpretation"]
+    full = shape_spliceai(SPLICEAI_TRAPPC9, response_mode="full")
+    assert "0.5" in full["interpretation"]["threshold_basis"]
 
 
 def test_interpretation_band_absent_threshold_in_minimal() -> None:

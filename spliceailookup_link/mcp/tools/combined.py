@@ -10,7 +10,7 @@ from pydantic import Field
 
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
+from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import for_combined
 from spliceailookup_link.mcp.tools._common import see_also_for
 from spliceailookup_link.mcp.tools._predict import predict_one
@@ -105,13 +105,19 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 meta["next_commands"] = for_combined(result["variant_id"], genome_build)
                 if include_see_also and response_mode != "minimal":
                     meta["see_also"] = see_also_for(
-                        result["variant_id"], genome_build, tel["gene"], response_mode
+                        result["variant_id"],
+                        genome_build,
+                        tel["gene"],
+                        response_mode,
+                        gene_id=tel.get("gene_id"),
                     )
             if tel["cache"]:
                 meta["cache"] = tel["cache"]
             meta["served_warm"] = is_served_warm(
                 tel["cache"], tel["upstream_elapsed_ms"], settings.WARM_THRESHOLD_MS
             )
+            # P1#2: proactive pacing signal, kept even on the lean/minimal path.
+            meta["rate_budget"] = rate_budget_snapshot(saturated=False)
             if not lean:
                 if tel["upstream_elapsed_ms"] is not None:
                     meta["upstream_elapsed_ms"] = tel["upstream_elapsed_ms"]

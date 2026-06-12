@@ -88,6 +88,30 @@ def likely_build(chrom: str, pos: int) -> str | None:
     return None
 
 
+def max_length(chrom: str) -> int | None:
+    """Largest standard-build length for a contig, or None for MT/non-standard."""
+    c = _strip_chr(chrom)
+    if c in ("M", "MT") or c not in _GRCH38_LENGTHS:
+        return None
+    return max(_GRCH38_LENGTHS[c], _GRCH37_LENGTHS.get(c, 0))
+
+
+def out_of_range(chrom: str, pos: int) -> tuple[int, int] | None:
+    """Return (grch38_len, grch37_len) when pos exceeds BOTH builds; else None.
+
+    A position past every supported build cannot score in any build, so it is an
+    invalid coordinate (not a build_mismatch -- there is no build to switch to).
+    """
+    c = _strip_chr(chrom)
+    if c in ("M", "MT") or c not in _GRCH38_LENGTHS:
+        return None
+    g38 = _GRCH38_LENGTHS[c]
+    g37 = _GRCH37_LENGTHS.get(c, 0)
+    if pos > g38 and pos > g37:
+        return (g38, g37)
+    return None
+
+
 def detect_build_mismatch(variant_id: str, requested_build: str) -> str | None:
     """Return the inferred build when variant_id clearly belongs to a different build, else None."""
     try:

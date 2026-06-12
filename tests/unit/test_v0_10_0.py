@@ -41,3 +41,13 @@ def test_capabilities_advertises_tool_safety() -> None:
     assert ts["idempotent"] is True
     assert ts["open_world"] is True
     assert "auto" in ts["note"].lower()
+
+
+# ---------------- W5: basic gene_set scope clarified ----------------
+
+
+def test_basic_gene_set_documents_noncoding() -> None:
+    doc = get_capabilities_resource()
+    text = doc["parameters"]["gene_set"].lower()
+    assert "non-coding" in text or "noncoding" in text or "lncrna" in text
+    assert "gencode" in text

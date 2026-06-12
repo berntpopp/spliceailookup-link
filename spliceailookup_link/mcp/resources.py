@@ -106,7 +106,13 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "unannotated sites. Use raw for alternative-splicing analysis, masked for "
                 "variant interpretation."
             ),
-            "gene_set": "'basic' (default, MANE/curated) or 'comprehensive' (all GENCODE; much slower).",
+            "gene_set": (
+                "'basic' (default) = GENCODE v44 basic transcripts (MANE-prioritised) or "
+                "'comprehensive' = all GENCODE (much slower). NOTE: 'basic' includes "
+                "non-coding genes (e.g. lncRNAs like CCAT2 that have a basic transcript), "
+                "not only protein-coding -- a low-scoring lncRNA hit is a real transcript, "
+                "not the absence of annotation."
+            ),
             "transcripts": "'mane' (default, MANE Select only) or 'all' (every overlapping transcript).",
             "response_mode": "'compact' (default), 'full' (adds REF/ALT raw scores, exon model), or 'minimal'.",
         },

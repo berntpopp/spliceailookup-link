@@ -48,9 +48,14 @@ def _result_max_delta(r: dict[str, Any]) -> float | None:
 
 
 def _success_item(one: dict[str, Any], variant: str) -> dict[str, Any]:
+    from spliceailookup_link.services.telemetry import is_served_warm
+
     tele = one.pop("_telemetry")
     one["variant"] = variant
-    item_meta: dict[str, Any] = {"cache": tele.get("cache")}
+    item_meta: dict[str, Any] = {
+        "cache": tele.get("cache"),
+        "served_warm": is_served_warm(tele.get("cache"), tele.get("upstream_elapsed_ms")),
+    }
     if tele.get("upstream_elapsed_ms") is not None:
         item_meta["upstream_elapsed_ms"] = tele["upstream_elapsed_ms"]
     if tele.get("cache_age_s") is not None:
@@ -122,6 +127,7 @@ async def run_batch(
     ctx: Any = None,
     predict_fn: PredictFn = predict_one,
     retry_backoff_s: float | None = None,
+    max_items: int = 25,
 ) -> dict[str, Any]:
     """Score a panel resiliently; never let one item fail its siblings."""
     if retry_backoff_s is None:
@@ -171,7 +177,7 @@ async def run_batch(
         "retried": retried_count,
         **verdict_counts,
     }
-    meta: dict[str, Any] = {}
+    meta: dict[str, Any] = {"items_submitted": total, "max_items": max_items}
     if top is not None:
         meta["next_commands"] = [
             {

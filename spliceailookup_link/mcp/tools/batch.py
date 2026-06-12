@@ -46,7 +46,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         cross_build_check: Annotated[bool, Field()] = True,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
-        """Score a list of variants in ONE call. The server fans out under its concurrency cap and returns a single envelope with per-variant results (+ per-item errors that do not fail the batch) and a summary. Use this for gene panels instead of N predict_splicing calls. Returns up to ~25x a single compact result. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
+        """Score a list of variants in ONE call. The server fans out under its concurrency cap and returns a single envelope with per-variant results (+ per-item errors that do not fail the batch) and a summary. Use this for gene panels instead of N predict_splicing calls. Accepts 1-25 variants (more than max_items=25 returns validation_failed, not a truncated result); each item returns about one compact predict_splicing result, so a full batch is ~25x a single compact response, and _meta echoes items_submitted and max_items. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()
@@ -66,6 +66,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                     "enforce_deadline": not running_as_task(ctx),
                 },
                 ctx=ctx,
+                max_items=_MAX_BATCH,
             )
 
         return await run_mcp_tool("predict_splicing_batch", call)

@@ -310,6 +310,7 @@ def _lean_capabilities(full: dict[str, Any]) -> dict[str, Any]:
         "agreement_verdicts": full["agreement_verdicts"],
         "interpretation_bands": full["interpretation_bands"],
         "error_codes": full["error_codes"],
+        "resources": full["resources"],
         "params_by_reference": (
             "Per-parameter docs live in each tool's input schema and "
             "spliceailookup://reference; omitted here to avoid duplication (SEP-1576). "

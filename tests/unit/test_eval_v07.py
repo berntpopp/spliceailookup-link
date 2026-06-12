@@ -128,3 +128,38 @@ def test_transcript_info_tx_bounds_filled_when_null() -> None:
     assert ti["tx_start"] == 139727725
     assert ti["tx_end"] == 140300614
     assert ti["strand"] == "-"  # upstream fields preserved
+
+
+# --- C3: batch size contract --------------------------------------------------
+
+async def test_batch_envelope_self_describes_size_contract(mcp) -> None:
+    res = await mcp.call_tool(
+        "predict_splicing_batch", {"variants": ["8-140300616-T-G", "8-140300616-T-G"]}
+    )
+    meta = structured(res)["_meta"]
+    assert meta["items_submitted"] == 2
+    assert meta["max_items"] == 25
+
+
+async def test_batch_rejects_over_cap(mcp) -> None:
+    res = await mcp.call_tool(
+        "predict_splicing_batch", {"variants": ["8-140300616-T-G"] * 26}
+    )
+    data = structured(res)
+    assert data["success"] is False
+    assert data["error_code"] == "validation_failed"
+
+
+async def test_batch_item_meta_has_served_warm(mcp) -> None:
+    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["8-140300616-T-G"]})
+    item = structured(res)["results"][0]
+    assert "served_warm" in item["_meta"]
+
+
+# --- C5: resources in lean capabilities --------------------------------------
+
+async def test_lean_capabilities_lists_resources(mcp) -> None:
+    res = await mcp.call_tool("get_server_capabilities", {"detail": "lean"})
+    data = structured(res)
+    assert "resources" in data
+    assert "spliceailookup://reference" in data["resources"]

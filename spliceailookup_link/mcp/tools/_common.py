@@ -11,13 +11,24 @@ from spliceailookup_link.config import GenomeBuild, settings
 from spliceailookup_link.mcp.build_check import detect_build_mismatch
 from spliceailookup_link.mcp.errors import AmbiguousVariantError, BuildMismatchError
 from spliceailookup_link.services import SpliceService
-from spliceailookup_link.variant import parse_variant_input
+from spliceailookup_link.variant import (
+    UnsupportedContigError,
+    parse_variant_input,
+    unsupported_contig_reason,
+)
 
 _MASK_TO_INT = {"raw": 0, "masked": 1}
 
 
 def mask_to_int(mask: str) -> int:
     return _MASK_TO_INT.get(mask, 0)
+
+
+def _reject_unsupported_contig(variant_id: str) -> None:
+    """Fast-fail non-nuclear contigs (MT / non-standard) before any scoring call."""
+    reason = unsupported_contig_reason(variant_id)
+    if reason is not None:
+        raise UnsupportedContigError(reason)
 
 
 def running_as_task(ctx: Any) -> bool:
@@ -64,6 +75,7 @@ async def prepare_variant(
     """
     parsed = parse_variant_input(raw_variant)
     if parsed.kind == "coordinate":
+        _reject_unsupported_contig(parsed.value)
         inferred = detect_build_mismatch(parsed.value, genome_build)
         if inferred is not None:
             raise BuildMismatchError(
@@ -84,6 +96,7 @@ async def prepare_variant(
             candidates=resolution.get("variant_ids") or [resolution["variant_id"]],
             note=resolution.get("note"),
         )
+    _reject_unsupported_contig(resolution["variant_id"])
     return PreparedVariant(
         variant_id=resolution["variant_id"],
         genome_build=genome_build,

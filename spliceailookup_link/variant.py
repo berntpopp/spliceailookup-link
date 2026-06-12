@@ -31,6 +31,37 @@ class VariantParseError(ValueError):
     """
 
 
+class UnsupportedContigError(VariantParseError):
+    """Raised when a variant's contig is outside the splice models' nuclear scope.
+
+    SpliceAI and Pangolin are trained on the nuclear chromosomes (1-22, X, Y);
+    mitochondrial (M/MT) and non-standard contigs are out of model scope and would
+    otherwise burn a slow upstream slot before a 503. Subclasses VariantParseError
+    so the error layer maps it deterministically (a distinct code, checked first).
+    """
+
+
+# Contigs the SpliceAI / Pangolin models actually score (nuclear genome only).
+SCORING_CONTIGS = {str(i) for i in range(1, 23)} | {"X", "Y"}
+
+
+def unsupported_contig_reason(variant_id: str) -> str | None:
+    """Return a reason string if variant_id's contig is not scorable, else None."""
+    chrom = variant_id.split("-", 1)[0]
+    c = chrom.removeprefix("chr").removeprefix("CHR").upper()
+    if c in SCORING_CONTIGS:
+        return None
+    if c in ("M", "MT"):
+        return (
+            "Mitochondrial contig (MT) is not supported by the SpliceAI/Pangolin "
+            "splice models, which score only the nuclear chromosomes (1-22, X, Y)."
+        )
+    return (
+        f"Contig '{chrom}' is not supported by the SpliceAI/Pangolin splice models, "
+        "which score only the nuclear chromosomes (1-22, X, Y)."
+    )
+
+
 @dataclass(frozen=True)
 class VariantInput:
     """A classified variant input.

@@ -27,7 +27,7 @@ from spliceailookup_link.api import (
 )
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.resources import get_capabilities_version
-from spliceailookup_link.variant import VariantParseError
+from spliceailookup_link.variant import UnsupportedContigError, VariantParseError
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,8 @@ def _classify(
     if isinstance(exc, DataNotFoundError):
         tool, args = _fallback_for(context)
         return "not_found", False, tool, args
+    if isinstance(exc, UnsupportedContigError):
+        return "unsupported_contig", False, _FALLBACK_TOOL, None
     if isinstance(exc, (UpstreamInputError, VariantParseError)):
         tool, args = _fallback_for(context)
         return "invalid_input", False, tool, args
@@ -222,11 +224,25 @@ def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
             "variant_id (see variant_ids / next_commands, one prediction per allele) "
             "and retry, or call resolve_variant to review the candidates."
         )
+    if error_code == "unsupported_contig":
+        return (
+            "This contig is outside the SpliceAI/Pangolin nuclear scope (chr1-22, X, Y). "
+            "Do not retry unchanged. For mitochondrial variants, use gnomad-link "
+            "get_mitochondrial_variant; otherwise confirm the variant is on a nuclear "
+            "chromosome and re-submit."
+        )
     return f"Unexpected failure. Call {fallback_tool} for a safe entry point."
 
 
 def _envelope_message(exc: BaseException, error_code: str) -> str:
-    if error_code in {"build_mismatch", "invalid_input", "not_found", "ref_mismatch", "ambiguous"}:
+    if error_code in {
+        "build_mismatch",
+        "invalid_input",
+        "not_found",
+        "ref_mismatch",
+        "ambiguous",
+        "unsupported_contig",
+    }:
         # These carry developer-authored or upstream guidance safe to surface.
         return _safe_message(exc)
     if error_code == "validation_failed":

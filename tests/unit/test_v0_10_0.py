@@ -160,3 +160,66 @@ async def test_warmup_both_masks(mcp) -> None:
     assert data["coverage"]["mask"] == "both"
     assert "spliceai_raw" in data["detail"] and "spliceai_masked" in data["detail"]
     assert "pangolin_raw" in data["detail"] and "pangolin_masked" in data["detail"]
+
+
+# ---------------- W2: predict_splicing_batch dedup by resolved variant_id ----
+
+
+async def test_batch_dedups_coordinate_and_hgvs(stub_service) -> None:
+    from spliceailookup_link.mcp.tools._batch_runner import run_batch
+
+    # The ABCA3 HGVS resolves (in StubService) to 16-2317763-T-A.
+    variants = ["16-2317763-T-A", "NM_001089.3(ABCA3):c.875A>T"]
+    out = await run_batch(
+        stub_service,
+        variants=variants,
+        genome_build="GRCh38",
+        params={
+            "max_distance": 500,
+            "mask": "raw",
+            "gene_set": "basic",
+            "transcripts": "mane",
+            "response_mode": "compact",
+            "cross_build_check": True,
+            "enforce_deadline": True,
+        },
+        max_items=25,
+    )
+    assert out["count"] == 2
+    assert len(out["results"]) == 2
+    # 2 models x 1 unique variant = 2 upstream score calls (not 4).
+    assert len(stub_service.score_calls) == 2
+    assert out["summary"]["unique_variants"] == 1
+    assert out["summary"]["upstream_calls_saved"] == 2
+    assert out["_meta"]["deduped"] == {"unique": 1, "duplicates": 1}
+    # both positions carry a full per-item result; the copy is marked deduped.
+    for item in out["results"]:
+        assert "agreement" in item or "headline" in item
+    duped = [r for r in out["results"] if (r.get("_meta") or {}).get("cache") == "deduped"]
+    assert len(duped) == 1
+    assert duped[0]["_meta"]["served_from"] == "16-2317763-T-A"
+
+
+async def test_batch_distinct_variants_not_deduped(stub_service) -> None:
+    from spliceailookup_link.mcp.tools._batch_runner import run_batch
+
+    variants = ["chr8-140300616-T-G", "16-2317763-T-A"]
+    out = await run_batch(
+        stub_service,
+        variants=variants,
+        genome_build="GRCh38",
+        params={
+            "max_distance": 500,
+            "mask": "raw",
+            "gene_set": "basic",
+            "transcripts": "mane",
+            "response_mode": "compact",
+            "cross_build_check": True,
+            "enforce_deadline": True,
+        },
+        max_items=25,
+    )
+    # 2 distinct variants x 2 models = 4 upstream calls, nothing saved.
+    assert len(stub_service.score_calls) == 4
+    assert out["summary"]["upstream_calls_saved"] == 0
+    assert out["summary"]["unique_variants"] == 2

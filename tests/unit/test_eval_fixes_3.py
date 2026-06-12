@@ -162,7 +162,8 @@ async def test_f11_batch_error_matches_standalone(mcp, stub_service: StubService
 
 
 async def test_f12_batch_items_carry_slim_meta(mcp) -> None:
-    # Same string twice (batch does not dedup): item 0 misses, item 1 hits cache.
+    # Same string twice: W2 dedup scores it once (item 0 misses upstream) and
+    # serves item 1 from the first result (cache == "deduped", no upstream call).
     res = await mcp.call_tool(
         "predict_splicing_batch",
         {"variants": ["8-140300616-T-G", "8-140300616-T-G"]},
@@ -170,9 +171,10 @@ async def test_f12_batch_items_carry_slim_meta(mcp) -> None:
     data = structured(res)
     first, second = data["results"][0], data["results"][1]
     assert first["_meta"]["cache"] == "miss"
-    assert second["_meta"]["cache"] == "hit"
+    assert second["_meta"]["cache"] == "deduped"
+    assert second["_meta"]["served_from"] == "8-140300616-T-G"
     assert first["_meta"]["upstream_elapsed_ms"] is not None
-    # Cache hit has no upstream call -> field omitted, not null (omit-when-null).
+    # Deduped copy made no upstream call -> field omitted, not null (omit-when-null).
     assert "upstream_elapsed_ms" not in second["_meta"]
     # Slim only: the verbose fields stay out of per-item _meta.
     assert "gene" not in first["_meta"]

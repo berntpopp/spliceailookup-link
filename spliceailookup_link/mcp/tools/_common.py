@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from spliceailookup_link.api import DataNotFoundError
-from spliceailookup_link.config import GenomeBuild
+from spliceailookup_link.api import DataNotFoundError, SpliceApiError
+from spliceailookup_link.config import GenomeBuild, settings
 from spliceailookup_link.mcp.build_check import detect_build_mismatch
 from spliceailookup_link.mcp.errors import AmbiguousVariantError, BuildMismatchError
 from spliceailookup_link.services import SpliceService
@@ -17,6 +18,31 @@ _MASK_TO_INT = {"raw": 0, "masked": 1}
 
 def mask_to_int(mask: str) -> int:
     return _MASK_TO_INT.get(mask, 0)
+
+
+def running_as_task(ctx: Any) -> bool:
+    return bool(ctx is not None and getattr(ctx, "is_background_task", False))
+
+
+async def run_with_deadline(coro: Any, *, ctx: Any, enforce: bool = True) -> Any:
+    """Await `coro` under the foreground soft deadline, or directly when bypassed.
+
+    The deadline is bypassed when running as a background task, when `enforce`
+    is False (e.g. a batch item whose parent batch is a background task), or when
+    PREDICT_SOFT_DEADLINE_SECONDS is 0. On timeout, raises SpliceApiError, which
+    the error layer classifies as a retryable upstream_unavailable.
+    """
+    deadline = settings.PREDICT_SOFT_DEADLINE_SECONDS
+    bypass = not enforce or running_as_task(ctx)
+    if deadline and not bypass:
+        try:
+            return await asyncio.wait_for(coro, timeout=deadline)
+        except TimeoutError as exc:
+            raise SpliceApiError(
+                f"Scoring exceeded the server's {deadline}s deadline "
+                "(comprehensive gene_set and/or a large max_distance are slow)."
+            ) from exc
+    return await coro
 
 
 @dataclass

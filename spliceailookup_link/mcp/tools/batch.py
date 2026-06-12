@@ -10,6 +10,7 @@ from pydantic import Field
 
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, mcp_tool_error, run_mcp_tool
+from spliceailookup_link.mcp.tools._common import running_as_task
 from spliceailookup_link.mcp.tools._predict import predict_one
 from spliceailookup_link.services import SpliceService
 
@@ -63,6 +64,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
             results: list[dict[str, Any]] = []
             ok = failed = 0
             total = len(variants)
+            enforce_item_deadline = not running_as_task(ctx)
             for idx, variant in enumerate(variants):
                 try:
                     one = await predict_one(
@@ -75,6 +77,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                         transcripts=transcripts,
                         response_mode=response_mode,
                         cross_build_check=cross_build_check,
+                        enforce_deadline=enforce_item_deadline,
                     )
                     tele = one.pop("_telemetry")
                     one["variant"] = variant

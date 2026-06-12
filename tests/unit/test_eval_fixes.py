@@ -210,6 +210,25 @@ async def test_capabilities_version_echoed_on_error(mcp, stub_service) -> None:
     assert data["_meta"]["capabilities_version"] == get_capabilities_version()
 
 
+async def test_spliceai_soft_deadline_returns_upstream_unavailable(
+    mcp, stub_service, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "PREDICT_SOFT_DEADLINE_SECONDS", 1)
+
+    async def _slow_score(*args, **kwargs):
+        await asyncio.sleep(5)
+
+    monkeypatch.setattr(stub_service, "score", _slow_score)
+    data = structured(
+        await mcp.call_tool(
+            "predict_spliceai",
+            {"variant": "chr8-140300616-T-G", "gene_set": "comprehensive"},
+        )
+    )
+    assert data["error_code"] == "upstream_unavailable"
+    assert data["retryable"] is True
+
+
 async def test_soft_deadline_returns_upstream_unavailable(mcp, stub_service, monkeypatch) -> None:
     monkeypatch.setattr(settings, "PREDICT_SOFT_DEADLINE_SECONDS", 1)
 

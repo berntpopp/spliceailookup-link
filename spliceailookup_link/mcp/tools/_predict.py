@@ -11,8 +11,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Literal
 
-from spliceailookup_link.api import DataNotFoundError, SpliceApiError
-from spliceailookup_link.config import GenomeBuild, settings
+from spliceailookup_link.api import DataNotFoundError
+from spliceailookup_link.config import GenomeBuild
 from spliceailookup_link.mcp.shaping import (
     ResponseMode,
     Transcripts,
@@ -22,6 +22,7 @@ from spliceailookup_link.mcp.shaping import (
 from spliceailookup_link.mcp.tools._common import (
     mask_to_int,
     prepare_variant,
+    run_with_deadline,
 )
 from spliceailookup_link.mcp.tools._diagnose import diagnose_coordinate_failure
 from spliceailookup_link.mcp.tools._predict_shape import (
@@ -32,11 +33,6 @@ from spliceailookup_link.mcp.tools._predict_shape import (
 )
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.services.telemetry import CallTelemetry
-
-
-def _running_as_task(ctx: Any) -> bool:
-    return bool(ctx is not None and getattr(ctx, "is_background_task", False))
-
 
 _IDENTITY_KEYS = (
     "gene",
@@ -94,6 +90,7 @@ async def predict_one(
     response_mode: ResponseMode,
     cross_build_check: bool = True,
     ctx: Any = None,
+    enforce_deadline: bool = True,
 ) -> dict[str, Any]:
     if ctx is not None:
         await ctx.report_progress(progress=0, total=3, message="resolving variant")
@@ -109,22 +106,17 @@ async def predict_one(
     }
     if ctx is not None:
         await ctx.report_progress(progress=1, total=3, message="scoring SpliceAI + Pangolin")
-    deadline = settings.PREDICT_SOFT_DEADLINE_SECONDS
-    gather_coro = asyncio.gather(
-        service.score(model="spliceai", **common),
-        service.score(model="pangolin", **common),
-        return_exceptions=True,
+    gathered: list[Any] = list(
+        await run_with_deadline(
+            asyncio.gather(
+                service.score(model="spliceai", **common),
+                service.score(model="pangolin", **common),
+                return_exceptions=True,
+            ),
+            ctx=ctx,
+            enforce=enforce_deadline,
+        )
     )
-    if deadline and not _running_as_task(ctx):
-        try:
-            gathered: list[Any] = list(await asyncio.wait_for(gather_coro, timeout=deadline))
-        except TimeoutError as exc:
-            raise SpliceApiError(
-                f"Scoring exceeded the server's {deadline}s deadline "
-                "(comprehensive gene_set and/or a large max_distance are slow)."
-            ) from exc
-    else:
-        gathered = list(await gather_coro)
     sai_res, pang_res = gathered[0], gathered[1]
     if isinstance(sai_res, BaseException) and isinstance(pang_res, BaseException):
         if (

@@ -16,6 +16,7 @@ from spliceailookup_link.mcp.shaping import shape_spliceai
 from spliceailookup_link.mcp.tools._common import (
     mask_to_int,
     prepare_variant,
+    run_with_deadline,
     see_also_for,
 )
 from spliceailookup_link.mcp.tools._diagnose import diagnose_coordinate_failure
@@ -84,15 +85,18 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             if ctx is not None:
                 await ctx.report_progress(progress=1, total=2, message="scoring")
             try:
-                payload, tele = await service.score(
-                    model="spliceai",
-                    build=prepared.genome_build,
-                    variant_id=prepared.variant_id,
-                    distance=max_distance,
-                    mask=mask_to_int(mask),
-                    gene_set=gene_set,
-                    raw=variant,
-                    consequence=prepared.consequence,
+                payload, tele = await run_with_deadline(
+                    service.score(
+                        model="spliceai",
+                        build=prepared.genome_build,
+                        variant_id=prepared.variant_id,
+                        distance=max_distance,
+                        mask=mask_to_int(mask),
+                        gene_set=gene_set,
+                        raw=variant,
+                        consequence=prepared.consequence,
+                    ),
+                    ctx=ctx,
                 )
             except DataNotFoundError:
                 if cross_build_check and prepared.resolution is None:

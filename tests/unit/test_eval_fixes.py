@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 
+from spliceailookup_link.config import settings
 from tests.conftest import StubService, structured
 
 _COORD = re.compile(r"^[\dXYM]+-\d+-[ACGT]+-[ACGT]+$")
@@ -192,3 +194,21 @@ async def test_capabilities_version_echoed_on_error(mcp, stub_service) -> None:
     data = structured(await mcp.call_tool("predict_splicing", {"variant": "not a variant!!"}))
     assert data["error_code"] == "invalid_input"
     assert data["_meta"]["capabilities_version"] == get_capabilities_version()
+
+
+async def test_soft_deadline_returns_upstream_unavailable(mcp, stub_service, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "PREDICT_SOFT_DEADLINE_SECONDS", 1)
+
+    async def _slow_score(*args, **kwargs):
+        await asyncio.sleep(5)
+
+    monkeypatch.setattr(stub_service, "score", _slow_score)
+    data = structured(
+        await mcp.call_tool(
+            "predict_splicing",
+            {"variant": "chr8-140300616-T-G", "gene_set": "comprehensive"},
+        )
+    )
+    assert data["error_code"] == "upstream_unavailable"
+    assert data["retryable"] is True
+    assert "task" in data["recovery"].lower()

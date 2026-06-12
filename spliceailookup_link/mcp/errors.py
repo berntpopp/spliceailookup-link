@@ -201,9 +201,11 @@ def _recovery_text(error_code: str, fallback_tool: str | None) -> str:
         )
     if error_code == "upstream_unavailable":
         return (
-            "The scoring service failed transiently (or a comprehensive + large-distance call "
-            "timed out with a 503). Safe to retry with backoff; consider gene_set='basic' or a "
-            "smaller max_distance."
+            "The scoring service failed transiently, or the call exceeded the server's "
+            "soft deadline (comprehensive gene_set and/or a large max_distance are slow "
+            "and may 503 upstream). Retry with backoff using gene_set='basic' or a smaller "
+            "max_distance, or resubmit as a background task (task=...), which is not bound by "
+            "the deadline."
         )
     if error_code == "validation_failed":
         return "Inputs failed validation. Check the tool schema and call get_server_capabilities."

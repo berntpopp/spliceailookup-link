@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     QUEUE_WAIT_TIMEOUT: int = 30
     MAX_RETRIES: int = 3
 
+    # Foreground prediction soft deadline (seconds). A comprehensive gene_set with a
+    # large max_distance can exceed the client's MCP timeout; this returns a
+    # structured upstream_unavailable before the client gives up. Set 0 to disable.
+    # Background Tasks (ctx.is_background_task) bypass this deadline.
+    PREDICT_SOFT_DEADLINE_SECONDS: int = 55
+
     # In-process cache. Scores are deterministic per (model, build, variant,
     # distance, mask, gene_set), so a long TTL is safe and dramatically reduces
     # load on the rate-limited upstream.

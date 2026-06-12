@@ -90,3 +90,9 @@ def test_get_server_logger_tags_transport() -> None:
     logger = get_server_logger("unified")
     msg, _ = logger.process("hello", {})
     assert msg == "[unified] hello"
+
+
+def test_predict_soft_deadline_default() -> None:
+    from spliceailookup_link.config import Settings
+
+    assert Settings().PREDICT_SOFT_DEADLINE_SECONDS == 55

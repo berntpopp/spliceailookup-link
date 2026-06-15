@@ -19,11 +19,7 @@ import sys
 from pathlib import Path
 
 DEFAULT_LIMIT = 600
-DEFAULT_TARGETS = (
-    Path("spliceailookup_link"),
-    Path("server.py"),
-    Path("mcp_server.py"),
-)
+DEFAULT_TARGETS = (Path("spliceailookup_link"),)
 ALLOWLIST_PATH = Path(".loc-allowlist")
 
 

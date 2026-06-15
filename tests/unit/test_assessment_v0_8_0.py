@@ -296,7 +296,10 @@ def test_capabilities_document_v0_9_contract() -> None:
     assert "out of range" in ref or "exceeds the chromosome length" in ref
 
 
-def test_version_is_1_0_0() -> None:
+def test_version_matches_package_metadata() -> None:
+    import importlib.metadata
+
     from spliceailookup_link import __version__
 
-    assert __version__ == "1.0.0"
+    assert __version__ == "2.0.0"
+    assert importlib.metadata.version("spliceailookup-link") == __version__

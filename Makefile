@@ -1,4 +1,4 @@
-.PHONY: help install lock upgrade sync format format-check lint lint-ci lint-fix lint-loc typecheck typecheck-fresh test test-fast test-unit test-integration test-cov test-all check ci-local precommit clean dev mcp-serve mcp-serve-http run-prod docker-build docker-up docker-down docker-logs
+.PHONY: help install lock upgrade sync format format-check lint lint-ci lint-fix lint-loc typecheck typecheck-fresh test test-fast test-unit test-integration test-cov test-all check ci-local precommit clean dev serve-http run-prod docker-build docker-up docker-down docker-logs
 
 .DEFAULT_GOAL := help
 
@@ -21,29 +21,29 @@ upgrade: ## Upgrade locked dependencies
 	uv lock --upgrade
 
 format: ## Format Python code
-	uv run ruff format $(PKG) tests server.py mcp_server.py
+	uv run ruff format $(PKG) tests
 
 format-check: ## Check formatting without writing
-	uv run ruff format --check $(PKG) tests server.py mcp_server.py
+	uv run ruff format --check $(PKG) tests
 
 lint: ## Lint Python code
-	uv run ruff check $(PKG) tests server.py mcp_server.py
+	uv run ruff check $(PKG) tests
 
 lint-ci: ## Lint Python code without modifying files
-	uv run ruff check $(PKG) tests server.py mcp_server.py --output-format=github
+	uv run ruff check $(PKG) tests --output-format=github
 
 lint-fix: ## Lint and apply safe fixes
-	uv run ruff check $(PKG) tests server.py mcp_server.py --fix
+	uv run ruff check $(PKG) tests --fix
 
 lint-loc: ## Enforce per-file line budget (see AGENTS.md "File Size Discipline")
 	uv run python scripts/check_file_size.py
 
 typecheck: ## Type check package
-	uv run mypy $(PKG) server.py mcp_server.py
+	uv run mypy $(PKG)
 
 typecheck-fresh: ## Clear mypy cache and run typecheck
 	rm -rf .mypy_cache
-	uv run mypy $(PKG) server.py mcp_server.py
+	uv run mypy $(PKG)
 
 test: ## Run deterministic unit tests quickly
 	uv run pytest tests/unit -q
@@ -72,15 +72,12 @@ clean: ## Remove local caches and generated reports
 	rm -rf .pytest_cache .ruff_cache .mypy_cache htmlcov .coverage coverage.xml
 
 dev: ## Run FastAPI host (/health) + mounted MCP HTTP locally
-	uv run python server.py --transport unified --host 127.0.0.1 --port 8603
+	uv run spliceailookup-link serve --transport unified --host 127.0.0.1 --port 8603 --dev
 
-mcp-serve: ## Start local stdio MCP server
-	uv run python mcp_server.py
+serve-http: dev ## Alias: FastAPI host (/health) + mounted MCP HTTP locally
 
-mcp-serve-http: dev ## Alias: FastAPI host (/health) + mounted MCP HTTP locally
-
-run-prod: ## Run production server with uvicorn
-	uv run python server.py --transport unified --host 0.0.0.0 --port 8603
+run-prod: ## Run production server (Streamable HTTP, all interfaces)
+	uv run spliceailookup-link serve --transport unified --host 0.0.0.0 --port 8603
 
 docker-build: ## Build Docker image
 	$(DOCKER_COMPOSE) -f docker/docker-compose.yml build

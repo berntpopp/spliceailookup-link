@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spliceailookup-link"
-version = "1.0.0"
+version = "2.0.0"
 description = "A unified server providing REST API and MCP interfaces for SpliceAI / Pangolin splice-impact prediction (Broad SpliceAI Lookup backends)."
 readme = "README.md"
 authors = [{ name = "Bernt Popp" }]
@@ -38,6 +38,7 @@ dependencies = [
     "mcp[cli]>=1.27.0,<2.0.0",
     "fastmcp[tasks]>=3.2.0,<4.0.0",
     "gunicorn>=25.3.0,<27.0.0",
+    "asgi-correlation-id>=4.3.0,<5.0.0",
 ]
 
 [dependency-groups]
@@ -54,8 +55,7 @@ dev = [
 ]
 
 [project.scripts]
-spliceailookup-link = "server:main"
-spliceailookup-link-mcp = "mcp_server:main"
+spliceailookup-link = "spliceailookup_link.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/berntpopp/spliceailookup-link"
@@ -64,10 +64,6 @@ Issues = "https://github.com/berntpopp/spliceailookup-link/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["spliceailookup_link"]
-include = [
-    "server.py",
-    "mcp_server.py",
-]
 
 [tool.ruff]
 line-length = 100
@@ -104,6 +100,7 @@ exclude = [".*site-packages.*", ".*/venv/.*", ".*/.venv/.*", "htmlcov/.*"]
 module = [
     "async_lru.*",
     "structlog.*",
+    "asgi_correlation_id.*",
     "mcp.*",
     "fastmcp.*",
     "fastapi.*",

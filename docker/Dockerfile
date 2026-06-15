@@ -53,7 +53,7 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /home/app/web
 
 COPY --chown=app:app ./spliceailookup_link ./spliceailookup_link
-COPY --chown=app:app ./server.py ./mcp_server.py ./pyproject.toml ./README.md ./
+COPY --chown=app:app ./pyproject.toml ./README.md ./
 
 RUN /opt/venv/bin/pip install -e . --no-deps
 
@@ -61,4 +61,4 @@ USER app
 
 EXPOSE 8603
 
-CMD ["spliceailookup-link", "--transport", "unified", "--host", "0.0.0.0", "--port", "8603"]
+CMD ["spliceailookup-link", "serve", "--transport", "unified", "--host", "0.0.0.0", "--port", "8603"]

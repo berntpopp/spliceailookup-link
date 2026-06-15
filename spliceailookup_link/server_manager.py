@@ -1,4 +1,8 @@
-"""Unified server manager for spliceailookup-link (unified / http / stdio transports)."""
+"""Unified server manager for spliceailookup-link (Streamable HTTP only).
+
+Runs a thin FastAPI host that exposes ``/health`` and mounts the MCP HTTP app at
+``/mcp``. There is no stdio transport — the fleet standard is Streamable HTTP.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +19,7 @@ from fastmcp import FastMCP
 
 from spliceailookup_link.config import ServerConfig, settings
 from spliceailookup_link.exceptions import ConfigurationError, MCPIntegrationError, StartupError
-from spliceailookup_link.logging_config import configure_logging, get_server_logger
+from spliceailookup_link.logging_config import bind_correlation_id_middleware, configure_logging
 from spliceailookup_link.mcp.facade import create_spliceai_mcp
 from spliceailookup_link.services import SpliceService
 
@@ -57,12 +61,13 @@ class UnifiedServerManager:
         app = FastAPI(
             title="spliceailookup-link MCP Host",
             description="Thin FastAPI host exposing /health and mounting the MCP HTTP app at /mcp.",
-            version="0.1.0",
+            version="2.0.0",
             lifespan=lifespan,
             docs_url=None,
             redoc_url=None,
             openapi_url=None,
         )
+        bind_correlation_id_middleware(app)
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origins_list,
@@ -113,8 +118,7 @@ class UnifiedServerManager:
     async def start_unified_server(self, config: ServerConfig) -> None:
         try:
             self._current_transport = "unified"
-            configure_logging("unified", config.log_level)
-            self.logger = get_server_logger("unified")
+            self.logger = configure_logging(config.log_level)
 
             self.app = await self._create_fastapi_app(config)
 
@@ -144,23 +148,8 @@ class UnifiedServerManager:
         except Exception as e:
             raise StartupError(f"Failed to start unified server: {e}", "unified") from e
 
-    async def start_stdio_server(self, config: ServerConfig) -> None:
-        try:
-            self._current_transport = "stdio"
-            configure_logging("stdio", config.log_level)
-            self.logger = get_server_logger("stdio")
-
-            service = self._create_service()
-            self.mcp = self._create_mcp_server(lambda: service)
-            # show_banner=False keeps stdout pristine for the JSON-RPC framing.
-            await self.mcp.run_async(transport="stdio", show_banner=False)
-        except Exception as e:
-            raise StartupError(f"Failed to start STDIO server: {e}", "stdio") from e
-
     async def start_server(self, config: ServerConfig) -> None:
         if config.transport in {"unified", "http"}:
             await self.start_unified_server(config)
-        elif config.transport == "stdio":
-            await self.start_stdio_server(config)
         else:
             raise ConfigurationError(f"Unknown transport: {config.transport}")

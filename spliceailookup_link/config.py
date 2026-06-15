@@ -16,7 +16,7 @@ _BUILD_TO_HG = {"GRCh37": "37", "GRCh38": "38"}
 class ServerConfig:
     """Transport-level server configuration."""
 
-    transport: Literal["unified", "http", "stdio"] = "unified"
+    transport: Literal["unified", "http"] = "unified"
     host: str = "127.0.0.1"
     port: int = 8603
     mcp_path: str = "/mcp"
@@ -97,16 +97,16 @@ class Settings(BaseSettings):
     # correct for the single-process unified host; set redis://... for multi-worker.
     DOCKET_URL: str = "memory://"
 
-    # Transport
-    MCP_TRANSPORT: Literal["unified", "http", "stdio"] = "unified"
+    # Transport (Streamable HTTP only; no stdio)
+    MCP_TRANSPORT: Literal["unified", "http"] = "unified"
     MCP_HOST: str = "127.0.0.1"
     MCP_PORT: int = 8603
     MCP_PATH: str = "/mcp"
 
     # Logging
     LOG_LEVEL: str = "INFO"
-    MCP_LOG_LEVEL: str = "INFO"
-    STDIO_LOG_LEVEL: str = "WARNING"
+    # Render structlog as JSON in production or a human-friendly console in dev.
+    LOG_FORMAT: Literal["json", "console"] = "json"
 
     # Server
     CORS_ORIGINS: str = "*"

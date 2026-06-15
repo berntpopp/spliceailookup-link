@@ -47,7 +47,7 @@ discovery, and a research-use disclaimer.
 uv sync --group dev          # install
 cp .env.example .env         # optional: override hosts / limits
 make dev                     # FastAPI /health + MCP HTTP at http://127.0.0.1:8603/mcp
-make mcp-serve               # stdio MCP server (for Claude Desktop)
+# equivalently: uv run spliceailookup-link serve --transport unified --port 8603
 ```
 
 ## MCP integration
@@ -75,20 +75,8 @@ make dev   # serves http://127.0.0.1:8603/mcp
 claude mcp add --transport http spliceailookup-link http://127.0.0.1:8603/mcp
 ```
 
-stdio (Claude Desktop, no network):
-
-```json
-{
-  "mcpServers": {
-    "spliceailookup-link": {
-      "command": "spliceailookup-link-mcp",
-      "env": { "PYTHONUNBUFFERED": "1", "SPLICEAILOOKUP_LINK_LOG_LEVEL": "WARNING" }
-    }
-  }
-}
-```
-
-> TLS is terminated at your proxy (nginx / Caddy / npm); the app itself serves plain
+> Streamable HTTP is the only transport — there is no stdio entry point. TLS is
+> terminated at your proxy (nginx / Caddy / npm); the app itself serves plain
 > HTTP on its port, exactly like the sibling `-link` deployments.
 
 ## Example
@@ -138,6 +126,21 @@ Background tasks use FastMCP's Docket backend. `DOCKET_URL` defaults to
 `memory://` (in-process, correct for the single-process unified host); set
 `SPLICEAILOOKUP_LINK_DOCKET_URL=redis://…` (or the FastMCP-native
 `FASTMCP_DOCKET_URL`) for a multi-worker deployment.
+
+## CLI
+
+A single `typer` console script (`spliceailookup-link`) with `rich` output:
+
+```bash
+spliceailookup-link serve --transport unified --host 127.0.0.1 --port 8603
+spliceailookup-link config --validate     # show + validate resolved configuration
+spliceailookup-link health --url http://127.0.0.1:8603   # probe /health
+spliceailookup-link version
+```
+
+`--transport` accepts `unified` or `http` (Streamable HTTP only — there is no
+stdio transport). Logging is `structlog`: set `SPLICEAILOOKUP_LINK_LOG_FORMAT`
+to `json` (default, production) or `console` (dev; also enabled by `--dev`).
 
 ## Development
 

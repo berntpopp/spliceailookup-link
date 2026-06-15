@@ -39,9 +39,9 @@ _INSTRUCTIONS = (
 def create_spliceai_mcp(*, service_factory: Callable[[], SpliceService]) -> FastMCP:
     """Build the spliceailookup-link MCP server.
 
-    `service_factory` is a lazy callable so HTTP mode can defer to
-    `app.state.splice_service` and stdio mode can hold a directly constructed
-    instance.
+    `service_factory` is a lazy callable so the HTTP host can defer to
+    `app.state.splice_service` (constructed in the FastAPI lifespan) rather than
+    building the service eagerly at import time.
     """
     # Per-tool `task=True` (on the async prediction tools) opts those tools into the
     # 2025-11-25 background-task protocol via Docket. We deliberately do NOT set a

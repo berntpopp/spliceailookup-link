@@ -13,7 +13,7 @@ from tests.fixtures.api_responses import SPLICEAI_MASKED_EMPTY_ABERR, SPLICEAI_T
 async def test_preflight_ref_mismatch_skips_scoring(mcp, stub_service: StubService) -> None:
     # D2: a wrong REF is rejected as ref_mismatch BEFORE any scoring call.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
-    res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-A-G"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-A-G"})
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "ref_mismatch"
@@ -26,7 +26,7 @@ async def test_preflight_ref_typo_matching_other_build_is_ref_mismatch(
     # D1: the exact assessment case chr8-140300616-C-A. REF matches GRCh37 base,
     # but it is reported as ref_mismatch (with a secondary hint), NOT build_mismatch.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
-    res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-C-A"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-C-A"})
     data = structured(res)
     assert data["error_code"] == "ref_mismatch"
     assert data["other_build_hint"]["build"] == "GRCh37"
@@ -35,7 +35,7 @@ async def test_preflight_ref_typo_matching_other_build_is_ref_mismatch(
 
 async def test_preflight_proceeds_when_ref_matches(mcp, stub_service: StubService) -> None:
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "T"}  # REF 'T' matches
-    res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"})
     data = structured(res)
     assert data["success"] is True
     assert stub_service.score_calls  # scoring proceeded
@@ -43,7 +43,7 @@ async def test_preflight_proceeds_when_ref_matches(mcp, stub_service: StubServic
 
 async def test_preflight_proceeds_when_ensembl_unavailable(mcp, stub_service: StubService) -> None:
     stub_service.ref_bases = {}  # reference_base returns None -> inconclusive
-    res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-A-G"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-A-G"})
     data = structured(res)
     assert data["success"] is True  # never regress; scoring proceeds
     assert stub_service.score_calls
@@ -53,7 +53,7 @@ async def test_preflight_proceeds_when_ensembl_unavailable(mcp, stub_service: St
 
 
 async def test_resolve_ambiguous_nulls_singular_id(mcp) -> None:
-    res = await mcp.call_tool("resolve_variant", {"variant": "rs6025"})
+    res = await mcp.call_tool("resolve_variant", {"variant_id": "rs6025"})
     data = structured(res)
     assert data["ambiguous"] is True
     assert data["variant_id"] is None  # cannot silently pick one allele
@@ -67,7 +67,7 @@ async def test_resolve_ambiguous_nulls_singular_id(mcp) -> None:
 
 
 async def test_meta_full_provenance_in_compact(mcp) -> None:
-    res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"})
     meta = structured(res)["_meta"]
     assert "capabilities_version" in meta
     assert meta["unsafe_for_clinical_use"] is True
@@ -76,7 +76,7 @@ async def test_meta_full_provenance_in_compact(mcp) -> None:
 
 async def test_meta_trimmed_when_hints_off(mcp) -> None:
     res = await mcp.call_tool(
-        "predict_spliceai", {"variant": "8-140300616-T-G", "include_hints": False}
+        "predict_spliceai", {"variant_id": "8-140300616-T-G", "include_hints": False}
     )
     meta = structured(res)["_meta"]
     # Bulky/redundant provenance dropped on the lean path...
@@ -94,7 +94,7 @@ async def test_meta_trimmed_when_hints_off(mcp) -> None:
 
 async def test_meta_trimmed_in_minimal_mode(mcp) -> None:
     res = await mcp.call_tool(
-        "predict_splicing", {"variant": "8-140300616-T-G", "response_mode": "minimal"}
+        "predict_splicing", {"variant_id": "8-140300616-T-G", "response_mode": "minimal"}
     )
     meta = structured(res)["_meta"]
     assert "capabilities_version" not in meta
@@ -102,8 +102,8 @@ async def test_meta_trimmed_in_minimal_mode(mcp) -> None:
 
 
 async def test_served_warm_true_on_cache_hit(mcp, stub_service: StubService) -> None:
-    await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})  # warms cache
-    res = await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"})
+    await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"})  # warms cache
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"})
     assert structured(res)["_meta"]["served_warm"] is True
 
 
@@ -132,7 +132,7 @@ def test_transcript_info_tx_bounds_filled_when_null() -> None:
 
 async def test_batch_envelope_self_describes_size_contract(mcp) -> None:
     res = await mcp.call_tool(
-        "predict_splicing_batch", {"variants": ["8-140300616-T-G", "8-140300616-T-G"]}
+        "predict_splicing_batch", {"variant_ids": ["8-140300616-T-G", "8-140300616-T-G"]}
     )
     meta = structured(res)["_meta"]
     assert meta["items_submitted"] == 2
@@ -140,14 +140,14 @@ async def test_batch_envelope_self_describes_size_contract(mcp) -> None:
 
 
 async def test_batch_rejects_over_cap(mcp) -> None:
-    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["8-140300616-T-G"] * 26})
+    res = await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["8-140300616-T-G"] * 26})
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "validation_failed"
 
 
 async def test_batch_item_meta_has_served_warm(mcp) -> None:
-    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["8-140300616-T-G"]})
+    res = await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["8-140300616-T-G"]})
     item = structured(res)["results"][0]
     assert "served_warm" in item["_meta"]
 
@@ -172,7 +172,7 @@ async def test_comprehensive_503_maps_to_upstream_unavailable(
     stub_service.score_error = SpliceApiError("Upstream HTTP 503")
     res = await mcp.call_tool(
         "predict_splicing",
-        {"variant": "8-140300616-T-G", "gene_set": "comprehensive"},
+        {"variant_id": "8-140300616-T-G", "gene_set": "comprehensive"},
     )
     data = structured(res)
     assert data["success"] is False
@@ -182,7 +182,7 @@ async def test_comprehensive_503_maps_to_upstream_unavailable(
 
 async def test_rate_limited_reports_rate_budget(mcp, stub_service: StubService) -> None:
     stub_service.score_error = RateLimitedError("Local concurrency limit saturated")
-    res = await mcp.call_tool("predict_splicing", {"variant": "8-140300616-T-G"})
+    res = await mcp.call_tool("predict_splicing", {"variant_id": "8-140300616-T-G"})
     data = structured(res)
     assert data["error_code"] == "rate_limited"
     budget = data["_meta"]["rate_budget"]
@@ -193,7 +193,7 @@ async def test_rate_limited_reports_rate_budget(mcp, stub_service: StubService) 
 
 async def test_batch_per_item_rate_budget(mcp, stub_service: StubService) -> None:
     stub_service.score_error = RateLimitedError("saturated")
-    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["8-140300616-T-G"]})
+    res = await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["8-140300616-T-G"]})
     item = structured(res)["results"][0]
     assert item["error_code"] == "rate_limited"
     assert item["rate_budget"]["unit"] == "concurrent_requests"

@@ -111,9 +111,9 @@ def test_ambiguous_lists_alleles_and_per_allele_next_commands() -> None:
     cmds = env["_meta"]["next_commands"]
     assert cmds[0] == {
         "tool": "predict_splicing",
-        "arguments": {"variant": "1-169549811-C-A", "genome_build": "GRCh38"},
+        "arguments": {"variant_id": "1-169549811-C-A", "genome_build": "GRCh38"},
     }
-    assert cmds[1]["arguments"]["variant"] == "1-169549811-C-T"
+    assert cmds[1]["arguments"]["variant_id"] == "1-169549811-C-T"
 
 
 def test_ref_mismatch_classifies_and_routes_to_capabilities() -> None:

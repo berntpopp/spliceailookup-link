@@ -49,7 +49,7 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
         output_schema=_OUTPUT_SCHEMA,
     )
     async def resolve_variant(
-        variant: Annotated[
+        variant_id: Annotated[
             str,
             Field(
                 min_length=1,
@@ -84,7 +84,7 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
 
         async def call() -> dict[str, Any]:
             service = service_factory()
-            result = await service.resolve(variant, genome_build)
+            result = await service.resolve(variant_id, genome_build)
             # All candidates of an ambiguous result share a locus, so the contig
             # check on the first id is representative (and never None).
             ids = result.get("variant_ids") or [result["variant_id"]]
@@ -139,8 +139,8 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
             call,
             context=McpErrorContext(
                 tool_name="resolve_variant",
-                variant=variant,
+                variant=variant_id,
                 genome_build=genome_build,
-                query=variant,
+                query=variant_id,
             ),
         )

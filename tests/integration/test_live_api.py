@@ -27,7 +27,7 @@ async def live_mcp():
 
 async def test_resolve_hgvs_abca3(live_mcp) -> None:
     res = await live_mcp.call_tool(
-        "resolve_variant", {"variant": "NM_001089.3(ABCA3):c.875A>T", "genome_build": "GRCh38"}
+        "resolve_variant", {"variant_id": "NM_001089.3(ABCA3):c.875A>T", "genome_build": "GRCh38"}
     )
     data = structured(res)
     assert data["variant_id"] == "16-2317763-T-A"
@@ -36,7 +36,7 @@ async def test_resolve_hgvs_abca3(live_mcp) -> None:
 
 async def test_predict_splicing_trappc9(live_mcp) -> None:
     res = await live_mcp.call_tool(
-        "predict_splicing", {"variant": "chr8-140300616-T-G", "genome_build": "GRCh38"}
+        "predict_splicing", {"variant_id": "chr8-140300616-T-G", "genome_build": "GRCh38"}
     )
     data = structured(res)
     assert data["success"] is True
@@ -48,7 +48,7 @@ async def test_predict_splicing_trappc9(live_mcp) -> None:
 
 async def test_whitespace_delimited_example(live_mcp) -> None:
     res = await live_mcp.call_tool(
-        "predict_spliceai", {"variant": "6   31740453   G   T", "genome_build": "GRCh38"}
+        "predict_spliceai", {"variant_id": "6   31740453   G   T", "genome_build": "GRCh38"}
     )
     data = structured(res)
     assert data["success"] is True

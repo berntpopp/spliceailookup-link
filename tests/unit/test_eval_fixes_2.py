@@ -9,25 +9,25 @@ from tests.conftest import structured
 
 async def test_f6_headline_matches_verdict_concordant_high(mcp) -> None:
     # Stub returns SpliceAI 0.83 / Pangolin 0.85 -> concordant_high.
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"}))
     assert data["agreement"]["verdict"] == "concordant_high"
     assert "models agree" in data["headline"]
     assert "models disagree" not in data["headline"]
 
 
 async def test_interpretation_band_on_combined(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"}))
     assert data["interpretation"]["band"] == "high"
     # F6: the static threshold_basis glossary is full-only now; the band stays in compact.
     assert "threshold_basis" not in data["interpretation"]
 
 
 async def test_cache_ttl_and_age_in_meta(mcp) -> None:
-    first = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    first = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"}))
     assert first["_meta"]["cache"] == "miss"
     assert first["_meta"]["cache_ttl_s"] == 86400
     assert "cache_age_s" not in first["_meta"]
-    second = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    second = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"}))
     assert second["_meta"]["cache"] == "hit"
     assert second["_meta"]["cache_age_s"] == 0
     assert second["_meta"]["cache_ttl_s"] == 86400
@@ -36,12 +36,12 @@ async def test_cache_ttl_and_age_in_meta(mcp) -> None:
 async def test_f8_combined_minimal_is_headline_tier(mcp) -> None:
     full = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "compact"}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "response_mode": "compact"}
         )
     )
     minimal = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "minimal"}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "response_mode": "minimal"}
         )
     )
     assert len(json.dumps(minimal)) < len(json.dumps(full))
@@ -58,7 +58,7 @@ async def test_f8_combined_minimal_is_headline_tier(mcp) -> None:
 async def test_f9_validation_failed_has_request_id_and_timing(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_spliceai", {"variant": "8-140300616-T-G", "max_distance": 20000}
+            "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 20000}
         )
     )
     assert data["success"] is False
@@ -101,7 +101,7 @@ async def test_capabilities_documents_new_contracts(mcp) -> None:
 async def test_g1_see_also_includes_uniprot_full(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_spliceai", {"variant": "8-140300616-T-G", "response_mode": "full"}
+            "predict_spliceai", {"variant_id": "8-140300616-T-G", "response_mode": "full"}
         )
     )
     servers = {h["server"] for h in data["_meta"]["see_also"]}
@@ -112,7 +112,7 @@ async def test_g1_see_also_includes_uniprot_full(mcp) -> None:
 
 
 async def test_g1_see_also_uniprot_collapsed_in_compact(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"}))
     servers = {h["server"] for h in data["_meta"]["see_also"]}
     assert "uniprot-link" in servers
     uni = next(h for h in data["_meta"]["see_also"] if h["server"] == "uniprot-link")
@@ -124,21 +124,21 @@ async def test_g1_see_also_uniprot_collapsed_in_compact(mcp) -> None:
 
 async def test_g2_combined_molecular_consequence_and_headline(mcp) -> None:
     data = structured(
-        await mcp.call_tool("predict_splicing", {"variant": "NM_001089.3(ABCA3):c.875A>T"})
+        await mcp.call_tool("predict_splicing", {"variant_id": "NM_001089.3(ABCA3):c.875A>T"})
     )
     assert data["molecular_consequence"] == "missense_variant"
     assert "missense variant" in data["headline"]
 
 
 async def test_g2_coordinate_has_no_molecular_consequence(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"}))
     assert "molecular_consequence" not in data
     assert "missense variant" not in data["headline"]
 
 
 async def test_g2_single_model_molecular_consequence_field(mcp) -> None:
     data = structured(
-        await mcp.call_tool("predict_spliceai", {"variant": "NM_001089.3(ABCA3):c.875A>T"})
+        await mcp.call_tool("predict_spliceai", {"variant_id": "NM_001089.3(ABCA3):c.875A>T"})
     )
     assert data["molecular_consequence"] == "missense_variant"
 
@@ -147,7 +147,7 @@ async def test_g2_combined_minimal_keeps_molecular_consequence(mcp) -> None:
     data = structured(
         await mcp.call_tool(
             "predict_splicing",
-            {"variant": "NM_001089.3(ABCA3):c.875A>T", "response_mode": "minimal"},
+            {"variant_id": "NM_001089.3(ABCA3):c.875A>T", "response_mode": "minimal"},
         )
     )
     assert data["molecular_consequence"] == "missense_variant"
@@ -169,7 +169,7 @@ async def test_capabilities_documents_uniprot_and_molecular_consequence(mcp) -> 
 async def test_minimal_single_model_does_not_crash(mcp) -> None:
     for tool in ("predict_spliceai", "predict_pangolin"):
         data = structured(
-            await mcp.call_tool(tool, {"variant": "8-140300616-T-G", "response_mode": "minimal"})
+            await mcp.call_tool(tool, {"variant_id": "8-140300616-T-G", "response_mode": "minimal"})
         )
         assert data.get("success") is True
         assert "error_code" not in data
@@ -183,7 +183,7 @@ async def test_minimal_single_model_does_not_crash(mcp) -> None:
 async def test_f9_validation_envelope_carries_provenance(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_spliceai", {"variant": "8-140300616-T-G", "max_distance": 20000}
+            "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 20000}
         )
     )
     assert data["error_code"] == "validation_failed"

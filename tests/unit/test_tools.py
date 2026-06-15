@@ -16,7 +16,7 @@ async def test_capabilities_lists_tools(mcp) -> None:
 
 
 async def test_resolve_coordinate_no_upstream(mcp, stub_service: StubService) -> None:
-    res = await mcp.call_tool("resolve_variant", {"variant": "chr8-140300616-T-G"})
+    res = await mcp.call_tool("resolve_variant", {"variant_id": "chr8-140300616-T-G"})
     data = structured(res)
     assert data["variant_id"] == "8-140300616-T-G"
     assert data["input_kind"] == "coordinate"
@@ -24,7 +24,7 @@ async def test_resolve_coordinate_no_upstream(mcp, stub_service: StubService) ->
 
 
 async def test_resolve_hgvs(mcp) -> None:
-    res = await mcp.call_tool("resolve_variant", {"variant": "NM_001089.3(ABCA3):c.875A>T"})
+    res = await mcp.call_tool("resolve_variant", {"variant_id": "NM_001089.3(ABCA3):c.875A>T"})
     data = structured(res)
     assert data["variant_id"] == "16-2317763-T-A"
     assert data["gene_symbol"] == "ABCA3"
@@ -32,7 +32,7 @@ async def test_resolve_hgvs(mcp) -> None:
 
 
 async def test_predict_spliceai_success(mcp, stub_service: StubService) -> None:
-    res = await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-T-G"})
     data = structured(res)
     assert data["success"] is True
     assert data["max_delta_score"] == 0.83
@@ -45,7 +45,7 @@ async def test_predict_spliceai_success(mcp, stub_service: StubService) -> None:
 
 
 async def test_predict_spliceai_auto_resolves_hgvs(mcp, stub_service: StubService) -> None:
-    res = await mcp.call_tool("predict_spliceai", {"variant": "NM_001089.3(ABCA3):c.875A>T"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "NM_001089.3(ABCA3):c.875A>T"})
     data = structured(res)
     assert data["success"] is True
     # HGVS was resolved before scoring.
@@ -54,14 +54,14 @@ async def test_predict_spliceai_auto_resolves_hgvs(mcp, stub_service: StubServic
 
 
 async def test_predict_pangolin_success(mcp) -> None:
-    res = await mcp.call_tool("predict_pangolin", {"variant": "8-140300616-T-G"})
+    res = await mcp.call_tool("predict_pangolin", {"variant_id": "8-140300616-T-G"})
     data = structured(res)
     assert data["model"] == "Pangolin"
     assert data["max_delta_score"] == 0.85
 
 
 async def test_predict_splicing_runs_both_models(mcp, stub_service: StubService) -> None:
-    res = await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"})
+    res = await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"})
     data = structured(res)
     assert data["success"] is True
     assert "spliceai" in data and "pangolin" in data
@@ -74,7 +74,7 @@ async def test_predict_splicing_runs_both_models(mcp, stub_service: StubService)
 
 async def test_predict_splicing_partial_when_pangolin_fails(mcp, stub_service: StubService) -> None:
     stub_service.pangolin_error = DataNotFoundError("pangolin glitch")
-    res = await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"})
+    res = await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"})
     data = structured(res)
     # SpliceAI still succeeds; the failure is surfaced under _meta.partial.
     assert data["success"] is True
@@ -85,7 +85,7 @@ async def test_predict_splicing_partial_when_pangolin_fails(mcp, stub_service: S
 
 async def test_predict_splicing_both_fail_returns_error(mcp, stub_service: StubService) -> None:
     stub_service.score_error = DataNotFoundError("no overlapping transcript")
-    res = await mcp.call_tool("predict_splicing", {"variant": "1-1-A-T"})
+    res = await mcp.call_tool("predict_splicing", {"variant_id": "1-1-A-T"})
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "not_found"
@@ -93,7 +93,7 @@ async def test_predict_splicing_both_fail_returns_error(mcp, stub_service: StubS
 
 async def test_predict_build_mismatch_short_circuits(mcp, stub_service: StubService) -> None:
     res = await mcp.call_tool(
-        "predict_spliceai", {"variant": "8-145500000-A-T", "genome_build": "GRCh38"}
+        "predict_spliceai", {"variant_id": "8-145500000-A-T", "genome_build": "GRCh38"}
     )
     data = structured(res)
     assert data["success"] is False
@@ -135,7 +135,7 @@ async def test_invalid_variant_returns_invalid_input(mcp, stub_service: StubServ
 
     stub_service.resolve_error = VariantParseError("bad")
     # predict_splicing with an unparseable coordinate-ish string -> parse error
-    res = await mcp.call_tool("predict_spliceai", {"variant": "totally invalid"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "totally invalid"})
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "invalid_input"
@@ -158,7 +158,7 @@ async def test_capabilities_tool_detail_lean(mcp) -> None:
 
 
 async def test_predict_chr99_is_unsupported_contig(mcp) -> None:
-    res = await mcp.call_tool("predict_spliceai", {"variant": "chr99-1000-A-G"})
+    res = await mcp.call_tool("predict_spliceai", {"variant_id": "chr99-1000-A-G"})
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "unsupported_contig"

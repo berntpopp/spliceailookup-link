@@ -94,9 +94,9 @@ stdio (Claude Desktop, no network):
 ## Example
 
 ```text
-predict_splicing(variant="NM_001089.3(ABCA3):c.875A>T", genome_build="GRCh38")
+predict_splicing(variant_id="NM_001089.3(ABCA3):c.875A>T", genome_build="GRCh38")
 # -> headline: "ABCA3 (GRCh38): SpliceAI Δ=0.02; Pangolin Δ=0.05; models agree."
-predict_splicing(variant="chr8-140300616-T-G")
+predict_splicing(variant_id="chr8-140300616-T-G")
 # -> headline: "TRAPPC9 (GRCh38): SpliceAI Δ=0.83; Pangolin Δ=0.85; models agree; predicted exon skipping."
 ```
 
@@ -111,6 +111,20 @@ predict_splicing(variant="chr8-140300616-T-G")
 | `predict_splicing` | Combined SpliceAI + Pangolin + consequence (headline tool) |
 | `predict_splicing_batch` | Score many variants (gene panel) in one envelope, fanned out server-side |
 | `warmup` | Pre-warm the upstream Cloud Run containers before a burst |
+
+Tool names follow the **GeneFoundry Tool-Naming & Normalization Standard v1**:
+leaf tools are unprefixed `verb_noun` snake_case, the variant identifier argument
+is the fleet-canonical `variant_id` (`variant_ids` for the batch tool), and
+`response_mode` uses the `minimal | compact | standard | full` ladder.
+
+## GeneFoundry router namespace
+
+`serverInfo.name` is the stable server identity **`spliceailookup-link`**. When
+federated behind the [`genefoundry-router`](https://github.com/berntpopp/genefoundry-router)
+gateway, this server is mounted under the namespace token **`spliceai`**
+(`mount(namespace="spliceai")`), so leaf tools surface at the gateway as
+`spliceai_<tool>` — e.g. `predict_splicing` → `spliceai_predict_splicing`. Leaf
+tools therefore stay unprefixed; the gateway adds the `spliceai_` prefix.
 
 ## Configuration
 

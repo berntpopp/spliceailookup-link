@@ -160,7 +160,7 @@ def _fallback_for(context: McpErrorContext) -> tuple[str, dict[str, Any] | None]
     if context.tool_name == "resolve_variant":
         return _FALLBACK_TOOL, None
     if context.tool_name in _PREDICTION_TOOLS and context.variant:
-        return "resolve_variant", {"variant": context.variant}
+        return "resolve_variant", {"variant_id": context.variant}
     return _FALLBACK_TOOL, None
 
 
@@ -175,12 +175,12 @@ def _ref_mismatch_fallback(
     """
     tool = context.tool_name if context.tool_name in _PREDICTION_TOOLS else "predict_splicing"
     if exc.other_build_hint:
-        return tool, {"variant": exc.variant_id, "genome_build": exc.other_build_hint["build"]}
+        return tool, {"variant_id": exc.variant_id, "genome_build": exc.other_build_hint["build"]}
     ref, alt, base = exc.observed_ref, exc.alt, exc.reference_base
     if ref and alt and base and len(ref) == len(alt) == len(base) and alt.upper() == base.upper():
         try:
             chrom, pos, r, a = exc.variant_id.split("-", 3)
-            return tool, {"variant": f"{chrom}-{pos}-{a}-{r}", "genome_build": exc.build}
+            return tool, {"variant_id": f"{chrom}-{pos}-{a}-{r}", "genome_build": exc.build}
         except ValueError:
             pass
     return _FALLBACK_TOOL, None
@@ -200,13 +200,13 @@ def _classify(
             "build_mismatch",
             False,
             context.tool_name,
-            {"variant": exc.variant_id, "genome_build": exc.inferred_build},
+            {"variant_id": exc.variant_id, "genome_build": exc.inferred_build},
         )
     if isinstance(exc, RefMismatchError):
         tool, args = _ref_mismatch_fallback(exc, context)
         return "ref_mismatch", False, tool, args
     if isinstance(exc, AmbiguousVariantError):
-        return "ambiguous", False, "resolve_variant", {"variant": exc.variant}
+        return "ambiguous", False, "resolve_variant", {"variant_id": exc.variant}
     if isinstance(exc, CoordinateRangeError):
         return "invalid_input", False, _FALLBACK_TOOL, None
     if isinstance(exc, DataNotFoundError):
@@ -438,7 +438,7 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
         build = context.genome_build or "GRCh38"
         payload["variant_ids"] = exc.candidates
         payload["_meta"]["next_commands"] = [
-            {"tool": "predict_splicing", "arguments": {"variant": c, "genome_build": build}}
+            {"tool": "predict_splicing", "arguments": {"variant_id": c, "genome_build": build}}
             for c in exc.candidates
         ] + payload["_meta"]["next_commands"]
     if isinstance(exc, RefMismatchError):

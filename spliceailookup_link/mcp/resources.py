@@ -84,7 +84,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             "predict_spliceai / predict_pangolin = ONE model only.",
         ],
         "parameters": {
-            "variant": "CHROM-POS-REF-ALT (chr optional), HGVS, or rsID. resolve_variant normalizes it.",
+            "variant_id": "CHROM-POS-REF-ALT (chr optional), HGVS, or rsID. resolve_variant normalizes it.",
             "genome_build": "GRCh37 or GRCh38 (default GRCh38).",
             "max_distance": (
                 "nt window scanned around the variant (1-10000, default 500). Larger = slower; "
@@ -97,7 +97,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             ),
             "gene_set": "'basic' (default, MANE/curated) or 'comprehensive' (all GENCODE; much slower).",
             "transcripts": "'mane' (default, MANE Select only) or 'all' (every overlapping transcript).",
-            "response_mode": "'compact' (default), 'full' (adds REF/ALT raw scores, exon model), or 'minimal'.",
+            "response_mode": "'minimal', 'compact' (default), 'standard', or 'full' (adds REF/ALT raw scores, exon model).",
         },
         "score_glossary": {
             "spliceai_delta": (
@@ -322,6 +322,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
         "response_mode_tiers": {
             "minimal": "headline + single decision number + band",
             "compact": "per-transcript deltas (default)",
+            "standard": "per-transcript deltas (same as compact in this server)",
             "full": "compact + REF/ALT raw scores + exon model",
         },
         "transcript_collapse": (

@@ -17,19 +17,19 @@ def cmd(tool: str, **arguments: Any) -> dict[str, Any]:
 
 def after_resolve(variant_id: str, genome_build: str) -> list[dict[str, Any]]:
     """After resolving a variant, the natural next step is the combined prediction."""
-    return [cmd("predict_splicing", variant=variant_id, genome_build=genome_build)]
+    return [cmd("predict_splicing", variant_id=variant_id, genome_build=genome_build)]
 
 
 def after_resolve_many(variant_ids: list[str], genome_build: str) -> list[dict[str, Any]]:
     """One predict_splicing per allele so every candidate is directly callable."""
-    return [cmd("predict_splicing", variant=v, genome_build=genome_build) for v in variant_ids]
+    return [cmd("predict_splicing", variant_id=v, genome_build=genome_build) for v in variant_ids]
 
 
 def for_variant(variant_id: str, genome_build: str) -> list[dict[str, Any]]:
     """Standard follow-ups for a resolved coordinate: SpliceAI then Pangolin."""
     return [
-        cmd("predict_spliceai", variant=variant_id, genome_build=genome_build),
-        cmd("predict_pangolin", variant=variant_id, genome_build=genome_build),
+        cmd("predict_spliceai", variant_id=variant_id, genome_build=genome_build),
+        cmd("predict_pangolin", variant_id=variant_id, genome_build=genome_build),
     ]
 
 
@@ -38,7 +38,7 @@ def for_combined(variant_id: str, genome_build: str) -> list[dict[str, Any]]:
     return [
         cmd(
             "predict_spliceai",
-            variant=variant_id,
+            variant_id=variant_id,
             genome_build=genome_build,
             response_mode="full",
         ),

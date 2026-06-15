@@ -25,7 +25,7 @@ _INSTRUCTIONS = (
     "a nt position; Δ>=0.5 is commonly high-confidence, 0.2-0.5 moderate.\n"
     "- Options: genome_build (GRCh37|GRCh38), max_distance (default 500), mask (raw|masked), "
     "gene_set (basic|comprehensive; comprehensive is much slower), transcripts (mane|all), "
-    "response_mode (compact|full|minimal).\n"
+    "response_mode (minimal|compact|standard|full).\n"
     "- Chaining: every response carries _meta.next_commands (ready-to-call {tool, arguments} "
     "steps) and _meta.see_also (cross-server hints for gnomad-link / genereviews-link / "
     "gtex-link). Read the top-level headline first. Set include_hints=false on predict_* / "

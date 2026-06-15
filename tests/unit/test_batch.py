@@ -9,7 +9,7 @@ from tests.conftest import StubService, structured
 async def test_batch_scores_each_variant_once_envelope(mcp) -> None:
     res = await mcp.call_tool(
         "predict_splicing_batch",
-        {"variants": ["chr8-140300616-T-G", "8-140300616-T-G"]},
+        {"variant_ids": ["chr8-140300616-T-G", "8-140300616-T-G"]},
     )
     data = structured(res)
     assert data["success"] is True
@@ -23,7 +23,7 @@ async def test_batch_scores_each_variant_once_envelope(mcp) -> None:
 
 async def test_batch_partial_failure_does_not_fail_batch(mcp, stub_service: StubService) -> None:
     stub_service.score_error = DataNotFoundError("no overlap")
-    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["1-1-A-T"]})
+    res = await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["1-1-A-T"]})
     data = structured(res)
     assert data["success"] is True
     assert data["summary"]["failed"] == 1
@@ -32,7 +32,7 @@ async def test_batch_partial_failure_does_not_fail_batch(mcp, stub_service: Stub
 
 async def test_batch_over_cap_validation_failed(mcp) -> None:
     res = await mcp.call_tool(
-        "predict_splicing_batch", {"variants": [f"1-{i}-A-T" for i in range(26)]}
+        "predict_splicing_batch", {"variant_ids": [f"1-{i}-A-T" for i in range(26)]}
     )
     data = structured(res)
     assert data["success"] is False
@@ -42,7 +42,7 @@ async def test_batch_over_cap_validation_failed(mcp) -> None:
 async def test_f10_batch_summary_full_histogram(mcp) -> None:
     res = await mcp.call_tool(
         "predict_splicing_batch",
-        {"variants": ["chr8-140300616-T-G", "8-140300616-T-G"]},
+        {"variant_ids": ["chr8-140300616-T-G", "8-140300616-T-G"]},
     )
     data = structured(res)
     summary = data["summary"]
@@ -68,7 +68,7 @@ async def test_f10_batch_summary_full_histogram(mcp) -> None:
 
 
 async def test_f10_batch_next_commands_targets_top_variant(mcp) -> None:
-    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
+    res = await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["chr8-140300616-T-G"]})
     data = structured(res)
     nc = data["_meta"]["next_commands"][0]
     assert nc["tool"] == "predict_splicing"
@@ -79,7 +79,7 @@ async def test_batch_flags_ambiguous_rsid_not_silently_scored(mcp) -> None:
     data = structured(
         await mcp.call_tool(
             "predict_splicing_batch",
-            {"variants": ["chr8-140300616-T-G", "rs6025"]},
+            {"variant_ids": ["chr8-140300616-T-G", "rs6025"]},
         )
     )
     by_variant = {r["variant"]: r for r in data["results"]}

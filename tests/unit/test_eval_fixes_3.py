@@ -8,7 +8,7 @@ import json
 from spliceailookup_link.api import DataNotFoundError, RateLimitedError
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.shaping import THRESHOLD_BASIS, shape_spliceai
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 from tests.fixtures.api_responses import (
     SPLICEAI_MASKED_EMPTY_ABERR,
     SPLICEAI_MASKED_NO_EFFECT,
@@ -155,7 +155,9 @@ async def test_f11_batch_error_item_has_full_scaffold(mcp, stub_service: StubSer
 
 async def test_f11_batch_error_matches_standalone(mcp, stub_service: StubService) -> None:
     stub_service.score_error = DataNotFoundError("no overlap")
-    standalone = structured(await mcp.call_tool("predict_splicing", {"variant_id": "1-1-A-T"}))
+    # Standalone now RAISES a structured ToolError; the batch keeps per-item errors
+    # in-band. The scaffold (error_code/recovery/next_commands) must still match.
+    standalone = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "1-1-A-T"})
     batch = structured(await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["1-1-A-T"]}))
     item = batch["results"][0]
     for key in ("error_code", "retryable", "recovery_action", "fallback_tool", "recovery"):
@@ -187,7 +189,7 @@ async def test_f12_batch_items_carry_slim_meta(mcp) -> None:
 
 async def test_c1_rate_limited_carries_concurrency_budget(mcp, stub_service: StubService) -> None:
     stub_service.score_error = RateLimitedError("Local concurrency limit saturated")
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"}))
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G"})
     assert data["error_code"] == "rate_limited"
     budget = data["_meta"]["rate_budget"]
     assert budget["limit"] == settings.MAX_CONCURRENCY
@@ -259,7 +261,7 @@ async def test_inv_cross_tool_error_envelope_parity(mcp, stub_service: StubServi
         "recovery",
     }
     for tool in ("predict_spliceai", "predict_pangolin", "predict_splicing", "resolve_variant"):
-        data = structured(await mcp.call_tool(tool, {"variant_id": "8-140300616-T-G"}))
+        data = await expect_tool_error(mcp, tool, {"variant_id": "8-140300616-T-G"})
         assert data["success"] is False
         assert required <= set(data), f"{tool} dropped error keys: {required - set(data)}"
         assert "next_commands" in data["_meta"]

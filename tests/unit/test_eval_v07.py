@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from spliceailookup_link.api import RateLimitedError, SpliceApiError
 from spliceailookup_link.mcp.shaping import shape_spliceai
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 from tests.fixtures.api_responses import SPLICEAI_MASKED_EMPTY_ABERR, SPLICEAI_TRAPPC9
 
 # --- D1 + D2: pre-flight reference-base check ---------------------------------
@@ -13,9 +13,7 @@ from tests.fixtures.api_responses import SPLICEAI_MASKED_EMPTY_ABERR, SPLICEAI_T
 async def test_preflight_ref_mismatch_skips_scoring(mcp, stub_service: StubService) -> None:
     # D2: a wrong REF is rejected as ref_mismatch BEFORE any scoring call.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
-    res = await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-A-G"})
-    data = structured(res)
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "8-140300616-A-G"})
     assert data["error_code"] == "ref_mismatch"
     assert stub_service.score_calls == []  # never dispatched to the scoring backend
 
@@ -26,8 +24,7 @@ async def test_preflight_ref_typo_matching_other_build_is_ref_mismatch(
     # D1: the exact assessment case chr8-140300616-C-A. REF matches GRCh37 base,
     # but it is reported as ref_mismatch (with a secondary hint), NOT build_mismatch.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
-    res = await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-C-A"})
-    data = structured(res)
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "8-140300616-C-A"})
     assert data["error_code"] == "ref_mismatch"
     assert data["other_build_hint"]["build"] == "GRCh37"
     assert stub_service.score_calls == []
@@ -140,9 +137,9 @@ async def test_batch_envelope_self_describes_size_contract(mcp) -> None:
 
 
 async def test_batch_rejects_over_cap(mcp) -> None:
-    res = await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["8-140300616-T-G"] * 26})
-    data = structured(res)
-    assert data["success"] is False
+    data = await expect_tool_error(
+        mcp, "predict_splicing_batch", {"variant_ids": ["8-140300616-T-G"] * 26}
+    )
     assert data["error_code"] == "validation_failed"
 
 
@@ -170,20 +167,18 @@ async def test_comprehensive_503_maps_to_upstream_unavailable(
 ) -> None:
     # A 5xx during a comprehensive gene_set call surfaces as retryable upstream_unavailable.
     stub_service.score_error = SpliceApiError("Upstream HTTP 503")
-    res = await mcp.call_tool(
+    data = await expect_tool_error(
+        mcp,
         "predict_splicing",
         {"variant_id": "8-140300616-T-G", "gene_set": "comprehensive"},
     )
-    data = structured(res)
-    assert data["success"] is False
     assert data["error_code"] == "upstream_unavailable"
     assert data["retryable"] is True
 
 
 async def test_rate_limited_reports_rate_budget(mcp, stub_service: StubService) -> None:
     stub_service.score_error = RateLimitedError("Local concurrency limit saturated")
-    res = await mcp.call_tool("predict_splicing", {"variant_id": "8-140300616-T-G"})
-    data = structured(res)
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "8-140300616-T-G"})
     assert data["error_code"] == "rate_limited"
     budget = data["_meta"]["rate_budget"]
     assert budget["unit"] == "concurrent_requests"

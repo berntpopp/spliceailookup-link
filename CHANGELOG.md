@@ -3,6 +3,41 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.2.0] — 2026-06-16
+
+### Changed — MCP tool errors are now raised, fleet-uniform (`isError: true`)
+
+Tool failures now surface as an **MCP error result** (`isError: true`) carrying
+a `fastmcp.exceptions.ToolError`, instead of an in-band `{"success": false, …}`
+tool result. This matches the rest of the GeneFoundry `*-link` fleet
+(`gtex-link` / `genereviews-link` `error_passthrough`), so a single
+gateway/agent error-handling path works across every server.
+
+- The **full structured envelope is preserved**: the `ToolError` message is the
+  same compact-JSON body as before (`error_code`, `message`, `retryable`,
+  `recovery_action`, `fallback_tool`, `fallback_args`, `recovery`,
+  `next_commands`, `_meta`, plus the situational `field_errors` /
+  `variant_ids` / `other_build_hint` / `nearest_transcript` / `rate_budget`).
+  Clients that consume the structured recovery fields keep working — they now
+  read them from the error result's content rather than a success body.
+- `ToolError` is passed through `mask_error_details=True` unredacted by design,
+  so the structured body always reaches the client.
+- **Batch is intentionally unchanged**: `predict_splicing_batch` still returns a
+  successful envelope whose per-item failures stay in-band under `results[…]`
+  (one bad variant must never fail its siblings). Argument-level failures
+  (e.g. an over-cap batch) raise, like every other top-level tool.
+
+Migration: a client that branched on `result["success"] is False` should branch
+on the MCP error result (`isError`) and JSON-decode the error content instead.
+
+## [2.1.0] — 2026-06-15
+
+### Added
+
+- Self-contained Docker NPM deployment overlay
+  (`docker/docker-compose.npm.yml`) + `.env.docker.example` for deployment
+  behind nginx-proxy-manager at `spliceailookup-link.genefoundry.org`.
+
 ## [2.0.0] — 2026-06-15
 
 ### Breaking — GeneFoundry Logging & CLI Standard v1 (closes #3)

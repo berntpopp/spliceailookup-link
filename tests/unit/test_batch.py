@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from spliceailookup_link.api import DataNotFoundError
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 
 
 async def test_batch_scores_each_variant_once_envelope(mcp, stub_service: StubService) -> None:
@@ -38,11 +38,11 @@ async def test_batch_partial_failure_does_not_fail_batch(mcp, stub_service: Stub
 
 
 async def test_batch_over_cap_validation_failed(mcp) -> None:
-    res = await mcp.call_tool(
-        "predict_splicing_batch", {"variant_ids": [f"1-{i}-A-T" for i in range(26)]}
+    data = await expect_tool_error(
+        mcp,
+        "predict_splicing_batch",
+        {"variant_ids": [f"1-{i}-A-T" for i in range(26)]},
     )
-    data = structured(res)
-    assert data["success"] is False
     assert data["error_code"] == "validation_failed"
 
 

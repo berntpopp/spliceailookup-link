@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from spliceailookup_link.mcp.build_check import out_of_range
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 
 # ---------------- F1: out-of-range coordinate ----------------
 
@@ -23,8 +23,7 @@ def test_out_of_range_helper_detects_beyond_both_builds() -> None:
 async def test_out_of_range_returns_invalid_input_without_scoring(
     mcp, stub_service: StubService
 ) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr1-260000000-A-G"}))
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "chr1-260000000-A-G"})
     assert data["error_code"] == "invalid_input"
     assert "248,956,422" in data["message"] and "249,250,621" in data["message"]
     assert data["fallback_tool"] == "get_server_capabilities"
@@ -42,7 +41,7 @@ async def test_ref_mismatch_wrong_ref_falls_back_to_capabilities(
 ) -> None:
     # REF 'A' wrong in both builds; not a swap (ALT 'G' != ref base 'T').
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "T"}
-    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-A-G"}))
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "chr8-140300616-A-G"})
     assert data["error_code"] == "ref_mismatch"
     assert data["fallback_tool"] == "get_server_capabilities"
     assert data["fallback_args"] is None
@@ -58,7 +57,7 @@ async def test_ref_mismatch_other_build_redirects_to_same_tool_other_build(
 ) -> None:
     # REF 'A' matches the GRCh37 base -> re-run predict on GRCh37.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "A"}
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-A-G"}))
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "chr8-140300616-A-G"})
     assert data["error_code"] == "ref_mismatch"
     assert data["fallback_tool"] == "predict_spliceai"
     assert data["fallback_args"] == {"variant_id": "8-140300616-A-G", "genome_build": "GRCh37"}
@@ -68,7 +67,7 @@ async def test_ref_mismatch_other_build_redirects_to_same_tool_other_build(
 async def test_ref_mismatch_swap_suggests_swapped_variant(mcp, stub_service: StubService) -> None:
     # ALT 'T' equals the reference base 'T' at this locus -> likely REF/ALT swap.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-A-T"}))
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "chr8-140300616-A-T"})
     assert data["error_code"] == "ref_mismatch"
     assert data["fallback_tool"] == "predict_spliceai"
     assert data["fallback_args"] == {"variant_id": "8-140300616-T-A", "genome_build": "GRCh38"}
@@ -188,7 +187,7 @@ async def test_rate_limited_error_carries_retry_after(mcp, stub_service: StubSer
     from spliceailookup_link.api import RateLimitedError
 
     stub_service.score_error = RateLimitedError("saturated")
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-T-G"}))
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "chr8-140300616-T-G"})
     assert data["error_code"] == "rate_limited"
     rb = data["_meta"]["rate_budget"]
     assert rb["limit"] == 2
@@ -301,5 +300,5 @@ def test_version_matches_package_metadata() -> None:
 
     from spliceailookup_link import __version__
 
-    assert __version__ == "2.1.0"
+    assert __version__ == "2.2.0"
     assert importlib.metadata.version("spliceailookup-link") == __version__

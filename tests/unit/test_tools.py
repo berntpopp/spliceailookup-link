@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.mcp.resources import get_capabilities_resource, get_capabilities_version
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 
 
 async def test_capabilities_lists_tools(mcp) -> None:
@@ -85,18 +85,14 @@ async def test_predict_splicing_partial_when_pangolin_fails(mcp, stub_service: S
 
 async def test_predict_splicing_both_fail_returns_error(mcp, stub_service: StubService) -> None:
     stub_service.score_error = DataNotFoundError("no overlapping transcript")
-    res = await mcp.call_tool("predict_splicing", {"variant_id": "1-1-A-T"})
-    data = structured(res)
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "1-1-A-T"})
     assert data["error_code"] == "not_found"
 
 
 async def test_predict_build_mismatch_short_circuits(mcp, stub_service: StubService) -> None:
-    res = await mcp.call_tool(
-        "predict_spliceai", {"variant_id": "8-145500000-A-T", "genome_build": "GRCh38"}
+    data = await expect_tool_error(
+        mcp, "predict_spliceai", {"variant_id": "8-145500000-A-T", "genome_build": "GRCh38"}
     )
-    data = structured(res)
-    assert data["success"] is False
     assert data["error_code"] == "build_mismatch"
     # No scoring call was made.
     assert stub_service.score_calls == []
@@ -135,9 +131,7 @@ async def test_invalid_variant_returns_invalid_input(mcp, stub_service: StubServ
 
     stub_service.resolve_error = VariantParseError("bad")
     # predict_splicing with an unparseable coordinate-ish string -> parse error
-    res = await mcp.call_tool("predict_spliceai", {"variant_id": "totally invalid"})
-    data = structured(res)
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "totally invalid"})
     assert data["error_code"] == "invalid_input"
 
 
@@ -158,7 +152,5 @@ async def test_capabilities_tool_detail_lean(mcp) -> None:
 
 
 async def test_predict_chr99_is_unsupported_contig(mcp) -> None:
-    res = await mcp.call_tool("predict_spliceai", {"variant_id": "chr99-1000-A-G"})
-    data = structured(res)
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "chr99-1000-A-G"})
     assert data["error_code"] == "unsupported_contig"

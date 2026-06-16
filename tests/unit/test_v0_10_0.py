@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from spliceailookup_link.mcp.facade import create_spliceai_mcp
 from spliceailookup_link.mcp.resources import get_capabilities_resource
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 
 _TOOLS = {
     "get_server_capabilities",
@@ -70,32 +70,32 @@ def test_provenance_has_versioned_sources() -> None:
 
 
 async def test_predict_splicing_carries_provenance(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"}))
     assert "v44" in data["provenance"]["transcript_annotation"]
 
 
 async def test_minimal_omits_provenance(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "minimal"}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "response_mode": "minimal"}
         )
     )
     assert "provenance" not in data
 
 
 async def test_predict_spliceai_carries_provenance(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-T-G"}))
     assert "v44" in data["provenance"]["transcript_annotation"]
 
 
 async def test_predict_pangolin_carries_provenance(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_pangolin", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_pangolin", {"variant_id": "chr8-140300616-T-G"}))
     assert "v44" in data["provenance"]["transcript_annotation"]
 
 
 async def test_batch_envelope_carries_provenance(mcp) -> None:
     data = structured(
-        await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
+        await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["chr8-140300616-T-G"]})
     )
     assert "v44" in data["_meta"]["provenance"]["transcript_annotation"]
 
@@ -111,38 +111,36 @@ def test_capabilities_data_sources_versioned() -> None:
 async def test_correlation_id_echoed_on_success(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "correlation_id": "trace-123"}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "correlation_id": "trace-123"}
         )
     )
     assert data["_meta"]["correlation_id"] == "trace-123"
 
 
 async def test_correlation_id_echoed_on_error(mcp) -> None:
-    data = structured(
-        await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-zzz-T-G", "correlation_id": "trace-err"}
-        )
+    data = await expect_tool_error(
+        mcp, "predict_splicing", {"variant_id": "chr8-zzz-T-G", "correlation_id": "trace-err"}
     )
     assert data["error_code"] == "invalid_input"
     assert data["_meta"]["correlation_id"] == "trace-err"
 
 
 async def test_no_correlation_id_means_no_field(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"}))
     assert "correlation_id" not in data["_meta"]
 
 
 async def test_correlation_id_on_resolve_and_batch(mcp) -> None:
     res = structured(
         await mcp.call_tool(
-            "resolve_variant", {"variant": "chr8-140300616-T-G", "correlation_id": "c1"}
+            "resolve_variant", {"variant_id": "chr8-140300616-T-G", "correlation_id": "c1"}
         )
     )
     assert res["_meta"]["correlation_id"] == "c1"
     batch = structured(
         await mcp.call_tool(
             "predict_splicing_batch",
-            {"variants": ["chr8-140300616-T-G"], "correlation_id": "c2"},
+            {"variant_ids": ["chr8-140300616-T-G"], "correlation_id": "c2"},
         )
     )
     assert batch["_meta"]["correlation_id"] == "c2"
@@ -233,7 +231,7 @@ async def test_batch_distinct_variants_not_deduped(stub_service) -> None:
 async def test_not_found_includes_nearest_transcript(mcp, stub_service) -> None:
     stub_service.overlap_count = 0  # force the not_found fast-fail
     stub_service.nearest = {"distance_nt": 4200, "gene": "FOO", "transcript_id": "ENST123"}
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "1-50000-A-G"}))
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "1-50000-A-G"})
     assert data["error_code"] == "not_found"
     nt = data["nearest_transcript"]
     assert nt["distance_nt"] == 4200 and nt["gene"] == "FOO"
@@ -243,7 +241,7 @@ async def test_not_found_includes_nearest_transcript(mcp, stub_service) -> None:
 async def test_not_found_far_transcript_advises_intergenic(mcp, stub_service) -> None:
     stub_service.overlap_count = 0
     stub_service.nearest = {"distance_nt": 55000, "gene": "BAR", "transcript_id": "ENST9"}
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "1-50000-A-G"}))
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "1-50000-A-G"})
     assert data["error_code"] == "not_found"
     assert data["nearest_transcript"]["distance_nt"] == 55000
     assert "intergenic" in data["recovery"].lower()
@@ -252,7 +250,7 @@ async def test_not_found_far_transcript_advises_intergenic(mcp, stub_service) ->
 async def test_not_found_without_nearest_is_unchanged(mcp, stub_service) -> None:
     stub_service.overlap_count = 0
     stub_service.nearest = None  # Ensembl could not determine a nearest transcript
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "1-50000-A-G"}))
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "1-50000-A-G"})
     assert data["error_code"] == "not_found"
     assert "nearest_transcript" not in data
 
@@ -263,7 +261,7 @@ async def test_not_found_without_nearest_is_unchanged(mcp, stub_service) -> None
 async def test_include_hints_false_drops_capabilities_version(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "include_hints": False}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "include_hints": False}
         )
     )
     assert "capabilities_version" not in data["_meta"]

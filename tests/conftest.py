@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.mcp.facade import create_spliceai_mcp
@@ -149,5 +151,26 @@ def structured(result: Any) -> dict[str, Any]:
     return sc or {}
 
 
+async def expect_tool_error(
+    mcp: Any, name: str, arguments: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Call a tool expected to FAIL and return its structured error envelope.
+
+    Top-level tools surface failures fleet-uniformly (like gtex-link /
+    genereviews-link error_passthrough) as ``fastmcp.exceptions.ToolError`` whose
+    message is the compact-JSON structured envelope (error_code, recovery,
+    fallback_tool, next_commands, _meta, ...). This decodes that JSON and returns
+    it so a test can assert on the envelope exactly as it used to on the old
+    in-band ``success:false`` dict.
+
+    NOTE: per-item batch failures are NOT raised -- they stay embedded in a
+    SUCCESSFUL predict_splicing_batch envelope (one bad variant must not fail its
+    siblings). Use ``structured()`` and read ``results[i]`` for those.
+    """
+    with pytest.raises(ToolError) as excinfo:
+        await mcp.call_tool(name, arguments or {})
+    return json.loads(str(excinfo.value))
+
+
 # Re-export so tests can build their own error scenarios.
-__all__ = ["StubService", "structured", "DataNotFoundError"]
+__all__ = ["StubService", "structured", "expect_tool_error", "ToolError", "DataNotFoundError"]

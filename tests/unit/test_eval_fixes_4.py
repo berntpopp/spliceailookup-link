@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 from spliceailookup_link.api import RateLimitedError, SpliceApiError
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 
 
 # --- F19: unsupported contig fast-fails before any scoring call ---
 async def test_f19_mt_fast_fails_unsupported_contig_no_scoring(
     mcp, stub_service: StubService
 ) -> None:
-    res = await mcp.call_tool("predict_splicing", {"variant_id": "MT-3243-A-G"})
-    data = structured(res)
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "MT-3243-A-G"})
     assert data["error_code"] == "unsupported_contig"
     assert data["retryable"] is False
     # The whole point: no upstream scoring slot was ever consumed.
@@ -141,10 +139,7 @@ async def test_f18_batch_retryable_item_goes_to_retry_variants(
 
 # --- F21: resolve_variant recovery prose is not circular ---
 async def test_f21_resolve_invalid_input_recovery_is_not_circular(mcp) -> None:
-    data = structured(
-        await mcp.call_tool("resolve_variant", {"variant_id": "totally not a variant"})
-    )
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "resolve_variant", {"variant_id": "totally not a variant"})
     assert data["error_code"] == "invalid_input"
     # The bug: prose told you to "call resolve_variant" from inside resolve_variant.
     assert "resolve_variant" not in data["recovery"]
@@ -152,9 +147,7 @@ async def test_f21_resolve_invalid_input_recovery_is_not_circular(mcp) -> None:
 
 
 async def test_f21_prediction_invalid_input_still_points_to_resolve(mcp) -> None:
-    data = structured(
-        await mcp.call_tool("predict_splicing", {"variant_id": "totally not a variant"})
-    )
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "totally not a variant"})
     assert data["error_code"] == "invalid_input"
     assert "resolve_variant" in data["recovery"]  # unchanged for prediction tools
 

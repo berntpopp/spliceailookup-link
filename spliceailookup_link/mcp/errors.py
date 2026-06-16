@@ -2,8 +2,19 @@
 
 Patterned after gnomad-link / pubtator-link. The envelope shape is what LLMs
 branch on; codes are deterministic per exception class so prompts can recover
-without scraping free text. Every tool body runs inside run_mcp_tool, which
-returns (never raises) an envelope dict.
+without scraping free text. Every top-level tool body runs inside run_mcp_tool.
+
+Error delivery is fleet-uniform with gtex-link / genereviews-link
+(error_passthrough): on failure run_mcp_tool RAISES ``fastmcp.exceptions.ToolError``
+carrying the full structured envelope as compact JSON, so the client sees an MCP
+error result (isError=true) rather than an in-band ``success:false`` body. The
+rich envelope (error_code, recovery, fallback_tool, next_commands, _meta, ...) is
+preserved verbatim in the ToolError message, which FastMCP passes through
+unredacted even with mask_error_details=True.
+
+Batch per-item failures are the deliberate exception: they are built with
+mcp_tool_error(...).payload and embedded in a SUCCESSFUL batch envelope so one
+bad variant never fails its siblings -- those stay in-band by design.
 """
 
 from __future__ import annotations
@@ -15,8 +26,9 @@ import uuid
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NoReturn
 
+from fastmcp.exceptions import ToolError
 from pydantic import ValidationError as PydanticValidationError
 
 from spliceailookup_link.api import (
@@ -398,10 +410,9 @@ def install_validation_error_handler(mcp_server: Any) -> None:
                     message=envelope["message"],
                     raw_message=str(exc),
                 )
-                convert_result = getattr(_tool, "convert_result", None)
-                if callable(convert_result):
-                    return convert_result(envelope)
-                return envelope
+                # Fleet-uniform: surface argument-validation failures as a ToolError
+                # (isError=true) carrying the structured envelope, not an in-band body.
+                _raise_tool_error(envelope)
 
         object.__setattr__(tool, "run", wrapped_run)
         object.__setattr__(tool, "_splice_validation_wrapped", True)
@@ -507,6 +518,18 @@ def clear_recent_errors() -> None:
     _RECENT_ERRORS.clear()
 
 
+def _raise_tool_error(payload: dict[str, Any]) -> NoReturn:
+    """Surface a structured envelope as a FastMCP ToolError (fleet-uniform).
+
+    The envelope is serialised compactly as the ToolError message so the MCP
+    client receives an error result (isError=true) carrying every recovery field
+    -- matching gtex-link / genereviews-link error_passthrough -- instead of an
+    in-band success:false body. ToolError is passed through mask_error_details
+    unredacted by design, so the JSON reaches the client intact.
+    """
+    raise ToolError(json.dumps(payload, separators=(",", ":")))
+
+
 async def run_mcp_tool(
     tool_name: str,
     call: Callable[[], Awaitable[dict[str, Any]]],
@@ -556,7 +579,7 @@ async def run_mcp_tool(
             message=exc.payload.get("message", ""),
             raw_message=str(exc),
         )
-        return _stamp(exc.payload)
+        _raise_tool_error(_stamp(exc.payload))
     except Exception as exc:  # broad catch is the error-boundary contract
         wrapped = mcp_tool_error(exc, ctx)
         logger.warning(
@@ -572,4 +595,4 @@ async def run_mcp_tool(
             message=wrapped.payload["message"],
             raw_message=str(exc),
         )
-        return _stamp(wrapped.payload)
+        _raise_tool_error(_stamp(wrapped.payload))

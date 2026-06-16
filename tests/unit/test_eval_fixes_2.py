@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from tests.conftest import structured
+from tests.conftest import expect_tool_error, structured
 
 
 async def test_f6_headline_matches_verdict_concordant_high(mcp) -> None:
@@ -56,12 +56,9 @@ async def test_f8_combined_minimal_is_headline_tier(mcp) -> None:
 
 
 async def test_f9_validation_failed_has_request_id_and_timing(mcp) -> None:
-    data = structured(
-        await mcp.call_tool(
-            "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 20000}
-        )
+    data = await expect_tool_error(
+        mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 20000}
     )
-    assert data["success"] is False
     assert data["error_code"] == "validation_failed"
     meta = data["_meta"]
     assert isinstance(meta["request_id"], str) and len(meta["request_id"]) == 12
@@ -181,10 +178,8 @@ async def test_minimal_single_model_does_not_crash(mcp) -> None:
 
 
 async def test_f9_validation_envelope_carries_provenance(mcp) -> None:
-    data = structured(
-        await mcp.call_tool(
-            "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 20000}
-        )
+    data = await expect_tool_error(
+        mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 20000}
     )
     assert data["error_code"] == "validation_failed"
     assert data["_meta"]["unsafe_for_clinical_use"] is True

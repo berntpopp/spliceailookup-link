@@ -11,7 +11,7 @@ from spliceailookup_link.mcp.resources import (
     get_capabilities_version,
     get_reference_resource,
 )
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 
 _COORD = re.compile(r"^[\dXYM]+-\d+-[ACGT]+-[ACGT]+$")
 
@@ -41,9 +41,7 @@ async def test_error_envelope_has_request_id(mcp, stub_service: StubService) -> 
     from spliceailookup_link.variant import VariantParseError
 
     stub_service.resolve_error = VariantParseError("bad")
-    res = await mcp.call_tool("predict_spliceai", {"variant_id": "totally invalid"})
-    data = structured(res)
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "totally invalid"})
     assert "request_id" in data["_meta"]
 
 
@@ -93,12 +91,9 @@ async def test_f5_cross_build_probe_upgrades_to_build_mismatch(
     mcp, stub_service: StubService
 ) -> None:
     stub_service.only_build = "GRCh38"  # scores in 38, not in 37
-    data = structured(
-        await mcp.call_tool(
-            "predict_spliceai", {"variant_id": "8-140300616-T-G", "genome_build": "GRCh37"}
-        )
+    data = await expect_tool_error(
+        mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G", "genome_build": "GRCh37"}
     )
-    assert data["success"] is False
     assert data["error_code"] == "build_mismatch"
     assert data["fallback_args"]["genome_build"] == "GRCh38"
 
@@ -107,22 +102,18 @@ async def test_f5_pangolin_cross_build_upgrades_to_build_mismatch(
     mcp, stub_service: StubService
 ) -> None:
     stub_service.only_build = "GRCh38"
-    data = structured(
-        await mcp.call_tool(
-            "predict_pangolin", {"variant_id": "8-140300616-T-G", "genome_build": "GRCh37"}
-        )
+    data = await expect_tool_error(
+        mcp, "predict_pangolin", {"variant_id": "8-140300616-T-G", "genome_build": "GRCh37"}
     )
-    assert data["success"] is False
     assert data["error_code"] == "build_mismatch"
 
 
 async def test_f5_probe_can_be_disabled(mcp, stub_service: StubService) -> None:
     stub_service.only_build = "GRCh38"
-    data = structured(
-        await mcp.call_tool(
-            "predict_spliceai",
-            {"variant_id": "8-140300616-T-G", "genome_build": "GRCh37", "cross_build_check": False},
-        )
+    data = await expect_tool_error(
+        mcp,
+        "predict_spliceai",
+        {"variant_id": "8-140300616-T-G", "genome_build": "GRCh37", "cross_build_check": False},
     )
     assert data["error_code"] == "not_found"
 
@@ -152,12 +143,9 @@ async def test_minimal_strictly_smaller_than_compact(mcp) -> None:
 
 
 async def test_out_of_range_max_distance_is_validation_failed(mcp) -> None:
-    data = structured(
-        await mcp.call_tool(
-            "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 99999}
-        )
+    data = await expect_tool_error(
+        mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 99999}
     )
-    assert data["success"] is False
     assert data["error_code"] == "validation_failed"
 
 
@@ -166,7 +154,7 @@ async def test_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> None:
 
     stub_service.score_error = DataNotFoundError("did not return any scores")
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}  # REF 'A' matches neither
-    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "8-140300616-A-G"}))
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "8-140300616-A-G"})
     assert data["error_code"] == "ref_mismatch"
     # F2: wrong-REF on a coordinate (no other-build, no swap) no longer loops resolve_variant.
     assert data["fallback_tool"] == "get_server_capabilities"
@@ -177,12 +165,12 @@ async def test_spliceai_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> Non
 
     stub_service.score_error = DataNotFoundError("did not return any scores")
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-A-G"}))
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "8-140300616-A-G"})
     assert data["error_code"] == "ref_mismatch"
 
 
 async def test_single_predict_ambiguous_rsid_does_not_silently_score(mcp, stub_service) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "rs6025"}))
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "rs6025"})
     assert data["error_code"] == "ambiguous"
     assert stub_service.score_calls == []
 
@@ -209,7 +197,7 @@ async def test_capabilities_version_echoed_on_success(mcp) -> None:
 
 
 async def test_capabilities_version_echoed_on_error(mcp, stub_service) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "not a variant!!"}))
+    data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "not a variant!!"})
     assert data["error_code"] == "invalid_input"
     assert data["_meta"]["capabilities_version"] == get_capabilities_version()
 
@@ -223,11 +211,10 @@ async def test_spliceai_soft_deadline_returns_upstream_unavailable(
         await asyncio.sleep(5)
 
     monkeypatch.setattr(stub_service, "score", _slow_score)
-    data = structured(
-        await mcp.call_tool(
-            "predict_spliceai",
-            {"variant_id": "chr8-140300616-T-G", "gene_set": "comprehensive"},
-        )
+    data = await expect_tool_error(
+        mcp,
+        "predict_spliceai",
+        {"variant_id": "chr8-140300616-T-G", "gene_set": "comprehensive"},
     )
     assert data["error_code"] == "upstream_unavailable"
     assert data["retryable"] is True
@@ -240,11 +227,10 @@ async def test_soft_deadline_returns_upstream_unavailable(mcp, stub_service, mon
         await asyncio.sleep(5)
 
     monkeypatch.setattr(stub_service, "score", _slow_score)
-    data = structured(
-        await mcp.call_tool(
-            "predict_splicing",
-            {"variant_id": "chr8-140300616-T-G", "gene_set": "comprehensive"},
-        )
+    data = await expect_tool_error(
+        mcp,
+        "predict_splicing",
+        {"variant_id": "chr8-140300616-T-G", "gene_set": "comprehensive"},
     )
     assert data["error_code"] == "upstream_unavailable"
     assert data["retryable"] is True

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tests.conftest import StubService, structured
+from tests.conftest import StubService, expect_tool_error, structured
 
 _ECHO_KEYS = ("variant_id", "genome_build", "gene_set", "max_distance", "mask")
 
@@ -112,8 +112,7 @@ async def test_resolve_check_ref_false_makes_no_ensembl_call(
 
 async def test_not_found_fast_fails_on_zero_overlap(mcp, stub_service: StubService) -> None:
     stub_service.overlap_count = 0
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-T-G"}))
-    assert data["success"] is False
+    data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "chr8-140300616-T-G"})
     assert data["error_code"] == "not_found"
     assert stub_service.score_calls == []  # never dispatched to scoring
 

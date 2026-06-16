@@ -1,3 +1,3 @@
 """spliceailookup-link: MCP + REST server for SpliceAI / Pangolin splice prediction."""
 
-__version__ = "0.10.0"
+__version__ = "2.1.0"

@@ -10,7 +10,7 @@ from tests.conftest import StubService, structured
 async def test_f19_mt_fast_fails_unsupported_contig_no_scoring(
     mcp, stub_service: StubService
 ) -> None:
-    res = await mcp.call_tool("predict_splicing", {"variant": "MT-3243-A-G"})
+    res = await mcp.call_tool("predict_splicing", {"variant_id": "MT-3243-A-G"})
     data = structured(res)
     assert data["success"] is False
     assert data["error_code"] == "unsupported_contig"
@@ -27,7 +27,7 @@ async def test_f19_mt_in_batch_is_per_item_unsupported_contig(
     data = structured(
         await mcp.call_tool(
             "predict_splicing_batch",
-            {"variants": ["chr8-140300616-T-G", "MT-3243-A-G"]},
+            {"variant_ids": ["chr8-140300616-T-G", "MT-3243-A-G"]},
         )
     )
     by_variant = {r["variant"]: r for r in data["results"]}
@@ -130,7 +130,7 @@ async def test_f18_batch_retryable_item_goes_to_retry_variants(
     settings.BATCH_RETRY_BACKOFF_SECONDS = 0
     try:
         data = structured(
-            await mcp.call_tool("predict_splicing_batch", {"variants": ["1-100-A-T"]})
+            await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["1-100-A-T"]})
         )
     finally:
         settings.BATCH_RETRY_BACKOFF_SECONDS = old
@@ -141,7 +141,9 @@ async def test_f18_batch_retryable_item_goes_to_retry_variants(
 
 # --- F21: resolve_variant recovery prose is not circular ---
 async def test_f21_resolve_invalid_input_recovery_is_not_circular(mcp) -> None:
-    data = structured(await mcp.call_tool("resolve_variant", {"variant": "totally not a variant"}))
+    data = structured(
+        await mcp.call_tool("resolve_variant", {"variant_id": "totally not a variant"})
+    )
     assert data["success"] is False
     assert data["error_code"] == "invalid_input"
     # The bug: prose told you to "call resolve_variant" from inside resolve_variant.
@@ -150,19 +152,21 @@ async def test_f21_resolve_invalid_input_recovery_is_not_circular(mcp) -> None:
 
 
 async def test_f21_prediction_invalid_input_still_points_to_resolve(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "totally not a variant"}))
+    data = structured(
+        await mcp.call_tool("predict_splicing", {"variant_id": "totally not a variant"})
+    )
     assert data["error_code"] == "invalid_input"
     assert "resolve_variant" in data["recovery"]  # unchanged for prediction tools
 
 
 # --- F22: include_hints opt-out ---
 async def test_f22_include_hints_false_drops_next_commands_and_see_also(mcp) -> None:
-    full = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    full = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"}))
     assert "next_commands" in full["_meta"] and "see_also" in full["_meta"]
 
     lean = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "include_hints": False}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "include_hints": False}
         )
     )
     assert "next_commands" not in lean["_meta"]
@@ -175,12 +179,12 @@ async def test_f22_include_hints_false_drops_next_commands_and_see_also(mcp) -> 
 async def test_f22_include_hints_false_on_single_and_resolve(mcp) -> None:
     for tool in ("predict_spliceai", "predict_pangolin"):
         data = structured(
-            await mcp.call_tool(tool, {"variant": "chr8-140300616-T-G", "include_hints": False})
+            await mcp.call_tool(tool, {"variant_id": "chr8-140300616-T-G", "include_hints": False})
         )
         assert "next_commands" not in data["_meta"] and "see_also" not in data["_meta"]
     rv = structured(
         await mcp.call_tool(
-            "resolve_variant", {"variant": "chr8-140300616-T-G", "include_hints": False}
+            "resolve_variant", {"variant_id": "chr8-140300616-T-G", "include_hints": False}
         )
     )
     assert "next_commands" not in rv["_meta"]
@@ -188,14 +192,14 @@ async def test_f22_include_hints_false_on_single_and_resolve(mcp) -> None:
 
 # --- F19b: resolve_variant flags non-nuclear contigs as not scoring-supported ---
 async def test_f19b_resolve_marks_mt_not_scoring_supported(mcp) -> None:
-    data = structured(await mcp.call_tool("resolve_variant", {"variant": "MT-3243-A-G"}))
+    data = structured(await mcp.call_tool("resolve_variant", {"variant_id": "MT-3243-A-G"}))
     assert data["success"] is True  # resolve normalizes coordinates; it does not score
     assert data["scoring_supported"] is False
     assert "MT" in data["note"] or "itochondrial" in data["note"]
 
 
 async def test_f19b_resolve_nuclear_has_no_scoring_supported_flag(mcp) -> None:
-    data = structured(await mcp.call_tool("resolve_variant", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("resolve_variant", {"variant_id": "chr8-140300616-T-G"}))
     assert "scoring_supported" not in data  # additive: only set when NOT supported
 
 

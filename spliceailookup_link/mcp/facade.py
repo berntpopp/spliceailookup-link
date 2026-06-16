@@ -25,7 +25,7 @@ _INSTRUCTIONS = (
     "a nt position; Δ>=0.5 is commonly high-confidence, 0.2-0.5 moderate.\n"
     "- Options: genome_build (GRCh37|GRCh38), max_distance (default 500), mask (raw|masked), "
     "gene_set (basic|comprehensive; comprehensive is much slower), transcripts (mane|all), "
-    "response_mode (compact|full|minimal).\n"
+    "response_mode (minimal|compact|standard|full).\n"
     "- Chaining: every response carries _meta.next_commands (ready-to-call {tool, arguments} "
     "steps) and _meta.see_also (cross-server hints for gnomad-link / genereviews-link / "
     "gtex-link). Read the top-level headline first. Set include_hints=false on predict_* / "
@@ -40,9 +40,9 @@ _INSTRUCTIONS = (
 def create_spliceai_mcp(*, service_factory: Callable[[], SpliceService]) -> FastMCP:
     """Build the spliceailookup-link MCP server.
 
-    `service_factory` is a lazy callable so HTTP mode can defer to
-    `app.state.splice_service` and stdio mode can hold a directly constructed
-    instance.
+    `service_factory` is a lazy callable so the HTTP host can defer to
+    `app.state.splice_service` (constructed in the FastAPI lifespan) rather than
+    building the service eagerly at import time.
     """
     # Per-tool `task=True` (on the async prediction tools) opts those tools into the
     # 2025-11-25 background-task protocol via Docket. We deliberately do NOT set a

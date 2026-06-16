@@ -65,7 +65,7 @@ Primary areas:
 Required before claiming completion: `make ci-local`.
 
 Useful: `make install lock format lint lint-fix lint-loc typecheck test
-test-fast test-integration test-cov dev mcp-serve docker-build docker-up`.
+test-fast test-integration test-cov dev run-prod docker-build docker-up`.
 
 ## Coding Standards
 
@@ -79,8 +79,8 @@ test-fast test-integration test-cov dev mcp-serve docker-build docker-up`.
 
 ## File Size Discipline
 
-Hard cap: **600 lines per Python module** in `spliceailookup_link/`,
-`server.py`, and `mcp_server.py`. Enforced by `make lint-loc` (wired into
+Hard cap: **600 lines per Python module** in `spliceailookup_link/`.
+Enforced by `make lint-loc` (wired into
 `ci-local` and pre-commit). Tests are exempt. When a file approaches 500 lines,
 plan a cohesive split (one module per responsibility) and keep facades/tool
 names stable so call sites do not churn. Grandfather exceptions in

@@ -4,7 +4,8 @@ The upstream uses cryptic keys (DS_AG, DP_DL, ...). This module renames them to
 readable splice-site classes, filters transcripts (MANE vs all), trims heavy
 fields (exon arrays, REF/ALT raw scores) in compact mode, and builds a one-line
 headline. response_mode: minimal (headline + top score), compact (per-transcript
-deltas, default), full (adds REF/ALT raw scores + exon model + allNonZeroScores).
+deltas, default), standard (same as compact here), full (adds REF/ALT raw scores
++ exon model + allNonZeroScores).
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-ResponseMode = Literal["minimal", "compact", "full"]
+ResponseMode = Literal["minimal", "compact", "standard", "full"]
 Transcripts = Literal["mane", "all"]
 
 _STRONG = 0.5

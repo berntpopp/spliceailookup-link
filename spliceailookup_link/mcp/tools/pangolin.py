@@ -35,7 +35,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         task=True,
     )
     async def predict_pangolin(
-        variant: Annotated[
+        variant_id: Annotated[
             str,
             Field(
                 min_length=1,
@@ -65,8 +65,11 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             Field(description="mane (default) or all overlapping transcripts."),
         ] = "mane",
         response_mode: Annotated[
-            Literal["compact", "full", "minimal"],
-            Field(description="compact (default), full (adds REF/ALT + all-non-zero), or minimal."),
+            Literal["minimal", "compact", "standard", "full"],
+            Field(
+                description="minimal, compact (default), standard, or full "
+                "(adds REF/ALT + all-non-zero)."
+            ),
         ] = "compact",
         cross_build_check: Annotated[
             bool,
@@ -109,7 +112,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 await ctx.report_progress(progress=0, total=2, message="resolving")
             prepared = await prepare_variant(
                 service,
-                variant,
+                variant_id,
                 genome_build,
                 cross_build_check=cross_build_check,
                 max_distance=max_distance,
@@ -125,7 +128,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                         distance=max_distance,
                         mask=mask_to_int(mask),
                         gene_set=gene_set,
-                        raw=variant,
+                        raw=variant_id,
                         consequence=prepared.consequence,
                     ),
                     ctx=ctx,
@@ -156,7 +159,11 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             }
             if include_hints:
                 meta["next_commands"] = [
-                    cmd("predict_spliceai", variant=prepared.variant_id, genome_build=genome_build)
+                    cmd(
+                        "predict_spliceai",
+                        variant_id=prepared.variant_id,
+                        genome_build=genome_build,
+                    )
                 ]
                 if include_see_also and response_mode != "minimal":
                     meta["see_also"] = see_also_for(
@@ -180,7 +187,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             "predict_pangolin",
             call,
             context=McpErrorContext(
-                tool_name="predict_pangolin", variant=variant, genome_build=genome_build
+                tool_name="predict_pangolin", variant=variant_id, genome_build=genome_build
             ),
             lean_meta=lean,
             correlation_id=correlation_id,

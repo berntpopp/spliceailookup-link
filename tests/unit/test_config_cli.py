@@ -1,17 +1,18 @@
-"""Tests for config, CLI, logging, and exception modules."""
+"""Tests for config, logging, and exception modules."""
 
 from __future__ import annotations
 
 import logging
 
-from spliceailookup_link import cli
+import structlog
+
 from spliceailookup_link.config import ServerConfig, hg_for_build, settings
 from spliceailookup_link.exceptions import (
     ConfigurationError,
     MCPIntegrationError,
     StartupError,
 )
-from spliceailookup_link.logging_config import configure_logging, get_server_logger
+from spliceailookup_link.logging_config import configure_logging
 
 
 def test_url_builders() -> None:
@@ -46,50 +47,41 @@ def test_cors_origins_list() -> None:
 
 def test_server_config_from_env() -> None:
     cfg = ServerConfig.from_env()
-    assert cfg.transport in ("unified", "http", "stdio")
+    assert cfg.transport in ("unified", "http")
     assert cfg.mcp_path.startswith("/")
 
 
-def test_cli_parser_defaults() -> None:
-    parser = cli.create_parser()
-    args = parser.parse_args([])
-    assert args.transport == "unified"
-    cfg = cli.create_config_from_args(args)
-    assert isinstance(cfg, ServerConfig)
-    assert cfg.port == 8603
+def test_transport_literal_excludes_stdio() -> None:
+    from spliceailookup_link.config import Settings
 
-
-def test_cli_config_command(capsys) -> None:
-    parser = cli.create_parser()
-    args = parser.parse_args(["config"])
-    cli.handle_config_command(args)
-    out = capsys.readouterr().out
-    assert "spliceailookup-link Configuration" in out
-    assert "SpliceAI URL" in out
+    fields = Settings.model_fields["MCP_TRANSPORT"].annotation
+    assert "stdio" not in repr(fields)
 
 
 def test_exceptions_carry_transport() -> None:
     for exc_cls in (ConfigurationError, StartupError, MCPIntegrationError):
-        e = exc_cls("boom", transport="stdio")
-        assert e.transport == "stdio"
+        e = exc_cls("boom", transport="unified")
+        assert e.transport == "unified"
         assert str(e) == "boom"
 
 
-def test_configure_logging_stdio_quiets_libraries() -> None:
-    configure_logging("stdio", "WARNING")
-    assert logging.getLogger("httpx").level == logging.WARNING
-    assert logging.root.handlers
-
-
-def test_configure_logging_unified() -> None:
-    configure_logging("unified", "INFO")
+def test_configure_logging_returns_bound_logger() -> None:
+    logger = configure_logging("INFO")
     assert logging.root.level == logging.INFO
+    assert hasattr(logger, "info")
 
 
-def test_get_server_logger_tags_transport() -> None:
-    logger = get_server_logger("unified")
-    msg, _ = logger.process("hello", {})
-    assert msg == "[unified] hello"
+def test_configure_logging_emits_static_fields(capsys) -> None:
+    from spliceailookup_link import __version__
+
+    configure_logging("INFO")
+    logger = structlog.get_logger("spliceailookup_link.test")
+    logger.info("hello")
+    captured = capsys.readouterr()
+    payload = captured.out + captured.err
+    assert "spliceailookup-link" in payload
+    assert __version__ in payload
+    assert "hello" in payload
 
 
 def test_predict_soft_deadline_default() -> None:

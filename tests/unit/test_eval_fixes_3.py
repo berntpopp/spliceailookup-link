@@ -20,7 +20,7 @@ async def test_f13_threshold_basis_emitted_once_in_combined(mcp) -> None:
     # F6: threshold_basis is full-only; even in full it appears exactly once (top-level).
     data = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "response_mode": "full"}
         )
     )
     assert json.dumps(data).count("threshold_basis") == 1
@@ -36,7 +36,7 @@ async def test_f13_single_model_still_has_one_threshold_basis(mcp) -> None:
     # F6: standalone single-model carries threshold_basis only in full mode (exactly once).
     data = structured(
         await mcp.call_tool(
-            "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+            "predict_spliceai", {"variant_id": "chr8-140300616-T-G", "response_mode": "full"}
         )
     )
     assert data["interpretation"]["threshold_basis"] == THRESHOLD_BASIS
@@ -120,7 +120,9 @@ def test_f15_no_note_in_raw_mode() -> None:
 
 async def test_f15_combined_masked_does_not_crash(mcp) -> None:
     data = structured(
-        await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G", "mask": "masked"})
+        await mcp.call_tool(
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "mask": "masked"}
+        )
     )
     assert data["success"] is True
 
@@ -139,7 +141,7 @@ _RECOVERY_KEYS = (
 
 async def test_f11_batch_error_item_has_full_scaffold(mcp, stub_service: StubService) -> None:
     stub_service.score_error = DataNotFoundError("no overlap")
-    res = await mcp.call_tool("predict_splicing_batch", {"variants": ["1-1-A-T"]})
+    res = await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["1-1-A-T"]})
     data = structured(res)
     assert data["success"] is True
     assert data["summary"]["failed"] == 1
@@ -148,13 +150,13 @@ async def test_f11_batch_error_item_has_full_scaffold(mcp, stub_service: StubSer
         assert key in item, f"batch error item missing {key}"
     assert item["error_code"] == "not_found"
     assert item["next_commands"][0]["tool"] == "resolve_variant"
-    assert item["next_commands"][0]["arguments"]["variant"] == "1-1-A-T"
+    assert item["next_commands"][0]["arguments"]["variant_id"] == "1-1-A-T"
 
 
 async def test_f11_batch_error_matches_standalone(mcp, stub_service: StubService) -> None:
     stub_service.score_error = DataNotFoundError("no overlap")
-    standalone = structured(await mcp.call_tool("predict_splicing", {"variant": "1-1-A-T"}))
-    batch = structured(await mcp.call_tool("predict_splicing_batch", {"variants": ["1-1-A-T"]}))
+    standalone = structured(await mcp.call_tool("predict_splicing", {"variant_id": "1-1-A-T"}))
+    batch = structured(await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["1-1-A-T"]}))
     item = batch["results"][0]
     for key in ("error_code", "retryable", "recovery_action", "fallback_tool", "recovery"):
         assert item[key] == standalone[key], f"scaffold mismatch on {key}"
@@ -166,7 +168,7 @@ async def test_f12_batch_items_carry_slim_meta(mcp) -> None:
     # serves item 1 from the first result (cache == "deduped", no upstream call).
     res = await mcp.call_tool(
         "predict_splicing_batch",
-        {"variants": ["8-140300616-T-G", "8-140300616-T-G"]},
+        {"variant_ids": ["8-140300616-T-G", "8-140300616-T-G"]},
     )
     data = structured(res)
     first, second = data["results"][0], data["results"][1]
@@ -185,7 +187,7 @@ async def test_f12_batch_items_carry_slim_meta(mcp) -> None:
 
 async def test_c1_rate_limited_carries_concurrency_budget(mcp, stub_service: StubService) -> None:
     stub_service.score_error = RateLimitedError("Local concurrency limit saturated")
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"}))
     assert data["error_code"] == "rate_limited"
     budget = data["_meta"]["rate_budget"]
     assert budget["limit"] == settings.MAX_CONCURRENCY
@@ -197,7 +199,7 @@ async def test_c1_rate_limited_carries_concurrency_budget(mcp, stub_service: Stu
 async def test_c1_success_envelope_rate_budget_is_proactive(mcp) -> None:
     # P1#2: success now carries a proactive pacing budget (min_interval_ms) but no
     # fabricated remaining/retry_after_s -- those appear only on a rate_limited error.
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"}))
     assert data["success"] is True
     rb = data["_meta"]["rate_budget"]
     assert rb["min_interval_ms"] == 12000
@@ -228,9 +230,11 @@ async def test_f17_descriptions_disambiguate_one_vs_both(mcp) -> None:
 
 async def test_inv_batch_item_matches_single_call(mcp) -> None:
     """§8.1 success parity: a batch item == standalone result minus outer envelope."""
-    single = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    single = structured(
+        await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"})
+    )
     batch = structured(
-        await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
+        await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["chr8-140300616-T-G"]})
     )
     item = batch["results"][0]
     shared = ("agreement", "interpretation", "consequence", "transcript", "headline")
@@ -255,12 +259,12 @@ async def test_inv_cross_tool_error_envelope_parity(mcp, stub_service: StubServi
         "recovery",
     }
     for tool in ("predict_spliceai", "predict_pangolin", "predict_splicing", "resolve_variant"):
-        data = structured(await mcp.call_tool(tool, {"variant": "8-140300616-T-G"}))
+        data = structured(await mcp.call_tool(tool, {"variant_id": "8-140300616-T-G"}))
         assert data["success"] is False
         assert required <= set(data), f"{tool} dropped error keys: {required - set(data)}"
         assert "next_commands" in data["_meta"]
     batch = structured(
-        await mcp.call_tool("predict_splicing_batch", {"variants": ["8-140300616-T-G"]})
+        await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["8-140300616-T-G"]})
     )
     item = batch["results"][0]
     assert (required - {"message"}) <= set(item)
@@ -269,13 +273,13 @@ async def test_inv_cross_tool_error_envelope_parity(mcp, stub_service: StubServi
 async def test_inv_no_duplicated_threshold_basis(mcp) -> None:
     """§8.3: the static THRESHOLD_BASIS string appears at most once per payload."""
     combined = structured(
-        await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"})
+        await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"})
     )
     assert json.dumps(combined).count(THRESHOLD_BASIS) <= 1
     batch = structured(
         await mcp.call_tool(
             "predict_splicing_batch",
-            {"variants": ["chr8-140300616-T-G", "8-140300616-T-G"]},
+            {"variant_ids": ["chr8-140300616-T-G", "8-140300616-T-G"]},
         )
     )
     for item in batch["results"]:
@@ -299,7 +303,7 @@ async def test_inv_no_null_leaf_in_full_mode(mcp) -> None:
 
     data = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "response_mode": "full"}
         )
     )
     nulls = [
@@ -356,7 +360,7 @@ async def test_inv_no_null_leaf_in_batch_item(mcp) -> None:
     data = structured(
         await mcp.call_tool(
             "predict_splicing_batch",
-            {"variants": ["chr8-140300616-T-G"], "response_mode": "full"},
+            {"variant_ids": ["chr8-140300616-T-G"], "response_mode": "full"},
         )
     )
     item = data["results"][0]

@@ -23,7 +23,7 @@ def test_out_of_range_helper_detects_beyond_both_builds() -> None:
 async def test_out_of_range_returns_invalid_input_without_scoring(
     mcp, stub_service: StubService
 ) -> None:
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr1-260000000-A-G"}))
+    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr1-260000000-A-G"}))
     assert data["success"] is False
     assert data["error_code"] == "invalid_input"
     assert "248,956,422" in data["message"] and "249,250,621" in data["message"]
@@ -42,14 +42,14 @@ async def test_ref_mismatch_wrong_ref_falls_back_to_capabilities(
 ) -> None:
     # REF 'A' wrong in both builds; not a swap (ALT 'G' != ref base 'T').
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "T"}
-    data = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-A-G"}))
+    data = structured(await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-A-G"}))
     assert data["error_code"] == "ref_mismatch"
     assert data["fallback_tool"] == "get_server_capabilities"
     assert data["fallback_args"] is None
     # the dead-end resolve_variant echo must be gone
     assert not (
         data["fallback_tool"] == "resolve_variant"
-        and (data.get("fallback_args") or {}).get("variant") == "8-140300616-A-G"
+        and (data.get("fallback_args") or {}).get("variant_id") == "8-140300616-A-G"
     )
 
 
@@ -58,20 +58,20 @@ async def test_ref_mismatch_other_build_redirects_to_same_tool_other_build(
 ) -> None:
     # REF 'A' matches the GRCh37 base -> re-run predict on GRCh37.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "A"}
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-A-G"}))
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-A-G"}))
     assert data["error_code"] == "ref_mismatch"
     assert data["fallback_tool"] == "predict_spliceai"
-    assert data["fallback_args"] == {"variant": "8-140300616-A-G", "genome_build": "GRCh37"}
+    assert data["fallback_args"] == {"variant_id": "8-140300616-A-G", "genome_build": "GRCh37"}
     assert data["other_build_hint"]["build"] == "GRCh37"
 
 
 async def test_ref_mismatch_swap_suggests_swapped_variant(mcp, stub_service: StubService) -> None:
     # ALT 'T' equals the reference base 'T' at this locus -> likely REF/ALT swap.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-A-T"}))
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-A-T"}))
     assert data["error_code"] == "ref_mismatch"
     assert data["fallback_tool"] == "predict_spliceai"
-    assert data["fallback_args"] == {"variant": "8-140300616-T-A", "genome_build": "GRCh38"}
+    assert data["fallback_args"] == {"variant_id": "8-140300616-T-A", "genome_build": "GRCh38"}
     assert "swap" in data["recovery"].lower()
 
 
@@ -82,7 +82,7 @@ async def test_spliceai_top_present_in_all_modes(mcp) -> None:
     for mode in ("minimal", "compact", "full"):
         data = structured(
             await mcp.call_tool(
-                "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": mode}
+                "predict_spliceai", {"variant_id": "chr8-140300616-T-G", "response_mode": mode}
             )
         )
         assert data["top"] == {"class": "acceptor_loss", "score": 0.83, "position": -2}, mode
@@ -93,7 +93,7 @@ async def test_pangolin_top_present_in_all_modes(mcp) -> None:
     for mode in ("minimal", "compact", "full"):
         data = structured(
             await mcp.call_tool(
-                "predict_pangolin", {"variant": "chr8-140300616-T-G", "response_mode": mode}
+                "predict_pangolin", {"variant_id": "chr8-140300616-T-G", "response_mode": mode}
             )
         )
         assert data["top"]["class"] == "splice_loss", mode
@@ -105,7 +105,7 @@ async def test_combined_maxes_in_agreement_all_modes(mcp) -> None:
     for mode in ("minimal", "compact", "full"):
         data = structured(
             await mcp.call_tool(
-                "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": mode}
+                "predict_splicing", {"variant_id": "chr8-140300616-T-G", "response_mode": mode}
             )
         )
         ag = data["agreement"]
@@ -121,23 +121,27 @@ async def test_combined_maxes_in_agreement_all_modes(mcp) -> None:
 
 
 async def test_threshold_basis_only_in_full_single_model(mcp) -> None:
-    compact = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    compact = structured(
+        await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-T-G"})
+    )
     assert "threshold_basis" not in compact["interpretation"]
     assert compact["interpretation"]["band"] == "high"
     full = structured(
         await mcp.call_tool(
-            "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+            "predict_spliceai", {"variant_id": "chr8-140300616-T-G", "response_mode": "full"}
         )
     )
     assert "threshold_basis" in full["interpretation"]
 
 
 async def test_threshold_basis_only_in_full_combined(mcp) -> None:
-    compact = structured(await mcp.call_tool("predict_splicing", {"variant": "chr8-140300616-T-G"}))
+    compact = structured(
+        await mcp.call_tool("predict_splicing", {"variant_id": "chr8-140300616-T-G"})
+    )
     assert "threshold_basis" not in compact["interpretation"]
     full = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "response_mode": "full"}
         )
     )
     assert "threshold_basis" in full["interpretation"]
@@ -153,7 +157,7 @@ async def test_capabilities_version_not_duplicated_in_meta(mcp) -> None:
 
 
 async def test_prediction_still_carries_version_in_meta(mcp) -> None:
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-T-G"}))
     assert "capabilities_version" not in data  # no top-level on predictions
     assert "capabilities_version" in data["_meta"]  # provenance lives in _meta here
 
@@ -163,7 +167,7 @@ async def test_prediction_still_carries_version_in_meta(mcp) -> None:
 
 async def test_success_carries_rate_budget(mcp) -> None:
     for tool in ("predict_spliceai", "predict_pangolin", "predict_splicing"):
-        data = structured(await mcp.call_tool(tool, {"variant": "chr8-140300616-T-G"}))
+        data = structured(await mcp.call_tool(tool, {"variant_id": "chr8-140300616-T-G"}))
         rb = data["_meta"]["rate_budget"]
         assert rb["limit"] == 2
         assert rb["unit"] == "concurrent_requests"
@@ -174,7 +178,7 @@ async def test_success_carries_rate_budget(mcp) -> None:
 async def test_rate_budget_present_on_minimal(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": "minimal"}
+            "predict_spliceai", {"variant_id": "chr8-140300616-T-G", "response_mode": "minimal"}
         )
     )
     assert data["_meta"]["rate_budget"]["min_interval_ms"] == 12000
@@ -184,7 +188,7 @@ async def test_rate_limited_error_carries_retry_after(mcp, stub_service: StubSer
     from spliceailookup_link.api import RateLimitedError
 
     stub_service.score_error = RateLimitedError("saturated")
-    data = structured(await mcp.call_tool("predict_spliceai", {"variant": "chr8-140300616-T-G"}))
+    data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "chr8-140300616-T-G"}))
     assert data["error_code"] == "rate_limited"
     rb = data["_meta"]["rate_budget"]
     assert rb["limit"] == 2
@@ -194,7 +198,7 @@ async def test_rate_limited_error_carries_retry_after(mcp, stub_service: StubSer
 
 async def test_batch_envelope_carries_rate_budget(mcp) -> None:
     data = structured(
-        await mcp.call_tool("predict_splicing_batch", {"variants": ["chr8-140300616-T-G"]})
+        await mcp.call_tool("predict_splicing_batch", {"variant_ids": ["chr8-140300616-T-G"]})
     )
     assert data["_meta"]["rate_budget"]["min_interval_ms"] == 12000
 
@@ -205,7 +209,7 @@ async def test_batch_envelope_carries_rate_budget(mcp) -> None:
 async def test_gtex_see_also_uses_gene_id_in_full(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_spliceai", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+            "predict_spliceai", {"variant_id": "chr8-140300616-T-G", "response_mode": "full"}
         )
     )
     gtex = next(h for h in data["_meta"]["see_also"] if h["server"] == "gtex-link")
@@ -216,7 +220,7 @@ async def test_gtex_see_also_uses_gene_id_in_full(mcp) -> None:
 async def test_gtex_see_also_uses_gene_id_combined_full(mcp) -> None:
     data = structured(
         await mcp.call_tool(
-            "predict_splicing", {"variant": "chr8-140300616-T-G", "response_mode": "full"}
+            "predict_splicing", {"variant_id": "chr8-140300616-T-G", "response_mode": "full"}
         )
     )
     gtex = next(h for h in data["_meta"]["see_also"] if h["server"] == "gtex-link")
@@ -257,7 +261,7 @@ async def test_batch_items_have_request_id(mcp) -> None:
     data = structured(
         await mcp.call_tool(
             "predict_splicing_batch",
-            {"variants": ["chr8-140300616-T-G", "chr1-260000000-A-G"]},
+            {"variant_ids": ["chr8-140300616-T-G", "chr1-260000000-A-G"]},
         )
     )
     # success items carry request_id in _meta
@@ -292,7 +296,10 @@ def test_capabilities_document_v0_9_contract() -> None:
     assert "out of range" in ref or "exceeds the chromosome length" in ref
 
 
-def test_version_is_0_10_0() -> None:
+def test_version_matches_package_metadata() -> None:
+    import importlib.metadata
+
     from spliceailookup_link import __version__
 
-    assert __version__ == "0.10.0"
+    assert __version__ == "2.1.0"
+    assert importlib.metadata.version("spliceailookup-link") == __version__

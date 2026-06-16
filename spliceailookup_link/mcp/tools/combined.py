@@ -28,7 +28,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         task=True,
     )
     async def predict_splicing(
-        variant: Annotated[
+        variant_id: Annotated[
             str,
             Field(
                 min_length=1,
@@ -58,8 +58,11 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             Field(description="mane (default, MANE Select) or all overlapping transcripts."),
         ] = "mane",
         response_mode: Annotated[
-            Literal["compact", "full", "minimal"],
-            Field(description="compact (default), full (adds REF/ALT + exon model), or minimal."),
+            Literal["minimal", "compact", "standard", "full"],
+            Field(
+                description="minimal, compact (default), standard, or full "
+                "(adds REF/ALT + exon model)."
+            ),
         ] = "compact",
         cross_build_check: Annotated[
             bool,
@@ -100,7 +103,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             service = service_factory()
             result = await predict_one(
                 service,
-                variant=variant,
+                variant=variant_id,
                 genome_build=genome_build,
                 max_distance=max_distance,
                 mask=mask,
@@ -150,7 +153,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             "predict_splicing",
             call,
             context=McpErrorContext(
-                tool_name="predict_splicing", variant=variant, genome_build=genome_build
+                tool_name="predict_splicing", variant=variant_id, genome_build=genome_build
             ),
             lean_meta=lean,
             correlation_id=correlation_id,

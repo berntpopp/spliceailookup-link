@@ -27,7 +27,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         task=True,
     )
     async def predict_splicing_batch(
-        variants: Annotated[
+        variant_ids: Annotated[
             list[str],
             Field(
                 min_length=1,
@@ -43,7 +43,9 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         mask: Annotated[Literal["raw", "masked"], Field()] = "raw",
         gene_set: Annotated[Literal["basic", "comprehensive"], Field()] = "basic",
         transcripts: Annotated[Literal["mane", "all"], Field()] = "mane",
-        response_mode: Annotated[Literal["compact", "full", "minimal"], Field()] = "compact",
+        response_mode: Annotated[
+            Literal["minimal", "compact", "standard", "full"], Field()
+        ] = "compact",
         cross_build_check: Annotated[bool, Field()] = True,
         correlation_id: Annotated[
             str | None,
@@ -62,7 +64,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
             service = service_factory()
             out = await run_batch(
                 service,
-                variants=variants,
+                variants=variant_ids,
                 genome_build=genome_build,
                 params={
                     "max_distance": max_distance,

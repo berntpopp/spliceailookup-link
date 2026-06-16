@@ -1,0 +1,73 @@
+# Nginx Proxy Manager deployment overlay for spliceailookup-link.
+#
+# Self-contained (used standalone, not layered on docker-compose.yml): one
+# unified container serves the FastAPI REST API on / (+ /health) and the MCP
+# streamable-HTTP transport on /mcp via a single port (8000). NPM reverse-proxies
+# to the fixed container_name on the shared external npm_default network. Mirrors
+# the gtex-link / uniprot-link fleet pattern. Light, stateless proxy to the Broad
+# SpliceAI Lookup / Pangolin / Ensembl services (no local models, no DB/volume).
+#
+#   docker compose -f docker/docker-compose.npm.yml --env-file .env.docker up -d --build
+name: spliceailookup-link-npm
+
+services:
+  spliceailookup_link:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: spliceailookup-link-npm
+    # NO published host ports - NPM handles all routing via the container name.
+    # Override the image's :8603 default to :8000 for fleet consistency.
+    expose:
+      - "8000"
+    environment:
+      - SPLICEAILOOKUP_LINK_MCP_TRANSPORT=unified
+      - SPLICEAILOOKUP_LINK_MCP_HOST=0.0.0.0
+      - SPLICEAILOOKUP_LINK_MCP_PORT=8000
+      - SPLICEAILOOKUP_LINK_MCP_PATH=/mcp
+      - SPLICEAILOOKUP_LINK_LOG_LEVEL=${LOG_LEVEL_API:-INFO}
+      - SPLICEAILOOKUP_LINK_LOG_FORMAT=json
+    command: ["spliceailookup-link", "serve", "--transport", "unified", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    networks:
+      - spliceailookup_link_internal_net
+      - npm_proxy_network
+    deploy:
+      resources:
+        limits:
+          memory: ${SPLICEAI_API_MEMORY_LIMIT:-512m}
+          cpus: ${SPLICEAI_API_CPU_LIMIT:-0.5}
+          pids: 256
+        reservations:
+          memory: 128m
+          cpus: 0.25
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service=spliceailookup-link,environment=production,proxy=npm"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    init: true
+
+networks:
+  spliceailookup_link_internal_net:
+    driver: bridge
+    name: spliceailookup_link_internal_net
+  npm_proxy_network:
+    external: true
+    name: ${NPM_SHARED_NETWORK_NAME:-npm_default}

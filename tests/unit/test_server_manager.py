@@ -35,7 +35,7 @@ def test_create_mcp_server_registers_tools() -> None:
 def test_fastapi_host_health_endpoint() -> None:
     manager = UnifiedServerManager()
     manager.logger = logging.getLogger("test")
-    manager._current_transport = "unified"
+    manager._current_transport = "streamable-http-stateless"
     config = ServerConfig(transport="unified")
     app = asyncio.run(manager._create_fastapi_app(config))
     with TestClient(app) as client:
@@ -43,7 +43,29 @@ def test_fastapi_host_health_endpoint() -> None:
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "healthy"
-        assert body["transport"] == "unified"
+        assert body["transport"] == "streamable-http-stateless"
+
+
+def test_health_has_version_and_transport_fields() -> None:
+    """MCP Transport Standard v1: /health must return {status, version, transport}."""
+    from spliceailookup_link import __version__
+
+    manager = UnifiedServerManager()
+    manager.logger = logging.getLogger("test")
+    manager._current_transport = "streamable-http-stateless"
+    config = ServerConfig(transport="unified")
+    app = asyncio.run(manager._create_fastapi_app(config))
+    with TestClient(app) as client:
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "healthy"
+        assert body["version"] == __version__, (
+            f"expected {__version__!r}, got {body.get('version')!r}"
+        )
+        assert body["transport"] == "streamable-http-stateless", (
+            f"expected 'streamable-http-stateless', got {body.get('transport')!r}"
+        )
 
 
 def _build_unified_app(manager: UnifiedServerManager, config: ServerConfig):
@@ -72,7 +94,7 @@ def test_post_mcp_is_not_redirect() -> None:
     """Regression: POST /mcp must reach the MCP app directly, not 307 to /mcp/."""
     manager = UnifiedServerManager()
     manager.logger = logging.getLogger("test")
-    manager._current_transport = "unified"
+    manager._current_transport = "streamable-http-stateless"
     config = ServerConfig(transport="unified", mcp_path="/mcp")
     app = _build_unified_app(manager, config)
 

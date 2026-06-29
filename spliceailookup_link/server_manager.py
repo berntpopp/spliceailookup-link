@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
 
+from spliceailookup_link import __version__
 from spliceailookup_link.config import ServerConfig, settings
 from spliceailookup_link.exceptions import ConfigurationError, MCPIntegrationError, StartupError
 from spliceailookup_link.logging_config import bind_correlation_id_middleware, configure_logging
@@ -82,7 +83,11 @@ class UnifiedServerManager:
 
         @app.get("/health")
         async def health() -> dict[str, str]:
-            return {"status": "healthy", "transport": self._current_transport}
+            return {
+                "status": "healthy",
+                "version": __version__,
+                "transport": self._current_transport,
+            }
 
         return app
 
@@ -121,7 +126,7 @@ class UnifiedServerManager:
 
     async def start_unified_server(self, config: ServerConfig) -> None:
         try:
-            self._current_transport = "unified"
+            self._current_transport = "streamable-http-stateless"
             self.logger = configure_logging(config.log_level)
 
             self.app = await self._create_fastapi_app(config)

@@ -1,0 +1,59 @@
+# Keep the Docker build context small, reproducible, and secret-free
+# (GeneFoundry Container & Deployment Hardening Standard v1, rule 4).
+
+# Version control / CI / editor metadata
+.git
+.github/
+.gitignore
+.gitattributes
+.pre-commit-config.yaml
+.vscode/
+.idea/
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Tests and docs (not needed in the runtime image)
+tests/
+docs/
+scripts/
+
+# Secrets / local env — never ship into an image layer
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Markdown (the build only needs README.md)
+*.md
+!README.md
+
+# OS / misc
+*.log
+*.tmp
+*.temp
+*.bak
+.DS_Store
+Thumbs.db

@@ -31,19 +31,19 @@ def _capabilities_version(doc: dict[str, Any]) -> tuple[str, int]:
     return digest, len(serialized)
 
 
-_CAPABILITIES_VERSION: str | None = None
-
-
 def get_capabilities_version() -> str:
-    """The full capabilities doc's content hash, computed once and cached.
+    """The full capabilities doc's content hash.
 
     Echoed into every response `_meta` so a warm client compares the hash and
-    skips re-fetching the capabilities document until it actually changes.
+    skips re-fetching the capabilities document until it actually changes. The
+    document is deterministic for a given configuration, so the hash is recomputed
+    from the live document on each call rather than memoized: a module-level cache
+    would otherwise pin the *first* value it ever computed and diverge from the
+    document if any configuration value feeding it (concurrency, deadlines) changed
+    after warm-up. Recomputation is a sub-millisecond JSON dump + SHA-256.
     """
-    global _CAPABILITIES_VERSION
-    if _CAPABILITIES_VERSION is None:
-        _CAPABILITIES_VERSION = get_capabilities_resource()["capabilities_version"]
-    return _CAPABILITIES_VERSION
+    version_hash: str = get_capabilities_resource()["capabilities_version"]
+    return version_hash
 
 
 def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:

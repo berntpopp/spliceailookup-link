@@ -44,3 +44,52 @@ def test_fastapi_host_health_endpoint() -> None:
         body = resp.json()
         assert body["status"] == "healthy"
         assert body["transport"] == "unified"
+
+
+def _build_unified_app(manager: UnifiedServerManager, config: ServerConfig):
+    """Replicate ``start_unified_server`` wiring without uvicorn.
+
+    Mirrors the production mount: the MCP path is baked into the sub-app via
+    ``http_app(path=config.mcp_path)`` and the sub-app is mounted at "/" so the
+    endpoint is served at ``/mcp`` directly (no 307 redirect to ``/mcp/``).
+    """
+    app = asyncio.run(manager._create_fastapi_app(config))
+    manager.app = app
+
+    def service_factory() -> SpliceService:
+        return manager.app.state.splice_service  # type: ignore[union-attr,return-value]
+
+    manager.mcp = manager._create_mcp_server(service_factory)
+    mcp_http_app = manager.mcp.http_app(
+        path=config.mcp_path, stateless_http=True, json_response=True
+    )
+    manager._compose_lifespan(app, mcp_http_app)
+    app.mount("/", mcp_http_app)
+    return app
+
+
+def test_post_mcp_is_not_redirect() -> None:
+    """Regression: POST /mcp must reach the MCP app directly, not 307 to /mcp/."""
+    manager = UnifiedServerManager()
+    manager.logger = logging.getLogger("test")
+    manager._current_transport = "unified"
+    config = ServerConfig(transport="unified", mcp_path="/mcp")
+    app = _build_unified_app(manager, config)
+
+    init = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "s", "version": "1"},
+        },
+    }
+    headers = {"Accept": "application/json, text/event-stream"}
+    with TestClient(app) as client:
+        resp = client.post("/mcp", json=init, headers=headers, follow_redirects=False)
+        assert resp.status_code != 307
+        assert resp.status_code == 200
+        # FastAPI's own routes still take precedence over the root mount.
+        assert client.get("/health").status_code == 200

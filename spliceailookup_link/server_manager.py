@@ -132,9 +132,18 @@ class UnifiedServerManager:
                 return cast(SpliceService, self.app.state.splice_service)
 
             self.mcp = self._create_mcp_server(service_factory)
-            mcp_http_app = self.mcp.http_app(path="/", stateless_http=True, json_response=True)
+            # Bake the MCP path ("/mcp") into the StarletteWithLifespan routes
+            # returned by http_app(path=...), then mount that sub-app at the
+            # project root. This serves the MCP endpoint at "/mcp" directly
+            # rather than "/mcp/", avoiding a 307 redirect on POST /mcp and
+            # matching the rest of the fleet (canonical gtex-link pattern).
+            # FastAPI's own routes (/health, /api/...) are registered before
+            # this mount, so they continue to take precedence.
+            mcp_http_app = self.mcp.http_app(
+                path=config.mcp_path, stateless_http=True, json_response=True
+            )
             self._compose_lifespan(self.app, mcp_http_app)
-            self.app.mount(config.mcp_path, mcp_http_app)
+            self.app.mount("/", mcp_http_app)
 
             self.logger.info(f"MCP HTTP at http://{config.host}:{config.port}{config.mcp_path}")
             self.logger.info(f"Health at http://{config.host}:{config.port}/health")

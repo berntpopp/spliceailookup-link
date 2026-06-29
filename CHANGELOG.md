@@ -3,6 +3,18 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.2.1] — 2026-06-29
+
+### Security — adopted the GeneFoundry Container & Deployment Hardening Standard v1
+
+Added a `docker/docker-compose.prod.yml` hardening overlay (read-only rootfs +
+explicit writable tmpfs, `cap_drop: ALL`, `no-new-privileges`, `init`, and
+memory/CPU/PID limits; expose-only with `ports: !reset []`), added a
+`HEALTHCHECK` to the Dockerfile, digest-pinned the `python:3.14-slim` base image,
+added a root `.dockerignore`, added a `container-security` CI workflow (Trivy
+scan failing on fixable HIGH/CRITICAL + CycloneDX SBOM artifact), and fixed the
+CORS middleware to never pair wildcard origins with `allow_credentials=True`.
+
 ## [2.2.0] — 2026-06-16
 
 ### Changed — MCP tool errors are now raised, fleet-uniform (`isError: true`)

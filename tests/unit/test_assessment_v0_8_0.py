@@ -300,5 +300,5 @@ def test_version_matches_package_metadata() -> None:
 
     from spliceailookup_link import __version__
 
-    assert __version__ == "2.2.0"
+    assert __version__ == "2.2.1"
     assert importlib.metadata.version("spliceailookup-link") == __version__

@@ -1,4 +1,4 @@
-"""Tool-name & argument compliance with the GeneFoundry Tool-Naming Standard v1.
+"""Tool-name & argument compliance with the GeneFoundry Tool-Naming Standard v1.1.
 
 Every registered tool must be unprefixed, snake_case, <= 50 chars, and start with
 a canonical verb so it composes cleanly behind the ``genefoundry-router`` gateway,
@@ -6,11 +6,22 @@ which mounts this server under the ``spliceai`` namespace (tools surface as
 ``spliceai_<tool>``). Guards against future drift. See issue
 berntpopp/spliceailookup-link#2.
 
-Per issue #2 (resolution A), ``predict`` is part of this server's canonical verb
-set: splice scoring is ML inference, which the base verb list does not otherwise
-cover. ``ops``-tagged side-effecting utilities (e.g. ``warmup``) are exempt from
-the verb rule per the documented fleet ops carve-out, but still must match the
-name charset/length and must not self-prefix the namespace token.
+VERB CANON (ratified Standard v1.1, 2026-06-30)
+------------------------------------------------
+Tier-1 (universal read/query, all backends):
+    get, search, list, resolve, find, compare, compute, map
+
+Tier-2 (sanctioned domain action/compute verbs):
+    predict, annotate, recode, liftover, analyze, score,
+    submit, export, generate, download
+
+``predict`` is now ratified Tier-2 (ML inference verb, fleet-wide decision).
+Prior local extension "issue #2 resolution A" is superseded by the ratification.
+
+Operational/meta carve-out (by tag, not verb, Standard v1.1 §Q3):
+    Tools tagged ``ops`` or ``meta`` skip the verb rule but still must match the
+    name charset/length and must not self-prefix the namespace token.
+    Covers ``warmup`` and similar infrastructure utilities.
 """
 
 from __future__ import annotations
@@ -21,10 +32,31 @@ from typing import Any
 import pytest
 
 _NAME_RE = re.compile(r"^[a-z0-9_]{1,50}$")
-# Base fleet verbs + ``predict`` (issue #2, resolution A: ML inference verb).
+
+# Ratified Tier-1: universal read/query canon (Standard v1.1, Rule 2).
 _CANONICAL_VERBS = frozenset(
-    {"get", "search", "list", "resolve", "find", "compare", "compute", "predict"}
+    {"get", "search", "list", "resolve", "find", "compare", "compute", "map"}
 )
+
+# Ratified Tier-2: sanctioned domain action/compute verbs (Standard v1.1).
+_TIER2_VERBS = frozenset(
+    {
+        "predict",
+        "annotate",
+        "recode",
+        "liftover",
+        "analyze",
+        "score",
+        "submit",
+        "export",
+        "generate",
+        "download",
+    }
+)
+
+# Combined allowed verb set for domain tools.
+_ALL_VERBS = _CANONICAL_VERBS | _TIER2_VERBS
+
 _NAMESPACE = "spliceai"
 
 # Fleet-canon argument names that supersede local synonyms (issue #2, Rule 4).
@@ -33,7 +65,7 @@ _NAMESPACE = "spliceai"
 _FORBIDDEN_ARGS = frozenset({"variant", "variants"})
 
 
-async def test_tool_names_conform_to_standard_v1(mcp: Any) -> None:
+async def test_tool_names_conform_to_standard_v1_1(mcp: Any) -> None:
     tools = await mcp.list_tools()
     assert tools, "no tools registered on the facade"
     for tool in tools:
@@ -44,11 +76,15 @@ async def test_tool_names_conform_to_standard_v1(mcp: Any) -> None:
             f"{name!r} must not self-prefix the '{_NAMESPACE}' namespace "
             "token — the gateway adds it"
         )
-        # ``ops`` utilities (warmup/health) are exempt from the verb rule.
-        if "ops" in tags:
+        # Ops/meta tag carve-out (Standard v1.1 §Q3, ratified fleet rule):
+        # infrastructure tools are exempt from the verb rule.
+        if "ops" in tags or "meta" in tags:
             continue
-        assert name.split("_", 1)[0] in _CANONICAL_VERBS, (
-            f"{name!r} must start with a canonical verb {sorted(_CANONICAL_VERBS)}"
+        assert name.split("_", 1)[0] in _ALL_VERBS, (
+            f"{name!r} must start with a Tier-1 or Tier-2 verb; "
+            f"Tier-1: {sorted(_CANONICAL_VERBS)}, Tier-2: {sorted(_TIER2_VERBS)}; "
+            "or tag the tool 'ops'/'meta' for the operational carve-out "
+            "(Standard v1.1, genefoundry-router/docs/TOOL-NAMING-STANDARD-v1.md)"
         )
 
 

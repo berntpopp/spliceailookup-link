@@ -9,6 +9,7 @@ from fastmcp import Context, FastMCP
 from pydantic import Field
 
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
+from spliceailookup_link.mcp.envelope import latency_hint
 from spliceailookup_link.mcp.errors import run_mcp_tool
 from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.tools._batch_runner import run_batch
@@ -81,6 +82,15 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                 max_items=_MAX_BATCH,
             )
             out["_meta"]["provenance"] = prediction_provenance(genome_build)
+            # Response-Envelope Standard v1 SS7: typed cold-latency hint alongside
+            # the protocol-level execution.taskSupport (task=True above). Items run
+            # largely one at a time under the concurrency cap (see module docstring),
+            # so the worst-case cold estimate scales with the submitted item count.
+            out["_meta"].update(latency_hint("high", min(len(variant_ids), _MAX_BATCH) * 60_000))
             return out
 
-        return await run_mcp_tool("predict_splicing_batch", call, correlation_id=correlation_id)
+        # Already the SS1 collection frame (`results` array + sibling domain
+        # keys count/summary/summary_top_variant) -- do not double-wrap under `result`.
+        return await run_mcp_tool(
+            "predict_splicing_batch", call, correlation_id=correlation_id, envelope_key=None
+        )

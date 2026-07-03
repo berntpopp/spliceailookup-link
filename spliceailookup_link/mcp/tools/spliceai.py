@@ -11,7 +11,8 @@ from pydantic import Field
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
+from spliceailookup_link.mcp.envelope import latency_hint, rate_budget_snapshot
+from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import cmd
 from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.shaping import shape_spliceai
@@ -165,6 +166,9 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 ),
                 # P1#2: proactive pacing signal, kept even on the lean/minimal path.
                 "rate_budget": rate_budget_snapshot(saturated=False),
+                # Response-Envelope Standard v1 SS7: typed cold-latency hint
+                # alongside the protocol-level execution.taskSupport (task=True above).
+                **latency_hint("medium", 30_000),
             }
             if include_hints:
                 meta["next_commands"] = [

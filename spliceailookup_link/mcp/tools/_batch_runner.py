@@ -219,7 +219,7 @@ async def run_batch(
         "upstream_calls_saved": upstream_calls_saved,
         **verdict_counts,
     }
-    from spliceailookup_link.mcp.errors import rate_budget_snapshot
+    from spliceailookup_link.mcp.envelope import rate_budget_snapshot
 
     meta: dict[str, Any] = {
         "items_submitted": total,

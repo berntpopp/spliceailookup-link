@@ -3,6 +3,40 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.0] — 2026-07-03
+
+### Changed — adopted the ratified GeneFoundry Response-Envelope Standard v1 (BREAKING)
+
+**Response shape changed for every tool** (pre-alpha, no shims): single-item
+tools (`predict_spliceai`, `predict_pangolin`, `predict_splicing`,
+`resolve_variant`, `get_server_capabilities`, `warmup`) now nest their domain
+payload under a `result` object (`{"success": true, "result": {...}, "_meta": {...}}`)
+instead of returning the fields flat at the top level next to `success`/`_meta`.
+`predict_splicing_batch` is unchanged (it already returned the SS1 collection
+frame: a `results` array plus sibling `count`/`summary`/`summary_top_variant`).
+
+- **Errors are now delivered in-band, reversing v2.2.0**: a failing tool call
+  returns a normal MCP result with `isError: true` **and** the flat error
+  envelope (`error_code`, `message`, `retryable`, `recovery_action`,
+  `fallback_tool`, `next_commands`, `_meta`, ...) present as
+  `structuredContent` on that same result, instead of a raised
+  `fastmcp.exceptions.ToolError` carrying only a text message. Verified
+  against the installed fastmcp 3.4.2: a tool may return a
+  `fastmcp.tools.tool.ToolResult(is_error=True, structured_content=...)`,
+  which `Tool.convert_result` passes straight through untouched.
+- **Typed cold-latency hints**: `predict_spliceai` / `predict_pangolin`
+  (`cost_tier: "medium"`, `expected_cold_latency_ms: 30000`),
+  `predict_splicing` (`"high"`, `60000`), and `predict_splicing_batch`
+  (`"high"`, scaled by submitted item count) now carry these fields in
+  `_meta` so a caller can plan for a slow call before it blocks a turn.
+- **`execution.taskSupport` was already correctly declared** (via `task=True`
+  on the prediction tools, backed by the installed fastmcp 3.4.2
+  `Tool.task_config.mode` -> `ToolExecution(taskSupport="optional")` on the
+  wire MCP `Tool`); this release adds the `_meta` latency hint alongside it.
+- Batch per-item failures are unchanged: they stay embedded in a successful
+  `predict_splicing_batch` envelope so one bad variant never fails its
+  siblings.
+
 ## [2.2.1] — 2026-06-29
 
 ### Security — adopted the GeneFoundry Container & Deployment Hardening Standard v1

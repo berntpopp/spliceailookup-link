@@ -10,7 +10,8 @@ from pydantic import Field
 
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
-from spliceailookup_link.mcp.errors import McpErrorContext, rate_budget_snapshot, run_mcp_tool
+from spliceailookup_link.mcp.envelope import latency_hint, rate_budget_snapshot
+from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import for_combined
 from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.tools._common import see_also_for
@@ -116,7 +117,10 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             tel = result.pop("_telemetry")
             if response_mode != "minimal":
                 result["provenance"] = prediction_provenance(genome_build)
-            meta: dict[str, Any] = {}
+            # Response-Envelope Standard v1 SS7: typed cold-latency hint
+            # alongside the protocol-level execution.taskSupport (task=True above).
+            # This is the ~60s two-model call the standard's SS7 names explicitly.
+            meta: dict[str, Any] = dict(latency_hint("high", 60_000))
             if include_hints:
                 meta["next_commands"] = for_combined(result["variant_id"], genome_build)
                 if include_see_also and response_mode != "minimal":

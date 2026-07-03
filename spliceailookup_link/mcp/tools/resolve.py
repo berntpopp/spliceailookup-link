@@ -17,25 +17,37 @@ from spliceailookup_link.mcp.tools._diagnose import check_ref as run_ref_check
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.variant import unsupported_contig_reason
 
+# Response-Envelope Standard v1 SS1: the frame is {success, result, _meta}; the
+# domain fields (below) live under `result`, not flat at the top level.
+_RESULT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "variant_id": {"type": ["string", "null"]},
+        "genome_build": {"type": "string"},
+        "input_kind": {"type": "string"},
+        "source": {"type": "string"},
+        "gene_symbol": {"type": ["string", "null"]},
+        "consequence": {"type": ["string", "null"]},
+        "assembly_name": {"type": ["string", "null"]},
+        "ambiguous": {"type": "boolean"},
+        "scoring_supported": {"type": "boolean"},
+        "variant_ids": {"type": "array", "items": {"type": "string"}},
+        "note": {"type": ["string", "null"]},
+        "ref_validated": {"type": ["boolean", "null"]},
+        "ref_warning": {"type": ["string", "null"]},
+    },
+    "required": ["variant_id", "genome_build"],
+}
+
 _OUTPUT_SCHEMA = relax_output_schema(
     {
         "type": "object",
         "properties": {
-            "variant_id": {"type": ["string", "null"]},
-            "genome_build": {"type": "string"},
-            "input_kind": {"type": "string"},
-            "source": {"type": "string"},
-            "gene_symbol": {"type": ["string", "null"]},
-            "consequence": {"type": ["string", "null"]},
-            "assembly_name": {"type": ["string", "null"]},
-            "ambiguous": {"type": "boolean"},
-            "scoring_supported": {"type": "boolean"},
-            "variant_ids": {"type": "array", "items": {"type": "string"}},
-            "note": {"type": ["string", "null"]},
-            "ref_validated": {"type": ["boolean", "null"]},
-            "ref_warning": {"type": ["string", "null"]},
+            "success": {"type": "boolean"},
+            "result": _RESULT_SCHEMA,
+            "_meta": {"type": "object"},
         },
-        "required": ["variant_id", "genome_build"],
+        "required": ["success"],
     }
 )
 

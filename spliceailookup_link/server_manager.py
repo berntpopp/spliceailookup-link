@@ -62,7 +62,7 @@ class UnifiedServerManager:
         app = FastAPI(
             title="spliceailookup-link MCP Host",
             description="Thin FastAPI host exposing /health and mounting the MCP HTTP app at /mcp.",
-            version="2.0.0",
+            version=__version__,
             lifespan=lifespan,
             docs_url=None,
             redoc_url=None,

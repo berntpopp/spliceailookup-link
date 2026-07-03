@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from fastmcp import FastMCP
 
+from spliceailookup_link import __version__
 from spliceailookup_link.mcp.errors import install_validation_error_handler
 from spliceailookup_link.mcp.resources import RESEARCH_USE_NOTICE
 from spliceailookup_link.mcp.tools import register_splice_tools
@@ -50,6 +51,7 @@ def create_spliceai_mcp(*, service_factory: Callable[[], SpliceService]) -> Fast
     # the sync resources -- to be task-eligible (and async).
     mcp = FastMCP(
         name="spliceailookup-link",
+        version=__version__,
         instructions=_INSTRUCTIONS,
         mask_error_details=True,
     )

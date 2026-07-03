@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from mcp.types import LATEST_PROTOCOL_VERSION as MCP_PROTOCOL_VERSION
@@ -19,10 +18,9 @@ RESEARCH_USE_NOTICE = (
 
 
 def _server_version() -> str:
-    try:
-        return version("spliceailookup-link")
-    except PackageNotFoundError:
-        return "unknown"
+    from spliceailookup_link import __version__
+
+    return __version__
 
 
 def _capabilities_version(doc: dict[str, Any]) -> tuple[str, int]:

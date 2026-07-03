@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import pytest
-from fastmcp.exceptions import ToolError
 
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.mcp.facade import create_spliceai_mcp
@@ -141,8 +139,17 @@ def mcp(stub_service: StubService):
     return create_spliceai_mcp(service_factory=lambda: stub_service)
 
 
-def structured(result: Any) -> dict[str, Any]:
-    """Extract the structured payload from a FastMCP call_tool result."""
+def envelope(result: Any) -> dict[str, Any]:
+    """Return the RAW structuredContent exactly as the tool returned it.
+
+    Response-Envelope Standard v1: single-item success results are framed as
+    ``{"success": true, "result": {...}, "_meta": {...}}``; collection tools
+    (predict_splicing_batch) return ``{"success": true, "results": [...], ...}``
+    directly; execution errors are the flat ``{"success": false, "error_code",
+    ...}`` frame. Use this helper for envelope-SHAPE conformance assertions.
+    Use ``structured()`` below for legacy field-level assertions that predate
+    the ``result`` wrapper.
+    """
     sc = getattr(result, "structured_content", None)
     if sc is None:
         sc = getattr(result, "data", None)
@@ -151,26 +158,58 @@ def structured(result: Any) -> dict[str, Any]:
     return sc or {}
 
 
+def structured(result: Any) -> dict[str, Any]:
+    """Extract + flatten the structured payload from a FastMCP call_tool result.
+
+    Single-item success envelopes nest the domain payload under ``result``
+    (Response-Envelope Standard v1 SS1); this transparently unwraps it (dropping
+    the wrapper key, not merging it alongside a duplicate copy) so existing call
+    sites can keep asserting domain fields at the top level next to
+    ``success``/``_meta``. Collection envelopes (``results`` array + sibling
+    domain keys) and error envelopes are already flat and pass through
+    unchanged. Use ``envelope()`` to assert on the raw wire frame instead.
+    """
+    sc = envelope(result)
+    inner = sc.get("result")
+    if isinstance(inner, dict):
+        flattened = dict(inner)
+        flattened["success"] = sc.get("success", True)
+        if "_meta" in sc:
+            flattened["_meta"] = sc["_meta"]
+        return flattened
+    return sc
+
+
 async def expect_tool_error(
     mcp: Any, name: str, arguments: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """Call a tool expected to FAIL and return its structured error envelope.
 
-    Top-level tools surface failures fleet-uniformly (like gtex-link /
-    genereviews-link error_passthrough) as ``fastmcp.exceptions.ToolError`` whose
-    message is the compact-JSON structured envelope (error_code, recovery,
-    fallback_tool, next_commands, _meta, ...). This decodes that JSON and returns
-    it so a test can assert on the envelope exactly as it used to on the old
-    in-band ``success:false`` dict.
+    Response-Envelope Standard v1 SS2: execution errors are delivered IN-BAND --
+    a normal tool result with MCP ``isError: true`` AND the flat error envelope
+    (error_code, recovery, fallback_tool, next_commands, _meta, ...) present as
+    ``structuredContent`` on that SAME result -- not raised as a bare
+    ``fastmcp.exceptions.ToolError`` (that shape only carries a text message and
+    drops structuredContent). This awaits the call directly, asserts
+    ``is_error``, and returns the decoded envelope.
 
-    NOTE: per-item batch failures are NOT raised -- they stay embedded in a
-    SUCCESSFUL predict_splicing_batch envelope (one bad variant must not fail its
-    siblings). Use ``structured()`` and read ``results[i]`` for those.
+    NOTE: per-item batch failures are NOT delivered as isError -- they stay
+    embedded in a SUCCESSFUL predict_splicing_batch envelope (one bad variant
+    must not fail its siblings). Use ``structured()`` and read ``results[i]``
+    for those.
     """
-    with pytest.raises(ToolError) as excinfo:
-        await mcp.call_tool(name, arguments or {})
-    return json.loads(str(excinfo.value))
+    result = await mcp.call_tool(name, arguments or {})
+    assert getattr(result, "is_error", False) is True, (
+        f"{name} did not signal is_error=True for a failing call"
+    )
+    return structured(result)
 
 
 # Re-export so tests can build their own error scenarios.
-__all__ = ["StubService", "structured", "expect_tool_error", "ToolError", "DataNotFoundError"]
+__all__ = [
+    "StubService",
+    "structured",
+    "envelope",
+    "expect_tool_error",
+    "DataNotFoundError",
+]

@@ -1,16 +1,27 @@
 """Structured MCP error envelopes for spliceailookup-link.
 
-Patterned after gnomad-link / pubtator-link. The envelope shape is what LLMs
-branch on; codes are deterministic per exception class so prompts can recover
-without scraping free text. Every top-level tool body runs inside run_mcp_tool.
+Patterned after gnomad-link / pubtator-link / clingen-link. The envelope shape
+is what LLMs branch on; codes are deterministic per exception class so prompts
+can recover without scraping free text. Every top-level tool body runs inside
+run_mcp_tool.
 
-Error delivery is fleet-uniform with gtex-link / genereviews-link
-(error_passthrough): on failure run_mcp_tool RAISES ``fastmcp.exceptions.ToolError``
-carrying the full structured envelope as compact JSON, so the client sees an MCP
-error result (isError=true) rather than an in-band ``success:false`` body. The
-rich envelope (error_code, recovery, fallback_tool, next_commands, _meta, ...) is
-preserved verbatim in the ToolError message, which FastMCP passes through
-unredacted even with mask_error_details=True.
+Envelope shape follows the ratified GeneFoundry Response-Envelope Standard v1
+(the "flat banner" contract): success results nest the domain payload under
+``result`` (single item) or ``results`` (collection, e.g. predict_splicing_batch),
+both siblings of ``success``/``_meta``. Execution errors are delivered IN-BAND:
+run_mcp_tool returns a ``fastmcp.tools.tool.ToolResult`` with ``is_error=True``
+AND the flat envelope (error_code, recovery, fallback_tool, next_commands,
+_meta, ...) as ``structured_content`` on that SAME result -- not a raised
+``ToolError`` (which only carries a text message and drops structuredContent,
+the shape v1 SS2 requires). ``Tool.convert_result`` (fastmcp 3.4.2) passes a
+returned ``ToolResult`` straight through without re-validating it against the
+declared output schema, so this works with every tool's existing (already
+loosely-declared) output_schema.
+
+Pure envelope-shape helpers (``rate_budget_snapshot``, ``latency_hint``,
+``error_tool_result``, ``frame_success``) live in the sibling ``mcp/envelope.py``
+module (600-LOC budget); this module owns exception -> error_code classification
+and the ``run_mcp_tool`` orchestration.
 
 Batch per-item failures are the deliberate exception: they are built with
 mcp_tool_error(...).payload and embedded in a SUCCESSFUL batch envelope so one
@@ -26,9 +37,9 @@ import uuid
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, NoReturn
+from typing import Any
 
-from fastmcp.exceptions import ToolError
+from fastmcp.tools.tool import ToolResult
 from pydantic import ValidationError as PydanticValidationError
 
 from spliceailookup_link.api import (
@@ -37,7 +48,11 @@ from spliceailookup_link.api import (
     SpliceApiError,
     UpstreamInputError,
 )
-from spliceailookup_link.config import settings
+from spliceailookup_link.mcp.envelope import (
+    error_tool_result,
+    frame_success,
+    rate_budget_snapshot,
+)
 from spliceailookup_link.mcp.resources import get_capabilities_version
 from spliceailookup_link.variant import UnsupportedContigError, VariantParseError
 
@@ -142,24 +157,6 @@ class CoordinateRangeError(ValueError):
 
 def _provenance_meta() -> dict[str, Any]:
     return {**_BASE_META, "capabilities_version": get_capabilities_version()}
-
-
-def rate_budget_snapshot(*, saturated: bool) -> dict[str, Any]:
-    """The advertised concurrency budget + soft client-pacing interval.
-
-    The cap is a LOCAL asyncio.Semaphore (MAX_CONCURRENCY), not a tracked time-window
-    quota. On success we advertise the soft min spacing for cache-miss calls; on a
-    rate_limited failure we add remaining=0 and a retry_after_s for immediate backoff.
-    """
-    snap: dict[str, Any] = {
-        "limit": settings.MAX_CONCURRENCY,
-        "unit": "concurrent_requests",
-        "min_interval_ms": settings.RATE_BUDGET_MIN_INTERVAL_MS,
-    }
-    if saturated:
-        snap["remaining"] = 0
-        snap["retry_after_s"] = max(1, round(settings.RATE_BUDGET_MIN_INTERVAL_MS / 1000))
-    return snap
 
 
 def _safe_message(exc: BaseException) -> str:
@@ -410,9 +407,9 @@ def install_validation_error_handler(mcp_server: Any) -> None:
                     message=envelope["message"],
                     raw_message=str(exc),
                 )
-                # Fleet-uniform: surface argument-validation failures as a ToolError
-                # (isError=true) carrying the structured envelope, not an in-band body.
-                _raise_tool_error(envelope)
+                # Response-Envelope Standard v1 SS2: in-band isError=true result
+                # carrying the flat envelope as structuredContent.
+                return error_tool_result(envelope)
 
         object.__setattr__(tool, "run", wrapped_run)
         object.__setattr__(tool, "_splice_validation_wrapped", True)
@@ -518,18 +515,6 @@ def clear_recent_errors() -> None:
     _RECENT_ERRORS.clear()
 
 
-def _raise_tool_error(payload: dict[str, Any]) -> NoReturn:
-    """Surface a structured envelope as a FastMCP ToolError (fleet-uniform).
-
-    The envelope is serialised compactly as the ToolError message so the MCP
-    client receives an error result (isError=true) carrying every recovery field
-    -- matching gtex-link / genereviews-link error_passthrough -- instead of an
-    in-band success:false body. ToolError is passed through mask_error_details
-    unredacted by design, so the JSON reaches the client intact.
-    """
-    raise ToolError(json.dumps(payload, separators=(",", ":")))
-
-
 async def run_mcp_tool(
     tool_name: str,
     call: Callable[[], Awaitable[dict[str, Any]]],
@@ -537,8 +522,15 @@ async def run_mcp_tool(
     context: McpErrorContext | None = None,
     lean_meta: bool = False,
     correlation_id: str | None = None,
-) -> dict[str, Any]:
+    envelope_key: str | None = "result",
+) -> dict[str, Any] | ToolResult:
     """Execute an MCP tool body, converting any exception to an envelope dict.
+
+    Response-Envelope Standard v1 framing: success payloads are nested under
+    ``envelope_key`` (default ``"result"``, the SS1 single-item frame); pass
+    ``envelope_key=None`` for tools that already return the collection frame
+    (``results`` array). Execution errors are returned in-band as a
+    ``ToolResult`` with ``is_error=True`` (see ``mcp/envelope.py`` ``error_tool_result``).
 
     lean_meta=True (response_mode='minimal' or include_hints=False) drops the
     repetitive capabilities_version from _meta to save tokens on high-volume
@@ -571,7 +563,7 @@ async def run_mcp_tool(
     try:
         result = await call()
         result.setdefault("success", True)
-        return _stamp(result)
+        return frame_success(_stamp(result), envelope_key)
     except McpToolError as exc:
         record_mcp_error(
             tool_name=tool_name,
@@ -579,7 +571,7 @@ async def run_mcp_tool(
             message=exc.payload.get("message", ""),
             raw_message=str(exc),
         )
-        _raise_tool_error(_stamp(exc.payload))
+        return error_tool_result(_stamp(exc.payload))
     except Exception as exc:  # broad catch is the error-boundary contract
         wrapped = mcp_tool_error(exc, ctx)
         logger.warning(
@@ -595,4 +587,4 @@ async def run_mcp_tool(
             message=wrapped.payload["message"],
             raw_message=str(exc),
         )
-        _raise_tool_error(_stamp(wrapped.payload))
+        return error_tool_result(_stamp(wrapped.payload))

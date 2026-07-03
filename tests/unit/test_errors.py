@@ -2,11 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
-import pytest
-from fastmcp.exceptions import ToolError
-
 from spliceailookup_link.api import (
     DataNotFoundError,
     RateLimitedError,
@@ -87,19 +82,21 @@ async def test_run_mcp_tool_injects_success_and_meta() -> None:
     assert out["_meta"]["unsafe_for_clinical_use"] is True
 
 
-async def test_run_mcp_tool_raises_structured_tool_error_on_exception() -> None:
-    # Fleet-uniform: a failing tool body raises ToolError carrying the structured
-    # envelope as JSON (isError=true), rather than returning an in-band envelope.
+async def test_run_mcp_tool_returns_inband_error_tool_result_on_exception() -> None:
+    # Response-Envelope Standard v1 SS2: execution errors are delivered IN-BAND --
+    # a ToolResult with is_error=True AND the flat envelope as structured_content
+    # on that same result, not raised as a bare fastmcp.exceptions.ToolError.
     async def call() -> dict:
         raise DataNotFoundError("nope")
 
-    with pytest.raises(ToolError) as excinfo:
-        await run_mcp_tool(
-            "predict_spliceai",
-            call,
-            context=McpErrorContext(tool_name="predict_spliceai", variant="1-1-A-T"),
-        )
-    payload = json.loads(str(excinfo.value))
+    result = await run_mcp_tool(
+        "predict_spliceai",
+        call,
+        context=McpErrorContext(tool_name="predict_spliceai", variant="1-1-A-T"),
+    )
+    assert result.is_error is True
+    payload = result.structured_content
+    assert payload is not None
     assert payload["success"] is False
     assert payload["error_code"] == "not_found"
 

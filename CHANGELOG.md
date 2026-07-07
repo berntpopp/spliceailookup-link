@@ -3,6 +3,19 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.1] — 2026-07-07
+
+### Security
+
+- **Base `docker-compose.yml` now loopback-binds its published host port**
+  (`127.0.0.1:${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8603`). Copying the base
+  compose to a server previously bound `0.0.0.0`, which bypasses the host
+  firewall and would publish the unauthenticated backend on the public IP.
+  Production continues to reach the container only via the reverse proxy
+  (`prod`/`npm` overlays drop the port with `ports: !reset []`). Added a unit
+  guard (`tests/unit/test_docker_compose_loopback.py`) asserting every published
+  base-compose port is loopback-bound.
+
 ## [3.0.0] — 2026-07-03
 
 ### Changed — adopted the ratified GeneFoundry Response-Envelope Standard v1 (BREAKING)

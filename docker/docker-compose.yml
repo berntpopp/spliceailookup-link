@@ -11,8 +11,13 @@ services:
     image: spliceailookup-link:latest
     # Host port 8603 chosen to avoid colliding with sibling -link servers
     # (gnomad-link 8020, gtex-link 8765, etc.).
+    # Dev/local only — loopback-bound (127.0.0.1) so copying this file to a
+    # server never publishes the unauthenticated backend on the public IP
+    # (Docker would otherwise bind 0.0.0.0 and bypass the host firewall).
+    # Production fronts the container with a reverse proxy via the prod/npm
+    # overlays (ports: !reset []). Backends are unauthenticated by design.
     ports:
-      - "${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8603"
+      - "127.0.0.1:${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8603"
     environment:
       SPLICEAILOOKUP_LINK_MCP_TRANSPORT: unified
       SPLICEAILOOKUP_LINK_MCP_HOST: 0.0.0.0

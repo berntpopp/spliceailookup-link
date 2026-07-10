@@ -69,25 +69,8 @@ def test_health_has_version_and_transport_fields() -> None:
 
 
 def _build_unified_app(manager: UnifiedServerManager, config: ServerConfig):
-    """Replicate ``start_unified_server`` wiring without uvicorn.
-
-    Mirrors the production mount: the MCP path is baked into the sub-app via
-    ``http_app(path=config.mcp_path)`` and the sub-app is mounted at "/" so the
-    endpoint is served at ``/mcp`` directly (no 307 redirect to ``/mcp/``).
-    """
-    app = asyncio.run(manager._create_fastapi_app(config))
-    manager.app = app
-
-    def service_factory() -> SpliceService:
-        return manager.app.state.splice_service  # type: ignore[union-attr,return-value]
-
-    manager.mcp = manager._create_mcp_server(service_factory)
-    mcp_http_app = manager.mcp.http_app(
-        path=config.mcp_path, stateless_http=True, json_response=True
-    )
-    manager._compose_lifespan(app, mcp_http_app)
-    app.mount("/", mcp_http_app)
-    return app
+    """Build the production unified app without starting uvicorn."""
+    return asyncio.run(manager._create_unified_app(config))
 
 
 def test_post_mcp_is_not_redirect() -> None:

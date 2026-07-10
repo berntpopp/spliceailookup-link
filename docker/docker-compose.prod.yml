@@ -13,6 +13,9 @@ services:
     environment:
       SPLICEAILOOKUP_LINK_LOG_LEVEL: INFO
       SPLICEAILOOKUP_LINK_LOG_FORMAT: json
+      SPLICEAILOOKUP_LINK_ALLOWED_HOSTS: '["localhost","127.0.0.1","::1","spliceailookup-link.genefoundry.org"]'
+      SPLICEAILOOKUP_LINK_ALLOWED_ORIGINS: '["https://spliceailookup-link.genefoundry.org"]'
+      SPLICEAILOOKUP_LINK_CORS_ORIGINS: https://spliceailookup-link.genefoundry.org
     # Expose-only behind the reverse proxy. !reset (not []) is required: Compose
     # MERGES list fields across -f overlays, so a plain `ports: []` would NOT drop
     # the base file's published "${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8603" map.

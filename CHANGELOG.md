@@ -3,6 +3,22 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.4] - 2026-07-11
+
+### Security
+
+- **Security (defense in depth): guard the FastMCP-core not-found reflection
+  surface. FastMCP core echoes the caller's OWN requested tool name / resource
+  URI / prompt name back to the caller and to logs BEFORE backend middleware
+  runs. A new `NotFoundGuard` middleware preflights the tool name (unknown ->
+  fixed name-free `not_found` envelope) and fixes the `on_read_resource`
+  boundary; a protocol-handler backstop covers the unknown-tool return path and
+  the unknown-prompt surface; a validation-log scrub filter neutralizes the
+  FastMCP/MCP-SDK records ("Handler called", "Tool cache miss for", "Failed to
+  validate request") that would echo the caller-supplied name/URI (and its
+  control/zero-width/bidi/NUL code points) into a log sink. Caller
+  self-reflection surface; research use only.**
+
 ## [3.0.3] - 2026-07-11
 
 ### Security

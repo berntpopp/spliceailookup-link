@@ -102,6 +102,8 @@ class Settings(BaseSettings):
     MCP_HOST: str = "127.0.0.1"
     MCP_PORT: int = 8603
     MCP_PATH: str = "/mcp"
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "::1"]
+    ALLOWED_ORIGINS: list[str] = []
 
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -135,6 +137,13 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_mcp_path(cls, v: str) -> str:
         return v if v.startswith("/") else f"/{v}"
+
+    @field_validator("ALLOWED_HOSTS", "ALLOWED_ORIGINS")
+    @classmethod
+    def _reject_wildcard_allowlists(cls, v: list[str]) -> list[str]:
+        if any(any(marker in value for marker in "*?[]") for value in v):
+            raise ValueError("wildcard patterns are not allowed in request allowlists")
+        return v
 
     def spliceai_url(self, build: GenomeBuild) -> str:
         return self.SPLICEAI_URL_TEMPLATE.format(hg=_BUILD_TO_HG[build])

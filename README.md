@@ -122,6 +122,16 @@ Key knobs: the scoring/Ensembl host templates, `REQUEST_TIMEOUT` (default 90s),
 (default 1440), `RATE_BUDGET_MIN_INTERVAL_MS` (default 12000 — the soft client-pacing
 interval surfaced as `_meta.rate_budget`), and `MCP_TRANSPORT`/`MCP_HOST`/`MCP_PORT`/`MCP_PATH`.
 
+Every HTTP route uses exact Host and browser Origin allowlists. The default
+`ALLOWED_HOSTS` admits only `localhost`, `127.0.0.1`, and IPv6 loopback (`::1`);
+`ALLOWED_ORIGINS` defaults to `[]`, which still permits non-browser requests
+without an `Origin` header. Public deployments must add the proxy hostname
+explicitly, without a scheme or port. Write IPv6 as bare `::1`, not `[::1]`.
+Wildcard Host and Origin patterns are rejected at configuration time.
+
+`ALLOWED_ORIGINS` controls request admission while `CORS_ORIGINS` controls
+browser response headers. Keep the two lists aligned for browser clients.
+
 Background tasks use FastMCP's Docket backend. `DOCKET_URL` defaults to
 `memory://` (in-process, correct for the single-process unified host); set
 `SPLICEAILOOKUP_LINK_DOCKET_URL=redis://…` (or the FastMCP-native

@@ -39,6 +39,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from fastmcp.exceptions import ValidationError as FastMCPValidationError
 from fastmcp.tools.tool import ToolResult
 from pydantic import ValidationError as PydanticValidationError
 
@@ -389,10 +390,16 @@ def install_validation_error_handler(mcp_server: Any) -> None:
             start = time.perf_counter()
             try:
                 return await _original_run(arguments)
-            except PydanticValidationError as exc:
+            except (PydanticValidationError, FastMCPValidationError) as exc:
+                # fastmcp >=3.4.3 wraps arg-validation in its own ValidationError
+                # and chains the original pydantic error (structured errors()) as
+                # __cause__; older fastmcp raised the pydantic error directly.
+                pydantic_exc = exc if isinstance(exc, PydanticValidationError) else exc.__cause__
+                if not isinstance(pydantic_exc, PydanticValidationError):
+                    raise
                 envelope = mcp_validation_tool_error(
                     tool_name=str(getattr(_tool, "name", "unknown")),
-                    exc=exc,
+                    exc=pydantic_exc,
                 ).payload
                 elapsed_ms = int((time.perf_counter() - start) * 1000)
                 envelope["_meta"] = {

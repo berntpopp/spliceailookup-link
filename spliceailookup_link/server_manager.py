@@ -89,6 +89,14 @@ class UnifiedServerManager:
                 "transport": self._current_transport,
             }
 
+        from fastmcp.server.http import HostOriginGuardMiddleware
+
+        app.add_middleware(
+            HostOriginGuardMiddleware,
+            allowed_hosts=settings.ALLOWED_HOSTS,
+            allowed_origins=settings.ALLOWED_ORIGINS,
+            mode="strict",
+        )
         return app
 
     # ---------------- MCP creation ----------------
@@ -122,6 +130,27 @@ class UnifiedServerManager:
         signal.signal(signal.SIGTERM, handler)
         signal.signal(signal.SIGINT, handler)
 
+    async def _create_unified_app(self, config: ServerConfig) -> FastAPI:
+        self.app = await self._create_fastapi_app(config)
+
+        def service_factory() -> SpliceService:
+            if self.app is None:
+                raise RuntimeError("FastAPI host not initialized")
+            return cast(SpliceService, self.app.state.splice_service)
+
+        self.mcp = self._create_mcp_server(service_factory)
+        mcp_http_app = self.mcp.http_app(
+            path=config.mcp_path,
+            stateless_http=True,
+            json_response=True,
+            host_origin_protection=True,
+            allowed_hosts=settings.ALLOWED_HOSTS,
+            allowed_origins=settings.ALLOWED_ORIGINS,
+        )
+        self._compose_lifespan(self.app, mcp_http_app)
+        self.app.mount("/", mcp_http_app)
+        return self.app
+
     # ---------------- entry points ----------------
 
     async def start_unified_server(self, config: ServerConfig) -> None:
@@ -129,26 +158,7 @@ class UnifiedServerManager:
             self._current_transport = "streamable-http-stateless"
             self.logger = configure_logging(config.log_level)
 
-            self.app = await self._create_fastapi_app(config)
-
-            def service_factory() -> SpliceService:
-                if self.app is None:
-                    raise RuntimeError("FastAPI host not initialized")
-                return cast(SpliceService, self.app.state.splice_service)
-
-            self.mcp = self._create_mcp_server(service_factory)
-            # Bake the MCP path ("/mcp") into the StarletteWithLifespan routes
-            # returned by http_app(path=...), then mount that sub-app at the
-            # project root. This serves the MCP endpoint at "/mcp" directly
-            # rather than "/mcp/", avoiding a 307 redirect on POST /mcp and
-            # matching the rest of the fleet (canonical gtex-link pattern).
-            # FastAPI's own routes (/health, /api/...) are registered before
-            # this mount, so they continue to take precedence.
-            mcp_http_app = self.mcp.http_app(
-                path=config.mcp_path, stateless_http=True, json_response=True
-            )
-            self._compose_lifespan(self.app, mcp_http_app)
-            self.app.mount("/", mcp_http_app)
+            self.app = await self._create_unified_app(config)
 
             self.logger.info(f"MCP HTTP at http://{config.host}:{config.port}{config.mcp_path}")
             self.logger.info(f"Health at http://{config.host}:{config.port}/health")

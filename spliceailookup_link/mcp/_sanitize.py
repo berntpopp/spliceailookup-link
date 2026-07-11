@@ -16,6 +16,8 @@ applied to EVERY caller-visible message/error/diagnostics string.
 
 from __future__ import annotations
 
+from typing import Any
+
 # The ratified fence forbidden code-point set (C0/C1 controls except tab/LF/CR,
 # zero-width, word-joiner, BOM, and bidi embedding/override/isolate controls).
 # Byte-identical to the fleet fence's ``FORBIDDEN_CODEPOINTS``.
@@ -49,3 +51,33 @@ def sanitize_message(text: str) -> str:
     """
     clean = "".join(char for char in text if ord(char) not in FORBIDDEN_CODEPOINTS)
     return clean[:MAX_MESSAGE_CHARS]
+
+
+# Pydantic error ``type``s whose location IS a caller-supplied, attacker-controlled
+# argument NAME (an unexpected/extra argument). That name is redacted, never echoed:
+# sanitizing it would still surface hostile prose, and the name has no diagnostic value.
+_UNEXPECTED_ARG_TYPES = frozenset(
+    {"unexpected_keyword_argument", "unexpected_positional_argument", "extra_forbidden"}
+)
+
+
+def sanitize_field_errors(errors: list[Any]) -> list[dict[str, str]]:
+    """Build sanitized ``{field, reason}`` rows from pydantic ``.errors()`` output.
+
+    Both the ``field`` (joined location) and the ``reason`` (pydantic ``msg``) are
+    caller-influenceable: an unexpected-argument location is the caller's own
+    argument name, and a value message can echo the rejected input. The field name
+    is redacted for unexpected/extra arguments and sanitized of forbidden code
+    points otherwise; the reason is a fixed string for those and sanitized elsewhere.
+    """
+    result: list[dict[str, str]] = []
+    for err in errors:
+        err_type = str(err.get("type", "invalid"))
+        if err_type in _UNEXPECTED_ARG_TYPES:
+            field_name, reason = "unexpected_argument", "Unexpected argument for this tool."
+        else:
+            loc = err.get("loc", ())
+            field_name = ".".join(str(x) for x in loc) if loc else "unknown"
+            reason = sanitize_message(err.get("msg", err_type))
+        result.append({"field": sanitize_message(field_name), "reason": reason})
+    return result

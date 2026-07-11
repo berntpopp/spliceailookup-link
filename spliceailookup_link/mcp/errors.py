@@ -49,7 +49,7 @@ from spliceailookup_link.api import (
     SpliceApiError,
     UpstreamInputError,
 )
-from spliceailookup_link.mcp._sanitize import sanitize_message
+from spliceailookup_link.mcp._sanitize import sanitize_field_errors, sanitize_message
 from spliceailookup_link.mcp.envelope import (
     error_tool_result,
     frame_success,
@@ -330,19 +330,8 @@ def _envelope_message(exc: BaseException, error_code: str) -> str:
     return _safe_message(exc)
 
 
-def _extract_field_errors(errors: list[Any]) -> list[dict[str, str]]:
-    result: list[dict[str, str]] = []
-    for err in errors:
-        loc = err.get("loc", ())
-        field_name = ".".join(str(x) for x in loc) if loc else "unknown"
-        # A pydantic ``msg`` can echo the caller value; sanitize the arg-validation frame.
-        reason = sanitize_message(err.get("msg", str(err.get("type", "invalid"))))
-        result.append({"field": field_name, "reason": reason})
-    return result
-
-
 def mcp_validation_tool_error(*, tool_name: str, exc: PydanticValidationError) -> McpToolError:
-    field_errors = _extract_field_errors(list(exc.errors()))
+    field_errors = sanitize_field_errors(list(exc.errors()))
     payload: dict[str, Any] = {
         "success": False,
         "error_code": "validation_failed",

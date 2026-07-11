@@ -189,6 +189,35 @@ async def test_partial_success_row_is_sanitized() -> None:
         _assert_clean(row)
 
 
+async def test_hostile_unexpected_argument_name_is_redacted() -> None:
+    """An unexpected-argument NAME carrying hostile code points is redacted, not echoed.
+
+    The pydantic ``loc`` for an unexpected keyword argument IS the caller-supplied
+    argument name (fully attacker-controlled); it must not reach field_errors[].field
+    verbatim in either mirror.
+    """
+    mcp = create_spliceai_mcp(service_factory=lambda: StubService())
+    hostile_arg = "evil‍﻿‮\x00arg"
+
+    result = await mcp.call_tool(
+        "predict_spliceai", {"variant_id": "chr8-140300616-T-G", hostile_arg: 1}
+    )
+    assert result.is_error is True
+
+    structured = result.structured_content
+    assert structured["error_code"] == "validation_failed"
+    assert structured["field_errors"], "expected a field_errors row for the bad argument"
+    for fe in structured["field_errors"]:
+        _assert_clean(fe["field"])
+        _assert_clean(fe["reason"])
+        assert "evil" not in fe["field"], "hostile argument name was echoed, not redacted"
+
+    for fe in _mirror(result)["field_errors"]:
+        _assert_clean(fe["field"])
+        _assert_clean(fe["reason"])
+        assert "evil" not in fe["field"]
+
+
 async def test_timeout_path_yields_clean_fixed_message() -> None:
     """A transport/timeout error surfaces a clean upstream_unavailable message."""
     stub = StubService()

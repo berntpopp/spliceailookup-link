@@ -3,6 +3,16 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.2] - 2026-07-11
+
+### Security
+
+- **Re-enabled FastMCP 3.4.4 strict Host/Origin protection** with configurable
+  allowlists (`ALLOWED_HOSTS` / `ALLOWED_ORIGINS`). Deploy prerequisite: set the
+  proxied public host in `ALLOWED_HOSTS` or router federation will 421.
+- **Fixed FastMCP 3.4.4 `ValidationError` handling** (regression from the
+  3.2 → 3.4.4 upgrade).
+
 ## [3.0.1] — 2026-07-07
 
 ### Security

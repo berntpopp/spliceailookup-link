@@ -49,6 +49,7 @@ from spliceailookup_link.api import (
     SpliceApiError,
     UpstreamInputError,
 )
+from spliceailookup_link.mcp._sanitize import sanitize_message
 from spliceailookup_link.mcp.envelope import (
     error_tool_result,
     frame_success,
@@ -161,8 +162,8 @@ def _provenance_meta() -> dict[str, Any]:
 
 
 def _safe_message(exc: BaseException) -> str:
-    text = str(exc) or exc.__class__.__name__
-    return text[:300]
+    # Strip forbidden code points + cap; upstream bodies are severed at the API client.
+    return sanitize_message(str(exc) or exc.__class__.__name__)
 
 
 def _fallback_for(context: McpErrorContext) -> tuple[str, dict[str, Any] | None]:
@@ -334,7 +335,8 @@ def _extract_field_errors(errors: list[Any]) -> list[dict[str, str]]:
     for err in errors:
         loc = err.get("loc", ())
         field_name = ".".join(str(x) for x in loc) if loc else "unknown"
-        reason = err.get("msg", str(err.get("type", "invalid")))
+        # A pydantic ``msg`` can echo the caller value; sanitize the arg-validation frame.
+        reason = sanitize_message(err.get("msg", str(err.get("type", "invalid"))))
         result.append({"field": field_name, "reason": reason})
     return result
 
@@ -504,12 +506,13 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
 
 
 def record_mcp_error(*, tool_name: str, error_code: str, message: str, raw_message: str) -> None:
+    # Telemetry sink: sanitize on storage so no reader retains a raw code point.
     _RECENT_ERRORS.append(
         {
             "tool_name": tool_name,
             "error_code": error_code,
-            "message": message,
-            "raw_message": raw_message[:500],
+            "message": sanitize_message(message),
+            "raw_message": sanitize_message(raw_message),
         }
     )
 

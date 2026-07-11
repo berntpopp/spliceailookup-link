@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from spliceailookup_link.api import DataNotFoundError
 from spliceailookup_link.config import GenomeBuild
+from spliceailookup_link.mcp._sanitize import sanitize_message
 from spliceailookup_link.mcp.shaping import (
     ResponseMode,
     Transcripts,
@@ -181,7 +182,9 @@ async def predict_one(
     _shape_mode = "compact" if response_mode == "minimal" else response_mode
 
     if isinstance(sai_res, BaseException):
-        partial.append(f"spliceai_failed: {sai_res!s}"[:200])
+        # Partial-success row embedded in an otherwise-successful combined result:
+        # it bypasses the error envelope, so sanitize the interpolated str(exc).
+        partial.append(sanitize_message(f"spliceai_failed: {sai_res!s}"[:200]))
     else:
         sai_payload, sai_tele = sai_res
         teles.append(sai_tele)
@@ -195,7 +198,7 @@ async def predict_one(
         result["spliceai"] = shaped_sai
 
     if isinstance(pang_res, BaseException):
-        partial.append(f"pangolin_failed: {pang_res!s}"[:200])
+        partial.append(sanitize_message(f"pangolin_failed: {pang_res!s}"[:200]))
     else:
         pang_payload, pang_tele = pang_res
         teles.append(pang_tele)

@@ -48,14 +48,17 @@ def _is_retryable(exc: BaseException) -> bool:
     return isinstance(exc, (httpx.TransportError, httpx.TimeoutException, TimeoutError))
 
 
-def _extract_error_message(response: httpx.Response, status: int) -> str:
-    """Best-effort human-readable message from a 4xx body (Ensembl uses {"error": ...})."""
-    try:
-        body = response.json()
-        if isinstance(body, dict) and body.get("error"):
-            return str(body["error"])
-    except Exception:  # noqa: S110 - body may not be JSON; fall through to generic message
-        pass
+def _status_error_message(status: int) -> str:
+    """Fixed, body-free message keyed on the (safe, low-cardinality) HTTP status.
+
+    The upstream 4xx response BODY is deliberately NOT interpolated: a
+    caller-influenced request can make the upstream (Ensembl / the scoring
+    services) reflect hostile prose -- incl. control/zero-width/bidi/NUL code
+    points -- into an ``{"error": ...}`` body, and echoing it verbatim would
+    smuggle attacker-controlled text into a caller-visible message. The status is
+    a bounded scalar a caller cannot use to carry prose, so it is safe to key on;
+    the body is not surfaced and not logged (no-PII-in-logs invariant).
+    """
     return f"Upstream rejected the request (HTTP {status})."
 
 
@@ -117,7 +120,7 @@ class BaseHTTPClient:
                 last_exc = exc
                 status = exc.response.status_code
                 if status in _INPUT_ERROR_STATUS:
-                    raise UpstreamInputError(_extract_error_message(exc.response, status)) from exc
+                    raise UpstreamInputError(_status_error_message(status)) from exc
                 if status == 429 and attempt == settings.MAX_RETRIES:
                     raise RateLimitedError(f"Rate limited by upstream (HTTP 429): {url}") from exc
                 if not _is_retryable(exc) or attempt == settings.MAX_RETRIES:

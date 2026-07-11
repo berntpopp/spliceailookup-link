@@ -63,12 +63,20 @@ class ScoringClient(BaseHTTPClient):
         payload: dict[str, Any] = await self.get_json(self._url(model, build), params)
         error = payload.get("error") if isinstance(payload, dict) else None
         if error:
+            # The upstream reports failures as HTTP 200 with an ``error`` STRING in
+            # the body. That body is caller-influenceable (a hostile variant can
+            # make the service reflect arbitrary prose + control/zero-width/bidi/NUL
+            # code points), so it is classified locally (read-only) but NEVER echoed
+            # into the raised exception: fixed, body-free messages are raised instead
+            # and the raw body is not logged (no-PII-in-logs invariant).
             lowered = str(error).lower()
             if any(sig in lowered for sig in _PARSE_ERROR_SIGNALS):
-                raise UpstreamInputError(str(error))
+                raise UpstreamInputError("The upstream could not parse the requested variant.")
             if any(sig in lowered for sig in _NO_SCORE_SIGNALS):
-                raise DataNotFoundError(str(error))
-            # Unknown error string from the model service: treat as not_found so
-            # the caller reformulates rather than hammering the rate-limited API.
-            raise DataNotFoundError(str(error))
+                raise DataNotFoundError(
+                    "The upstream returned no scores for the requested variant."
+                )
+            # Unknown error string from the model service: treat as not_found so the
+            # caller reformulates rather than hammering the rate-limited API.
+            raise DataNotFoundError("The upstream returned an error for the requested variant.")
         return payload

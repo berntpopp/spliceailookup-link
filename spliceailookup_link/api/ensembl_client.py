@@ -36,7 +36,10 @@ class EnsemblVepClient(BaseHTTPClient):
             record = payload[0]
         elif isinstance(payload, dict):
             if payload.get("error"):
-                raise UpstreamInputError(str(payload["error"]))
+                # Do not echo the upstream VEP ``error`` body: a hostile HGVS/rsID
+                # could make VEP reflect arbitrary prose/code points. Raise a fixed
+                # body-free message (body neither surfaced nor logged).
+                raise UpstreamInputError("Ensembl VEP rejected the request as invalid.")
             record = payload
         else:  # pragma: no cover - defensive
             raise DataNotFoundError("Unexpected Ensembl VEP response shape.")

@@ -3,6 +3,16 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.3] - 2026-07-11
+
+### Security
+
+- **Security (defense in depth): caller-visible error messages are sanitized of
+  control/zero-width/bidi/NUL code points; upstream SpliceAI/Ensembl/scoring
+  error bodies are no longer echoed; the arg-validation frame redacts unexpected
+  argument names; the recent-error telemetry sink is sanitized. Research use
+  only.**
+
 ## [3.0.2] - 2026-07-11
 
 ### Security

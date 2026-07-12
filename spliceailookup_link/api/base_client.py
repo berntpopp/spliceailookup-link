@@ -26,7 +26,7 @@ from spliceailookup_link.config import settings
 logger = logging.getLogger(__name__)
 
 
-def _resolved_allowed_hosts() -> frozenset[str]:
+def _resolved_allowed_hosts() -> frozenset[tuple[str, int]]:
     """Exact-host allowlist derived from the *resolved* upstream config (never hardcoded).
 
     Covers the 4 Cloud Run scoring hosts (SpliceAI/Pangolin x GRCh37/GRCh38) plus
@@ -171,6 +171,13 @@ class BaseHTTPClient:
                     raise RateLimitedError(f"Rate limited by upstream (HTTP 429): {url}") from exc
                 if not _is_retryable(exc) or attempt == settings.MAX_RETRIES:
                     raise SpliceApiError(f"Upstream HTTP {status} for {url}") from exc
+            except httpx.TooManyRedirects as exc:
+                # httpx's own redirect exception is a RequestError and would
+                # otherwise be retried. Redirect exhaustion is deterministic
+                # policy failure, so turn it into the fixed non-retryable class.
+                from spliceailookup_link.api.url_guard import DisallowedURLError
+
+                raise DisallowedURLError("outbound request blocked by HTTP policy") from exc
             except (httpx.TransportError, httpx.TimeoutException) as exc:
                 last_exc = exc
                 if attempt == settings.MAX_RETRIES:

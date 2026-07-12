@@ -43,17 +43,17 @@ def test_allowlist_derived_from_resolved_config() -> None:
     )
     assert allow == frozenset(
         {
-            "spliceai-37-xwkwwwxdwq-uc.a.run.app",
-            "spliceai-38-xwkwwwxdwq-uc.a.run.app",
-            "pangolin-37-xwkwwwxdwq-uc.a.run.app",
-            "pangolin-38-xwkwwwxdwq-uc.a.run.app",
-            "rest.ensembl.org",
-            "grch37.rest.ensembl.org",
+            ("spliceai-37-xwkwwwxdwq-uc.a.run.app", 443),
+            ("spliceai-38-xwkwwwxdwq-uc.a.run.app", 443),
+            ("pangolin-37-xwkwwwxdwq-uc.a.run.app", 443),
+            ("pangolin-38-xwkwwwxdwq-uc.a.run.app", 443),
+            ("rest.ensembl.org", 443),
+            ("grch37.rest.ensembl.org", 443),
         }
     )
     # Exact-host only: no substring/suffix admits a look-alike host.
-    assert "evil-spliceai-38-xwkwwwxdwq-uc.a.run.app" not in allow
-    assert "spliceai-38-xwkwwwxdwq-uc.a.run.app.evil.test" not in allow
+    assert ("evil-spliceai-38-xwkwwwxdwq-uc.a.run.app", 443) not in allow
+    assert ("spliceai-38-xwkwwwxdwq-uc.a.run.app.evil.test", 443) not in allow
 
 
 # --- Guard exceptions are NON-RETRYABLE -------------------------------------

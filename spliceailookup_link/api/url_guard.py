@@ -69,7 +69,7 @@ def make_url_guard(
         url = request.url
         if url.scheme != "https":
             raise DisallowedURLError(f"non-https scheme not permitted: {url.scheme}")
-        if url.username or url.password:
+        if url.userinfo:
             raise DisallowedURLError("userinfo in URL not permitted")
         host = (url.host or "").lower()
         if host not in allowed_hosts:

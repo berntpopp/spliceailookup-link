@@ -3,6 +3,16 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.5] - 2026-07-12
+
+### Security
+
+- Adopted the canonical outbound HTTP Policy v1 for configured SpliceAI,
+  Pangolin, and Ensembl origins. Redirect hops are validated against the
+  configured origins, decoded response bodies have bounded reads, and policy
+  failures use fixed, identifier-free errors. The production client is bound to
+  the shared conformance suite. Research use only.
+
 ## [3.0.4] - 2026-07-11
 
 ### Security

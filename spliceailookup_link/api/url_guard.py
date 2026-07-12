@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import SplitResult, urlsplit
 
 import httpx
 
@@ -40,23 +40,37 @@ class ResponseTooLargeError(Exception):
     """An upstream response exceeded the byte ceiling. NON-RETRYABLE (fail-closed)."""
 
 
-def build_host_allowlist(*base_urls: str) -> frozenset[str]:
-    """Return the lowercased exact-host allowlist derived from resolved base URLs.
+_POLICY_ERROR = "outbound request blocked by HTTP policy"
+_SIZE_ERROR = "upstream response exceeds HTTP policy byte limit"
+
+
+def _normalized_origin(url: str | SplitResult) -> tuple[str, int]:
+    """Return the configured URL's normalized HTTPS origin or reject it safely."""
+    parsed = urlsplit(url) if isinstance(url, str) else url
+    try:
+        port = parsed.port if parsed.port is not None else 443
+    except ValueError as exc:
+        raise DisallowedURLError(_POLICY_ERROR) from exc
+    if parsed.scheme != "https" or parsed.username is not None or not parsed.hostname:
+        raise DisallowedURLError(_POLICY_ERROR)
+    return parsed.hostname.lower(), port
+
+
+def build_host_allowlist(*base_urls: str) -> frozenset[tuple[str, int]]:
+    """Return the normalized exact-origin allowlist from resolved base URLs.
 
     Hosts are taken from the caller's already-resolved configuration values, so
     an operator override of any upstream URL is honoured automatically and no
     host literal is hardcoded here.
     """
-    hosts: set[str] = set()
+    origins: set[tuple[str, int]] = set()
     for url in base_urls:
-        host = urlsplit(url).hostname
-        if host:
-            hosts.add(host.lower())
-    return frozenset(hosts)
+        origins.add(_normalized_origin(url))
+    return frozenset(origins)
 
 
 def make_url_guard(
-    allowed_hosts: frozenset[str],
+    allowed_hosts: frozenset[tuple[str, int]],
 ) -> Callable[[httpx.Request], Awaitable[None]]:
     """Build an httpx request event-hook validating every hop against the allowlist.
 
@@ -68,12 +82,13 @@ def make_url_guard(
     async def _guard(request: httpx.Request) -> None:
         url = request.url
         if url.scheme != "https":
-            raise DisallowedURLError(f"non-https scheme not permitted: {url.scheme}")
+            raise DisallowedURLError(_POLICY_ERROR)
         if url.userinfo:
-            raise DisallowedURLError("userinfo in URL not permitted")
+            raise DisallowedURLError(_POLICY_ERROR)
         host = (url.host or "").lower()
-        if host not in allowed_hosts:
-            raise DisallowedURLError(f"host not in allowlist: {host}")
+        port = url.port if url.port is not None else 443
+        if (host, port) not in allowed_hosts:
+            raise DisallowedURLError(_POLICY_ERROR)
 
     return _guard
 
@@ -100,6 +115,6 @@ async def read_capped(
         async for chunk in response.aiter_bytes():
             total += len(chunk)
             if total > max_bytes:
-                raise ResponseTooLargeError(f"upstream response exceeded {max_bytes} bytes")
+                raise ResponseTooLargeError(_SIZE_ERROR)
             chunks.append(chunk)
     return b"".join(chunks)

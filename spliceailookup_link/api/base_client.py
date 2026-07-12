@@ -8,15 +8,40 @@ taxonomy mirrors the family so the MCP error layer can classify deterministicall
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
 from typing import Any
 
 import httpx
 
+from spliceailookup_link.api.url_guard import (
+    MAX_RESPONSE_BYTES,
+    build_host_allowlist,
+    make_url_guard,
+    read_capped,
+)
 from spliceailookup_link.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _resolved_allowed_hosts() -> frozenset[str]:
+    """Exact-host allowlist derived from the *resolved* upstream config (never hardcoded).
+
+    Covers the 4 Cloud Run scoring hosts (SpliceAI/Pangolin x GRCh37/GRCh38) plus
+    the 2 build-specific Ensembl REST hosts; an operator override of any of these
+    URLs is honoured automatically.
+    """
+    return build_host_allowlist(
+        settings.spliceai_url("GRCh37"),
+        settings.spliceai_url("GRCh38"),
+        settings.pangolin_url("GRCh37"),
+        settings.pangolin_url("GRCh38"),
+        settings.ENSEMBL_GRCH37_URL,
+        settings.ENSEMBL_GRCH38_URL,
+    )
+
 
 # Transport status codes worth retrying (rate limit + transient upstream faults).
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
@@ -65,24 +90,40 @@ def _status_error_message(status: int) -> str:
 class BaseHTTPClient:
     """Shared async httpx client with concurrency bounding and retry."""
 
-    def __init__(self, *, max_concurrency: int | None = None, timeout: int | None = None):
+    def __init__(
+        self,
+        *,
+        max_concurrency: int | None = None,
+        timeout: int | None = None,
+        max_response_bytes: int | None = None,
+    ):
         self._timeout = settings.REQUEST_TIMEOUT if timeout is None else timeout
         limit = settings.MAX_CONCURRENCY if max_concurrency is None else max_concurrency
         self._semaphore = asyncio.Semaphore(max(1, limit))
         self._client: httpx.AsyncClient | None = None
         self._client_lock = asyncio.Lock()
+        self._max_response_bytes = (
+            MAX_RESPONSE_BYTES if max_response_bytes is None else max_response_bytes
+        )
+        # Derived at client-build time from resolved config so an operator URL
+        # override is honoured and no host literal is baked into the client.
+        self._allowed_hosts = _resolved_allowed_hosts()
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None:
             async with self._client_lock:
                 if self._client is None:
                     self._client = httpx.AsyncClient(
+                        # Long-running prediction budget: KEEP as-is (bytes, not
+                        # time, are what F-17 bounds).
                         timeout=httpx.Timeout(self._timeout),
                         headers={
                             "Accept": "application/json",
                             "User-Agent": settings.USER_AGENT,
                         },
                         follow_redirects=True,
+                        max_redirects=5,
+                        event_hooks={"request": [make_url_guard(self._allowed_hosts)]},
                     )
         return self._client
 
@@ -113,9 +154,14 @@ class BaseHTTPClient:
         for attempt in range(settings.MAX_RETRIES + 1):
             await self._acquire_slot(timeout=max(0.0, queue_deadline - loop.time()))
             try:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-                return response.json()
+                # Streamed, byte-capped read (fail-closed past the ceiling). The
+                # url-guard event hook validates every hop incl. redirects; its
+                # DisallowedURLError / ResponseTooLargeError are non-retryable and
+                # propagate straight out of the loop (not caught below).
+                body = await read_capped(
+                    client, "GET", url, params=params, max_bytes=self._max_response_bytes
+                )
+                return json.loads(body)
             except httpx.HTTPStatusError as exc:
                 last_exc = exc
                 status = exc.response.status_code

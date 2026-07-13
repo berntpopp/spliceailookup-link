@@ -3,6 +3,14 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.6] - 2026-07-13
+
+### Added
+
+- Adopt the GeneFoundry container release standard with SHA-pinned reusable
+  container CI/release callers, release metadata, digest-only production Compose,
+  and complete OCI image labels. Research use only.
+
 ## [3.0.5] - 2026-07-12
 
 ### Security

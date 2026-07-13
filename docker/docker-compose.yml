@@ -9,25 +9,26 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     image: spliceailookup-link:latest
-    # Host port 8603 chosen to avoid colliding with sibling -link servers
-    # (gnomad-link 8020, gtex-link 8765, etc.).
+    # The container always listens on 8000 (GeneFoundry fleet standard); the
+    # HOST port is the tunable. Host port 8603 chosen to avoid colliding with
+    # sibling -link servers (gnomad-link 8020, gtex-link 8765, etc.).
     # Dev/local only — loopback-bound (127.0.0.1) so copying this file to a
     # server never publishes the unauthenticated backend on the public IP
     # (Docker would otherwise bind 0.0.0.0 and bypass the host firewall).
     # Production fronts the container with a reverse proxy via the prod/npm
     # overlays (ports: !reset []). Backends are unauthenticated by design.
     ports:
-      - "127.0.0.1:${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8603"
+      - "127.0.0.1:${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8000"
     environment:
       SPLICEAILOOKUP_LINK_MCP_TRANSPORT: unified
       SPLICEAILOOKUP_LINK_MCP_HOST: 0.0.0.0
-      SPLICEAILOOKUP_LINK_MCP_PORT: "8603"
+      SPLICEAILOOKUP_LINK_MCP_PORT: "8000"
       SPLICEAILOOKUP_LINK_MCP_PATH: /mcp
       SPLICEAILOOKUP_LINK_ALLOWED_HOSTS: '["localhost","127.0.0.1","::1"]'
       SPLICEAILOOKUP_LINK_ALLOWED_ORIGINS: '[]'
       SPLICEAILOOKUP_LINK_LOG_LEVEL: INFO
     healthcheck:
-      test: ["CMD", "curl", "-f", "-H", "Host: localhost", "http://localhost:8603/health"]
+      test: ["CMD", "curl", "-f", "-H", "Host: localhost", "http://localhost:8000/health"]
       interval: 30s
       timeout: 5s
       retries: 3

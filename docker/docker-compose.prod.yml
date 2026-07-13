@@ -10,7 +10,12 @@
 # Broad SpliceAI Lookup / Pangolin / Ensembl services — no local models, no DB.
 services:
   spliceailookup-link:
+    build: !reset null
+    image: "${SPLICEAILOOKUP_LINK_IMAGE:?Set SPLICEAILOOKUP_LINK_IMAGE to ghcr.io/berntpopp/spliceailookup-link@sha256:<digest>}"
+    pull_policy: missing
+
     environment:
+      GF_HEALTHCHECK_HOST: localhost
       SPLICEAILOOKUP_LINK_LOG_LEVEL: INFO
       SPLICEAILOOKUP_LINK_LOG_FORMAT: json
       SPLICEAILOOKUP_LINK_ALLOWED_HOSTS: '["localhost","127.0.0.1","::1","spliceailookup-link.genefoundry.org"]'
@@ -18,10 +23,10 @@ services:
       SPLICEAILOOKUP_LINK_CORS_ORIGINS: https://spliceailookup-link.genefoundry.org
     # Expose-only behind the reverse proxy. !reset (not []) is required: Compose
     # MERGES list fields across -f overlays, so a plain `ports: []` would NOT drop
-    # the base file's published "${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8603" map.
+    # the base file's published "${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8000" map.
     ports: !reset []
     expose:
-      - "8603"
+      - "8000"
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m,mode=1777
@@ -29,23 +34,21 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    pids_limit: 256
     init: true
     restart: on-failure
-    deploy:
+    deploy: !override
       resources:
         limits:
           memory: 512M
           cpus: "1.0"
           pids: 256
-        reservations:
-          memory: 256M
-          cpus: "0.5"
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
+    healthcheck:
+      test:
+        ["CMD", "sh", "-c", "curl -f -H \"Host: $${GF_HEALTHCHECK_HOST}\" http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     logging:
       driver: json-file
       options:

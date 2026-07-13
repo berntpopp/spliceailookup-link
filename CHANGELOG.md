@@ -3,6 +3,24 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.6] - 2026-07-13
+
+### Added
+
+- Adopt the GeneFoundry container release standard with SHA-pinned reusable
+  container CI/release callers, release metadata, digest-only production Compose,
+  and complete OCI image labels. Research use only.
+
+### Changed
+
+- **Container port is now `8000`**, aligning with the GeneFoundry fleet standard
+  (every `-link` container listens on `8000`; the HOST port stays the tunable).
+  The image `ENV`/`EXPOSE`/`HEALTHCHECK`/`CMD`, the base Compose service, and the
+  production overlay all move from container port `8603` to `8000`. Local dev is
+  unchanged: the base Compose still publishes `127.0.0.1:8603` on the host (it
+  now maps `8603 -> 8000`), and the host-side CLI default (`make dev`) still
+  binds `8603`. This is what the self-contained NPM overlay already did.
+
 ## [3.0.5] - 2026-07-12
 
 ### Security

@@ -29,6 +29,9 @@ wheels/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.nox/
+.tox/
+.cache/
 .dmypy.json
 htmlcov/
 .coverage
@@ -39,6 +42,12 @@ coverage.xml
 tests/
 docs/
 scripts/
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.parquet
+*.feather
 
 # Secrets / local env — never ship into an image layer
 .env

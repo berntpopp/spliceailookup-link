@@ -18,7 +18,7 @@ services:
       target: production
     container_name: spliceailookup-link-npm
     # NO published host ports - NPM handles all routing via the container name.
-    # Override the image's :8603 default to :8000 for fleet consistency.
+    # The image already listens on :8000 (GeneFoundry fleet standard).
     expose:
       - "8000"
     environment:

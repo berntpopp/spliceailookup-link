@@ -23,10 +23,10 @@ services:
       SPLICEAILOOKUP_LINK_CORS_ORIGINS: https://spliceailookup-link.genefoundry.org
     # Expose-only behind the reverse proxy. !reset (not []) is required: Compose
     # MERGES list fields across -f overlays, so a plain `ports: []` would NOT drop
-    # the base file's published "${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8603" map.
+    # the base file's published "${SPLICEAILOOKUP_LINK_HOST_PORT:-8603}:8000" map.
     ports: !reset []
     expose:
-      - "8603"
+      - "8000"
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m,mode=1777
@@ -44,7 +44,7 @@ services:
           pids: 256
     healthcheck:
       test:
-        ["CMD", "sh", "-c", "curl -f -H \"Host: $${GF_HEALTHCHECK_HOST}\" http://localhost:8603/health"]
+        ["CMD", "sh", "-c", "curl -f -H \"Host: $${GF_HEALTHCHECK_HOST}\" http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -38,7 +38,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH="/home/app/web" \
     SPLICEAILOOKUP_LINK_MCP_TRANSPORT=unified \
     SPLICEAILOOKUP_LINK_MCP_HOST=0.0.0.0 \
-    SPLICEAILOOKUP_LINK_MCP_PORT=8603 \
+    SPLICEAILOOKUP_LINK_MCP_PORT=8000 \
     SPLICEAILOOKUP_LINK_MCP_PATH=/mcp
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -95,16 +95,16 @@ ENV VCS_REF="${VCS_REF}" \
     PYTHONPATH="/home/app/web" \
     SPLICEAILOOKUP_LINK_MCP_TRANSPORT=unified \
     SPLICEAILOOKUP_LINK_MCP_HOST=0.0.0.0 \
-    SPLICEAILOOKUP_LINK_MCP_PORT=8603 \
+    SPLICEAILOOKUP_LINK_MCP_PORT=8000 \
     SPLICEAILOOKUP_LINK_MCP_PATH=/mcp
 
 WORKDIR /home/app/web
 
 USER app
 
-EXPOSE 8603
+EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=10s \
-    CMD curl -f -H 'Host: localhost' http://localhost:8603/health || exit 1
+    CMD curl -f -H 'Host: localhost' http://localhost:8000/health || exit 1
 
-CMD ["spliceailookup-link", "serve", "--transport", "unified", "--host", "0.0.0.0", "--port", "8603"]
+CMD ["spliceailookup-link", "serve", "--transport", "unified", "--host", "0.0.0.0", "--port", "8000"]

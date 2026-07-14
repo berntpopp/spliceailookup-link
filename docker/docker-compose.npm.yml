@@ -12,10 +12,10 @@ name: spliceailookup-link-npm
 
 services:
   spliceailookup_link:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      target: production
+    # Deploy pulls the released, attested image; it never builds from source.
+    # Pin a digest, not a tag: there is no `latest`, and only a digest is immutable.
+    image: ${SPLICEAILOOKUP_LINK_IMAGE:?Set SPLICEAILOOKUP_LINK_IMAGE to ghcr.io/berntpopp/spliceailookup-link@sha256:<digest>}
+    pull_policy: missing
     container_name: spliceailookup-link-npm
     # NO published host ports - NPM handles all routing via the container name.
     # The image already listens on :8000 (GeneFoundry fleet standard).

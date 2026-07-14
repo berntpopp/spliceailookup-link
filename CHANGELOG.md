@@ -3,6 +3,19 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.0.8] - 2026-07-14
+
+### Changed
+
+- **The NPM deployment pulls the released image instead of building from source.**
+  `docker/docker-compose.npm.yml` carried `build:`, so a deploy rebuilt the image on the
+  server even though CI had already published an attested, digest-addressable image to
+  GHCR — the published image was never consumed. The overlay now requires
+  `SPLICEAILOOKUP_LINK_IMAGE` pinned to a digest and fails closed when it is unset.
+  Nothing else changed: `container_name`, the Compose project name, the healthcheck,
+  networks, `expose` and `command` are all preserved, so the deployed topology is
+  untouched. Research use only.
+
 ## [3.0.7] - 2026-07-13
 
 ### Fixed

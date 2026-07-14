@@ -1,181 +1,121 @@
 # spliceailookup-link
 
-An MCP (Model Context Protocol) + REST server that grounds **splicing-impact
-prediction** for genetic variants in the Broad Institute's
-[SpliceAI Lookup](https://spliceailookup.broadinstitute.org) backends — the same
-**SpliceAI**, **Pangolin**, and **SpliceAI-10k** consequence predictions the
-website surfaces — exposed as LLM-ergonomic tools.
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![CI](https://github.com/berntpopp/spliceailookup-link/actions/workflows/ci.yml/badge.svg)](https://github.com/berntpopp/spliceailookup-link/actions/workflows/ci.yml)
+[![Conformance](https://github.com/berntpopp/spliceailookup-link/actions/workflows/conformance.yml/badge.svg)](https://github.com/berntpopp/spliceailookup-link/actions/workflows/conformance.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Part of the `-link` family (gnomad-link, gtex-link, pubtator-link,
-genereviews-link) and built to the same conventions: FastMCP, a thin FastAPI
-host, structured error envelopes, `_meta.next_commands` chaining, capabilities
-discovery, and a research-use disclaimer.
+An MCP server (Streamable HTTP) for **splice-impact prediction**. It wraps the Broad
+Institute's [SpliceAI Lookup](https://spliceailookup.broadinstitute.org) backends — the
+same **SpliceAI**, **Pangolin** and **SpliceAI-10k** consequence predictions the website
+surfaces — plus an Ensembl-VEP-backed variant resolver, as LLM-ergonomic tools.
 
-> Research use only; not for clinical decision support.
+> [!IMPORTANT]
+> Research use only. Not clinical decision support. Do not use for diagnosis,
+> treatment, triage, or patient management.
 
-## Features
+## Why
 
-- **predict_splicing** — one call resolves the variant, runs SpliceAI **and**
-  Pangolin, includes the SpliceAI-10k consequence prediction (exon skipping,
-  intron retention, frameshift), and reports whether the two models agree.
-- **predict_spliceai** / **predict_pangolin** — single-model delta scores.
-- **predict_splicing_batch** — score a whole gene panel in one call (server-side
-  fan-out under the concurrency cap; per-variant errors don't fail the batch).
-- **resolve_variant** — HGVS / rsID / loose coordinates → canonical
-  `CHROM-POS-REF-ALT` via Ensembl VEP (also returns gene + consequence;
-  multi-allelic rsIDs return a structured `variant_ids` list, never a stringified one).
-- **get_server_capabilities** — tools, parameters, score glossary, limits, plus a
-  `capabilities_version` content hash so warm clients can skip re-fetching it.
-- **warmup** — pre-warm the cold upstream before a burst.
-- GRCh37 + GRCh38; `raw`/`masked`; `basic`/`comprehensive` gene sets;
-  MANE-only or all transcripts; `compact`/`full`/`minimal` responses.
-- Build-mismatch pre-flight **and** an opportunistic cross-build probe on
-  `not_found`, aggressive caching, conservative rate limiting (the upstream is
-  interactive-use-only), and cross-server `see_also` hints to gnomad-link /
-  genereviews-link / gtex-link.
-- **Long-running calls are first-class**: every prediction tool emits MCP
-  progress notifications and opts into the 2025-11-25 background-task protocol
-  (`task=True`), so an agent can fire-and-continue instead of blocking on a 30 s+
-  cold call.
-- **Runtime observability**: every `_meta` carries `request_id` and
-  `timing.elapsed_ms`; prediction payloads add `cache` (`hit`/`miss`/`partial`)
-  and `upstream_elapsed_ms`.
+SpliceAI Lookup is a website with Cloud Run endpoints behind it, not an API you can
+hand to an agent:
+
+- **Its errors are HTTP 200.** A failure comes back as a normal `200` response with an
+  `error` field in the JSON body, so a naive client reads "unparseable variant" as a
+  result. This server inspects every body and returns a typed error envelope instead.
+- **Scoring accepts only `CHROM-POS-REF-ALT`.** An HGVS string or an rsID has to be
+  resolved first; `resolve_variant` does it via Ensembl VEP.
+- **The two models live at two endpoints**, and the SpliceAI-10k consequence is buried
+  inside the SpliceAI payload. `predict_splicing` runs both, surfaces the consequence,
+  and says whether the models agree.
+- **The upstream is fragile on purpose**: "interactive use only, several requests per
+  user per minute", with cold calls taking 30s+. This server caches hard, caps
+  concurrency, fast-fails wrong-build and no-transcript variants before the slow
+  dispatch, paces callers via `_meta.rate_budget`, and emits progress notifications and
+  MCP background tasks so an agent can fire-and-continue instead of blocking.
 
 ## Quick start
 
-```bash
-uv sync --group dev          # install
-cp .env.example .env         # optional: override hosts / limits
-make dev                     # FastAPI /health + MCP HTTP at http://127.0.0.1:8603/mcp
-# equivalently: uv run spliceailookup-link serve --transport unified --port 8603
-```
-
-## MCP integration
-
-The recommended transport is **streamable HTTP over HTTPS**, matching the sibling
-`-link` servers (gnomad-link, gtex-link, pubtator-link, genereviews-link). Put the
-server behind a TLS-terminating reverse proxy and connect to its `https://` URL.
-
-Hosted (HTTPS — Claude Code):
+Hosted — no install:
 
 ```bash
-claude mcp add --transport http spliceailookup-link https://spliceailookup-link.example.org/mcp
+claude mcp add --transport http spliceailookup-link https://spliceailookup-link.genefoundry.org/mcp
 ```
 
-Hosted (HTTPS — Claude Desktop / claude.ai connectors, `claude_desktop_config.json`):
-
-```json
-{ "mcpServers": { "spliceailookup-link": { "type": "http", "url": "https://spliceailookup-link.example.org/mcp" } } }
-```
-
-Local development (HTTP on loopback only):
+Local (Python 3.12+, [uv](https://github.com/astral-sh/uv)). There is no data build
+step — the server proxies the live upstreams:
 
 ```bash
-make dev   # serves http://127.0.0.1:8603/mcp
+uv sync --group dev
+cp .env.example .env      # optional: override upstream hosts, limits, allowlists
+make dev                  # FastAPI /health + MCP at http://127.0.0.1:8603/mcp
 claude mcp add --transport http spliceailookup-link http://127.0.0.1:8603/mcp
 ```
 
-> Streamable HTTP is the only transport — there is no stdio entry point. TLS is
-> terminated at your proxy (nginx / Caddy / npm); the app itself serves plain
-> HTTP on its port, exactly like the sibling `-link` deployments.
-
-## Example
-
 ```text
-predict_splicing(variant_id="NM_001089.3(ABCA3):c.875A>T", genome_build="GRCh38")
-# -> headline: "ABCA3 (GRCh38): SpliceAI Δ=0.02; Pangolin Δ=0.05; models agree."
 predict_splicing(variant_id="chr8-140300616-T-G")
-# -> headline: "TRAPPC9 (GRCh38): SpliceAI Δ=0.83; Pangolin Δ=0.85; models agree; predicted exon skipping."
+-> TRAPPC9 (GRCh38): SpliceAI Δ=0.83; Pangolin Δ=0.85; models agree; predicted exon skipping.
 ```
+
+Streamable HTTP is the only transport — there is no stdio entry point, and TLS is
+terminated at your proxy. See [Deployment](docs/deployment.md).
 
 ## Tools
 
 | Tool | Purpose |
 |---|---|
-| `get_server_capabilities` | Discovery: tools, parameters, glossary, limits, citations |
-| `resolve_variant` | HGVS / rsID / loose input → `CHROM-POS-REF-ALT` + gene + consequence |
-| `predict_spliceai` | SpliceAI delta scores (+ optional SAI-10k consequence) |
+| `predict_splicing` | Front door: SpliceAI **and** Pangolin plus the SpliceAI-10k consequence, with model agreement |
+| `predict_spliceai` | SpliceAI delta scores (optionally the SAI-10k consequence) |
 | `predict_pangolin` | Pangolin splice gain/loss scores |
-| `predict_splicing` | Combined SpliceAI + Pangolin + consequence (headline tool) |
-| `predict_splicing_batch` | Score many variants (gene panel) in one envelope, fanned out server-side |
-| `warmup` | Pre-warm the upstream Cloud Run containers before a burst |
+| `predict_splicing_batch` | Score a whole gene panel in one call; fanned out server-side, and one bad variant does not fail the batch |
+| `resolve_variant` | HGVS / rsID / loose coordinates → canonical `CHROM-POS-REF-ALT` + gene + consequence |
+| `get_server_capabilities` | Discovery: tools, parameters, score glossary, limits, citations, `capabilities_version` hash |
+| `warmup` | Pre-warm the cold upstream Cloud Run containers before a burst |
 
-Tool names follow the **GeneFoundry Tool-Naming & Normalization Standard v1**:
-leaf tools are unprefixed `verb_noun` snake_case, the variant identifier argument
-is the fleet-canonical `variant_id` (`variant_ids` for the batch tool), and
-`response_mode` uses the `minimal | compact | standard | full` ladder.
+Leaf names are unprefixed per **Tool-Naming Standard v1**, and the variant argument is
+the fleet-canonical `variant_id` (`variant_ids` for the batch tool). `serverInfo.name`
+is **`spliceailookup-link`**, but the router's namespace token is **`spliceai`**: behind
+the [genefoundry-router](https://github.com/berntpopp/genefoundry-router) gateway these
+surface as `spliceai_<tool>` — e.g. `spliceai_predict_splicing`. The gateway adds the
+prefix; the leaf names stay bare.
 
-## GeneFoundry router namespace
+## Data & provenance
 
-`serverInfo.name` is the stable server identity **`spliceailookup-link`**. When
-federated behind the [`genefoundry-router`](https://github.com/berntpopp/genefoundry-router)
-gateway, this server is mounted under the namespace token **`spliceai`**
-(`mount(namespace="spliceai")`), so leaf tools surface at the gateway as
-`spliceai_<tool>` — e.g. `predict_splicing` → `spliceai_predict_splicing`. Leaf
-tools therefore stay unprefixed; the gateway adds the `spliceai_` prefix.
+Nothing is bundled or redistributed here: every prediction is computed on demand by the
+upstream and cached in-process (`CACHE_TTL_MINUTES`, default 1440). Freshness tracks the
+upstream; there is no snapshot to rebuild.
 
-## Configuration
+- **Scoring** — Broad Institute [SpliceAI Lookup](https://spliceailookup.broadinstitute.org)
+  Cloud Run backends (SpliceAI, Pangolin, SpliceAI-10k), GRCh37 + GRCh38. Each response's
+  `provenance` names the backend's transcript-annotation release.
+- **Resolution** — [Ensembl VEP REST](https://rest.ensembl.org). Neither upstream needs
+  an API key; both are interactive-use-only and rate-limited, which is why the defaults
+  are conservative.
 
-All environment variables are prefixed `SPLICEAILOOKUP_LINK_` (see `.env.example`).
-Key knobs: the scoring/Ensembl host templates, `REQUEST_TIMEOUT` (default 90s),
-`MAX_CONCURRENCY` (default 2 — the upstream is rate-limited), `CACHE_TTL_MINUTES`
-(default 1440), `RATE_BUDGET_MIN_INTERVAL_MS` (default 12000 — the soft client-pacing
-interval surfaced as `_meta.rate_budget`), and `MCP_TRANSPORT`/`MCP_HOST`/`MCP_PORT`/`MCP_PATH`.
-
-Every HTTP route uses exact Host and browser Origin allowlists. The default
-`ALLOWED_HOSTS` admits only `localhost`, `127.0.0.1`, and IPv6 loopback (`::1`);
-`ALLOWED_ORIGINS` defaults to `[]`, which still permits non-browser requests
-without an `Origin` header. Public deployments must add the proxy hostname
-explicitly, without a scheme or port. Write IPv6 as bare `::1`, not `[::1]`.
-Wildcard Host and Origin patterns are rejected at configuration time.
-
-`ALLOWED_ORIGINS` controls request admission while `CORS_ORIGINS` controls
-browser response headers. Keep the two lists aligned for browser clients.
-
-Background tasks use FastMCP's Docket backend. `DOCKET_URL` defaults to
-`memory://` (in-process, correct for the single-process unified host); set
-`SPLICEAILOOKUP_LINK_DOCKET_URL=redis://…` (or the FastMCP-native
-`FASTMCP_DOCKET_URL`) for a multi-worker deployment.
-
-## CLI
-
-A single `typer` console script (`spliceailookup-link`) with `rich` output:
-
-```bash
-spliceailookup-link serve --transport unified --host 127.0.0.1 --port 8603
-spliceailookup-link config --validate     # show + validate resolved configuration
-spliceailookup-link health --url http://127.0.0.1:8603   # probe /health
-spliceailookup-link version
-```
-
-`--transport` accepts `unified` or `http` (Streamable HTTP only — there is no
-stdio transport). Logging is `structlog`: set `SPLICEAILOOKUP_LINK_LOG_FORMAT`
-to `json` (default, production) or `console` (dev; also enabled by `--dev`).
-
-## Development
-
-```bash
-make ci-local        # format-check + lint + line-budget + typecheck + tests
-make test            # deterministic unit tests
-make test-integration   # live SpliceAI/Pangolin/VEP tests (marked, may be slow)
-make docker-build && make docker-up
-```
-
-## Scope & boundaries
-
-In scope: SpliceAI / Pangolin / SAI-10k splice prediction + variant resolution.
-Out of scope (delegated): allele frequency & ClinVar (gnomad-link), gene–disease
-context (genereviews-link), expression (gtex-link), liftover (gnomad-link), and
-the AlphaMissense / PrimateAI / PromoterAI / CADD annotations shown on the website.
-
-## Citations
+Cite the models, not this wrapper:
 
 - **SpliceAI** — Jaganathan K, et al. *Cell* 2019;176(3):535-548. PMID:30661751.
 - **Pangolin** — Zeng T, Li YI. *Genome Biology* 2022;23:103. PMID:35449021.
 - **SpliceAI-10k** — Canson DM, et al. *Bioinformatics* 2023.
-- **SpliceAI Lookup** — Broad Institute, https://spliceailookup.broadinstitute.org.
-- **Ensembl VEP** — https://rest.ensembl.org.
+- **SpliceAI Lookup** — Broad Institute, https://spliceailookup.broadinstitute.org
+- **Ensembl VEP** — https://rest.ensembl.org
+
+## Documentation
+
+- [Configuration](docs/configuration.md) — every `SPLICEAILOOKUP_LINK_*` variable, the tuned defaults and why they are low, and the CLI.
+- [Deployment](docs/deployment.md) — transport, TLS, the exact Host/Origin allowlists, Docker, and multi-worker background tasks.
+- [Architecture](docs/architecture.md) — what the facade absorbs, the response contract, and what is deliberately out of scope.
+- [Data & upstreams](docs/data.md) — the upstream services, rate-limit etiquette, provenance and citations.
+- [Upstream API contract](docs/API.md) — the reverse-engineered SpliceAI Lookup / VEP behaviour this server is built against.
+- [AGENTS.md](AGENTS.md) — conventions for humans and coding agents working in this repo.
+
+## Contributing
+
+See [AGENTS.md](AGENTS.md) for repository conventions. `make ci-local` is the
+definition-of-done gate: format, lint, line budget, README standard, typecheck, tests.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE) © 2026 Bernt Popp — the code in this repository. It grants no rights over
+the upstream services' outputs: predictions come from the Broad SpliceAI Lookup service
+and Ensembl VEP under **their** terms of use, and the model papers above must be cited.
+See [Data & upstreams](docs/data.md).

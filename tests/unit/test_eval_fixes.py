@@ -94,7 +94,8 @@ async def test_f5_cross_build_probe_upgrades_to_build_mismatch(
     data = await expect_tool_error(
         mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G", "genome_build": "GRCh37"}
     )
-    assert data["error_code"] == "build_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "build_mismatch"
     assert data["fallback_args"]["genome_build"] == "GRCh38"
 
 
@@ -105,7 +106,8 @@ async def test_f5_pangolin_cross_build_upgrades_to_build_mismatch(
     data = await expect_tool_error(
         mcp, "predict_pangolin", {"variant_id": "8-140300616-T-G", "genome_build": "GRCh37"}
     )
-    assert data["error_code"] == "build_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "build_mismatch"
 
 
 async def test_f5_probe_can_be_disabled(mcp, stub_service: StubService) -> None:
@@ -146,7 +148,8 @@ async def test_out_of_range_max_distance_is_validation_failed(mcp) -> None:
     data = await expect_tool_error(
         mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 99999}
     )
-    assert data["error_code"] == "validation_failed"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "validation_failed"
 
 
 async def test_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> None:
@@ -155,7 +158,8 @@ async def test_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> None:
     stub_service.score_error = DataNotFoundError("did not return any scores")
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}  # REF 'A' matches neither
     data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "8-140300616-A-G"})
-    assert data["error_code"] == "ref_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "ref_mismatch"
     # F2: wrong-REF on a coordinate (no other-build, no swap) no longer loops resolve_variant.
     assert data["fallback_tool"] == "get_server_capabilities"
 
@@ -166,23 +170,30 @@ async def test_spliceai_wrong_ref_reports_ref_mismatch(mcp, stub_service) -> Non
     stub_service.score_error = DataNotFoundError("did not return any scores")
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
     data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "8-140300616-A-G"})
-    assert data["error_code"] == "ref_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "ref_mismatch"
 
 
 async def test_single_predict_ambiguous_rsid_does_not_silently_score(mcp, stub_service) -> None:
     data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "rs6025"})
-    assert data["error_code"] == "ambiguous"
+    assert data["error_code"] == "ambiguous_query"
+    assert data["error_subtype"] == "ambiguous"
     assert stub_service.score_calls == []
 
 
 def test_capabilities_documents_new_codes_and_verdict() -> None:
     doc = get_capabilities_resource()
-    assert "ref_mismatch" in doc["error_codes"]
-    assert "ambiguous" in doc["error_codes"]
+    # Response-Envelope v1: capabilities advertises the CLOSED wire codes only; the
+    # finer classification (ref_mismatch, ambiguous, ...) is documented as error_subtype
+    # in the reference resource, never as a wire error_code.
+    assert "invalid_input" in doc["error_codes"]
+    assert "ambiguous_query" in doc["error_codes"]
+    assert "ref_mismatch" not in doc["error_codes"]
     assert "discordant_subthreshold" in doc["agreement_verdicts"]
     ref = get_reference_resource()
-    assert "ref_mismatch" in ref["error_taxonomy"]["codes"]
-    assert "ambiguous" in ref["error_taxonomy"]["codes"]
+    assert "ambiguous_query" in ref["error_taxonomy"]["codes"]
+    assert "ref_mismatch" in ref["error_taxonomy"]["error_subtypes"]
+    assert ref["error_taxonomy"]["error_subtypes"]["ref_mismatch"]["error_code"] == "invalid_input"
     # New doc sections must be pinned so a refactor can't silently drop them.
     assert "warmth" in doc
     assert "prediction_deadline" in doc

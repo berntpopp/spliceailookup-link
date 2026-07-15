@@ -27,6 +27,10 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction"},
         task=True,
+        # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema
+        # (a model never reads it). structuredContent is still emitted -- every tool
+        # returns a dict envelope via run_mcp_tool.
+        output_schema=None,
     )
     async def predict_splicing(
         variant_id: Annotated[

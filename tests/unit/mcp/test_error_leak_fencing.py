@@ -205,7 +205,8 @@ async def test_hostile_unexpected_argument_name_is_redacted() -> None:
     assert result.is_error is True
 
     structured = result.structured_content
-    assert structured["error_code"] == "validation_failed"
+    assert structured["error_code"] == "invalid_input"
+    assert structured["error_subtype"] == "validation_failed"
     assert structured["field_errors"], "expected a field_errors row for the bad argument"
     for fe in structured["field_errors"]:
         _assert_clean(fe["field"])

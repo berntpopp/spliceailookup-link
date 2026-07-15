@@ -38,8 +38,9 @@ Layers (spec §3), copied per repo (no shared runtime library exists fleet-wide)
 
 Layer 4 (arg-validation) is the existing tool-run wrapper installed by
 ``install_validation_error_handler`` (``mcp/errors.py``): it converts FastMCP's own
-``ValidationError``/pydantic ``ValidationError`` into the fixed ``validation_failed``
-envelope. Layer 6 (OTel span redaction) is a no-op here: ``opentelemetry-sdk`` is
+``ValidationError``/pydantic ``ValidationError`` into the fixed ``invalid_input``
+envelope (error_subtype ``validation_failed``). Layer 6 (OTel span redaction) is a
+no-op here: ``opentelemetry-sdk`` is
 NOT in the base (runtime) dependency closure (``uv tree --no-dev`` excludes it) and
 the codebase configures no tracer, so the tracer provider is non-recording -- no
 span exception attributes are ever captured, so there is nothing to redact (fleet

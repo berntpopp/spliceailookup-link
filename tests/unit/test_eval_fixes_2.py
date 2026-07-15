@@ -59,7 +59,8 @@ async def test_f9_validation_failed_has_request_id_and_timing(mcp) -> None:
     data = await expect_tool_error(
         mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 20000}
     )
-    assert data["error_code"] == "validation_failed"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "validation_failed"
     meta = data["_meta"]
     assert isinstance(meta["request_id"], str) and len(meta["request_id"]) == 12
     assert isinstance(meta["timing"]["elapsed_ms"], int)
@@ -181,5 +182,6 @@ async def test_f9_validation_envelope_carries_provenance(mcp) -> None:
     data = await expect_tool_error(
         mcp, "predict_spliceai", {"variant_id": "8-140300616-T-G", "max_distance": 20000}
     )
-    assert data["error_code"] == "validation_failed"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "validation_failed"
     assert data["_meta"]["unsafe_for_clinical_use"] is True

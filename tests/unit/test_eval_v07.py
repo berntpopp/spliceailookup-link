@@ -14,7 +14,8 @@ async def test_preflight_ref_mismatch_skips_scoring(mcp, stub_service: StubServi
     # D2: a wrong REF is rejected as ref_mismatch BEFORE any scoring call.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
     data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "8-140300616-A-G"})
-    assert data["error_code"] == "ref_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "ref_mismatch"
     assert stub_service.score_calls == []  # never dispatched to the scoring backend
 
 
@@ -25,7 +26,8 @@ async def test_preflight_ref_typo_matching_other_build_is_ref_mismatch(
     # but it is reported as ref_mismatch (with a secondary hint), NOT build_mismatch.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
     data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "8-140300616-C-A"})
-    assert data["error_code"] == "ref_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "ref_mismatch"
     assert data["other_build_hint"]["build"] == "GRCh37"
     assert stub_service.score_calls == []
 
@@ -140,7 +142,8 @@ async def test_batch_rejects_over_cap(mcp) -> None:
     data = await expect_tool_error(
         mcp, "predict_splicing_batch", {"variant_ids": ["8-140300616-T-G"] * 26}
     )
-    assert data["error_code"] == "validation_failed"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "validation_failed"
 
 
 async def test_batch_item_meta_has_served_warm(mcp) -> None:

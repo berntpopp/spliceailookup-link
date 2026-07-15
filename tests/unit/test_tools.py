@@ -93,7 +93,8 @@ async def test_predict_build_mismatch_short_circuits(mcp, stub_service: StubServ
     data = await expect_tool_error(
         mcp, "predict_spliceai", {"variant_id": "8-145500000-A-T", "genome_build": "GRCh38"}
     )
-    assert data["error_code"] == "build_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "build_mismatch"
     # No scoring call was made.
     assert stub_service.score_calls == []
 
@@ -153,4 +154,5 @@ async def test_capabilities_tool_detail_lean(mcp) -> None:
 
 async def test_predict_chr99_is_unsupported_contig(mcp) -> None:
     data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "chr99-1000-A-G"})
-    assert data["error_code"] == "unsupported_contig"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "unsupported_contig"

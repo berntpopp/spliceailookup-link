@@ -34,6 +34,8 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction", "spliceai"},
         task=True,
+        # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema.
+        output_schema=None,
     )
     async def predict_spliceai(
         variant_id: Annotated[

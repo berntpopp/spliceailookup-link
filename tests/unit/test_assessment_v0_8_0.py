@@ -42,7 +42,8 @@ async def test_ref_mismatch_wrong_ref_falls_back_to_capabilities(
     # REF 'A' wrong in both builds; not a swap (ALT 'G' != ref base 'T').
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "T"}
     data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "chr8-140300616-A-G"})
-    assert data["error_code"] == "ref_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "ref_mismatch"
     assert data["fallback_tool"] == "get_server_capabilities"
     assert data["fallback_args"] is None
     # the dead-end resolve_variant echo must be gone
@@ -58,7 +59,8 @@ async def test_ref_mismatch_other_build_redirects_to_same_tool_other_build(
     # REF 'A' matches the GRCh37 base -> re-run predict on GRCh37.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "A"}
     data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "chr8-140300616-A-G"})
-    assert data["error_code"] == "ref_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "ref_mismatch"
     assert data["fallback_tool"] == "predict_spliceai"
     assert data["fallback_args"] == {"variant_id": "8-140300616-A-G", "genome_build": "GRCh37"}
     assert data["other_build_hint"]["build"] == "GRCh37"
@@ -68,7 +70,8 @@ async def test_ref_mismatch_swap_suggests_swapped_variant(mcp, stub_service: Stu
     # ALT 'T' equals the reference base 'T' at this locus -> likely REF/ALT swap.
     stub_service.ref_bases = {"GRCh38": "T", "GRCh37": "C"}
     data = await expect_tool_error(mcp, "predict_spliceai", {"variant_id": "chr8-140300616-A-T"})
-    assert data["error_code"] == "ref_mismatch"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "ref_mismatch"
     assert data["fallback_tool"] == "predict_spliceai"
     assert data["fallback_args"] == {"variant_id": "8-140300616-T-A", "genome_build": "GRCh38"}
     assert "swap" in data["recovery"].lower()

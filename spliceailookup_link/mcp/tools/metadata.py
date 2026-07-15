@@ -30,6 +30,8 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         title="Get spliceailookup-link Capabilities",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"metadata"},
+        # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema.
+        output_schema=None,
     )
     async def get_server_capabilities(
         detail: Annotated[
@@ -51,6 +53,8 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         title="Warm Up Upstream Scoring Containers",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"ops"},
+        # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema.
+        output_schema=None,
     )
     async def warmup(
         genome_build: Annotated[

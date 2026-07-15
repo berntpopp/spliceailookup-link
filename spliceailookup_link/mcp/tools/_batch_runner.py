@@ -89,6 +89,11 @@ def _error_item(
         "recovery": env["recovery"],
         "next_commands": env["_meta"]["next_commands"],
     }
+    if env.get("error_subtype"):
+        # Carry the finer classification onto the per-item envelope too, so a batch
+        # item error mirrors the single-call envelope (canonical error_code + the
+        # additive error_subtype). Never widens the wire enum.
+        item["error_subtype"] = env["error_subtype"]
     if env.get("variant_ids"):
         item["variant_ids"] = env["variant_ids"]
     # F23: surface the advertised rate_budget on per-item rate_limited failures.

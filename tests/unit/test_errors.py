@@ -61,7 +61,10 @@ def test_build_mismatch_recovery_carries_inferred_build() -> None:
         variant_id="8-145500000-A-T", inferred_build="GRCh37", requested_build="GRCh38"
     )
     p = _classify(exc, tool_name="predict_spliceai", variant="8-145500000-A-T")
-    assert p["error_code"] == "build_mismatch"
+    # Response-Envelope v1: the wire error_code is the closed six; the finer
+    # classification survives additively under error_subtype.
+    assert p["error_code"] == "invalid_input"
+    assert p["error_subtype"] == "build_mismatch"
     cmd0 = p["_meta"]["next_commands"][0]
     assert cmd0["tool"] == "predict_spliceai"
     assert cmd0["arguments"]["genome_build"] == "GRCh37"
@@ -69,7 +72,8 @@ def test_build_mismatch_recovery_carries_inferred_build() -> None:
 
 def test_internal_error_for_unexpected() -> None:
     p = _classify(KeyError("boom"), tool_name="predict_splicing")
-    assert p["error_code"] == "internal_error"
+    assert p["error_code"] == "internal"
+    assert p["error_subtype"] == "internal_error"
     assert p["retryable"] is False
 
 
@@ -111,7 +115,8 @@ def test_ambiguous_lists_alleles_and_per_allele_next_commands() -> None:
         exc,
         McpErrorContext(tool_name="predict_splicing", variant="rs6025", genome_build="GRCh38"),
     ).payload
-    assert env["error_code"] == "ambiguous"
+    assert env["error_code"] == "ambiguous_query"
+    assert env["error_subtype"] == "ambiguous"
     assert env["retryable"] is False
     assert env["variant_ids"] == ["1-169549811-C-A", "1-169549811-C-T"]
     cmds = env["_meta"]["next_commands"]
@@ -137,7 +142,8 @@ def test_ref_mismatch_classifies_and_routes_to_capabilities() -> None:
     env = mcp_tool_error(
         exc, McpErrorContext(tool_name="predict_splicing", variant="8-140300616-A-G")
     ).payload
-    assert env["error_code"] == "ref_mismatch"
+    assert env["error_code"] == "invalid_input"
+    assert env["error_subtype"] == "ref_mismatch"
     assert env["retryable"] is False
     assert env["recovery_action"] == "reformulate_input"
     assert env["fallback_tool"] == "get_server_capabilities"

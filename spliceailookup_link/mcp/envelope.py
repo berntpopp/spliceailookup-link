@@ -17,6 +17,7 @@ from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 
 from spliceailookup_link.config import settings
+from spliceailookup_link.mcp.error_codes import normalize_error_code
 
 
 def rate_budget_snapshot(*, saturated: bool) -> dict[str, Any]:
@@ -66,7 +67,15 @@ def error_tool_result(payload: dict[str, Any]) -> ToolResult:
     structuredContent=...)`` (``ToolResult.to_mcp_result``), and
     ``Tool.convert_result`` passes a returned ``ToolResult`` straight through
     without re-validating it against the tool's declared output schema.
+
+    This is the SINGLE error egress for the whole server, so ``error_code`` is
+    canonicalised HERE (Response-Envelope Standard v1): any off-enum code -- including
+    one on a raw ``McpToolError`` that bypassed the classification constructors -- is
+    normalised onto the closed six, with the original preserved additively under
+    ``error_subtype``. Both the ``structuredContent`` and the TextContent mirror below
+    are built from the normalised payload, so they can never disagree on the wire.
     """
+    payload = normalize_error_code(payload)
     text = json.dumps(payload, separators=(",", ":"))
     return ToolResult(
         content=[TextContent(type="text", text=text)],

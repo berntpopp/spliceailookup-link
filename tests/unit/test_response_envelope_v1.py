@@ -73,7 +73,8 @@ async def test_error_is_inband_iserror_true_with_flat_structured_content(mcp) ->
     payload = result.structured_content
     assert payload is not None, "error result dropped structuredContent"
     assert payload["success"] is False
-    assert payload["error_code"] == "unsupported_contig"
+    assert payload["error_code"] == "invalid_input"
+    assert payload["error_subtype"] == "unsupported_contig"
     assert "message" in payload
     assert "retryable" in payload
     assert "recovery_action" in payload

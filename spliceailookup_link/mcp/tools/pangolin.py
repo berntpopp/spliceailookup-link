@@ -34,6 +34,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction", "pangolin"},
         task=True,
+        # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema.
+        output_schema=None,
     )
     async def predict_pangolin(
         variant_id: Annotated[

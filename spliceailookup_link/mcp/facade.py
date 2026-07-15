@@ -59,6 +59,10 @@ def create_spliceai_mcp(*, service_factory: Callable[[], SpliceService]) -> Fast
         version=__version__,
         instructions=_INSTRUCTIONS,
         mask_error_details=True,
+        # Tool-Surface Budget Standard v1 (Rule 4): do not inline $defs/$ref at every
+        # use site. Free and safe (no input schema here contains a $ref); shrinks the
+        # advertised surface without touching any description the model reads.
+        dereference_schemas=False,
     )
     # Guard the FastMCP-core not-found reflection surface: core echoes the
     # caller's OWN requested tool name / resource URI / prompt name (with any

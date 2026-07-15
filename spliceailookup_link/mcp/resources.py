@@ -159,17 +159,16 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "joins line up; response_mode='full' preserves the raw value under gencode_id."
             ),
         },
+        # Response-Envelope Standard v1: the wire `error_code` is this CLOSED six-value
+        # enum. A finer classification (build_mismatch, ref_mismatch, ...) is carried
+        # alongside as `error_subtype`; see error_subtypes in spliceailookup://reference.
         "error_codes": [
             "invalid_input",
             "not_found",
-            "ref_mismatch",
-            "ambiguous",
-            "build_mismatch",
-            "unsupported_contig",
-            "rate_limited",
-            "validation_failed",
+            "ambiguous_query",
             "upstream_unavailable",
-            "internal_error",
+            "rate_limited",
+            "internal",
         ],
         "response_fields": {
             "headline": "one-line plain-English answer at the top of every prediction payload.",
@@ -281,12 +280,13 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             "predict_splicing_batch runs items through the concurrency cap so a slow or failing "
             "item never spuriously rate_limits its siblings, and retries a per-item "
             "rate_limited/upstream_unavailable failure once. summary splits failures into "
-            "terminal_failed (invalid_input / not_found / ref_mismatch / build_mismatch / "
-            "ambiguous / unsupported_contig -- do not resubmit) and retryable_failed; the "
+            "terminal_failed (invalid_input -- including the ref_mismatch / build_mismatch / "
+            "unsupported_contig error_subtypes -- plus not_found and ambiguous_query; do not "
+            "resubmit) and retryable_failed; the "
             "variants in retryable_failed are listed in the top-level retry_variants array for "
             "resubmission (ideally as a background task). summary.retried counts auto-retries. "
             "predict_splicing_batch accepts max_items=25 variants; submitting more returns "
-            "validation_failed (the cap is enforced, not silently truncated). Each item returns "
+            "invalid_input (the cap is enforced, not silently truncated). Each item returns "
             "about one compact predict_splicing result, and the envelope _meta echoes "
             "items_submitted and max_items."
         ),
@@ -407,55 +407,58 @@ def get_reference_resource() -> dict[str, Any]:
                 "reformulate_input": "fix the variant/fields, same tool",
                 "switch_tool": "call fallback_tool with fallback_args, then retry",
             },
+            # The CLOSED wire enum a client branches on (Response-Envelope Standard v1).
             "codes": {
                 "invalid_input": {
                     "retryable": False,
-                    "when": "variant could not be parsed / upstream rejected the input shape; "
-                    "also when a coordinate's position is out of range (exceeds the chromosome "
-                    "length in all supported builds), rejected locally before any upstream call",
+                    "when": "the variant/arguments could not be parsed or validated, or a "
+                    "coordinate is unscoreable in principle (out of range in every build, a wrong "
+                    "REF, a non-nuclear contig, or the wrong build). See error_subtype for which.",
                 },
                 "not_found": {
                     "retryable": False,
                     "when": "well-formed variant but no overlapping transcript for the gene set",
                 },
-                "ref_mismatch": {
-                    "retryable": False,
-                    "when": "the coordinate REF does not match the genome reference at that "
-                    "position/build (swapped REF/ALT, wrong strand, or a typo). Detected "
-                    "pre-flight via an Ensembl reference-base check (fast, before scoring). If "
-                    "the REF matches the other build, other_build_hint carries a secondary "
-                    "suggestion -- but this stays a ref_mismatch, not a build_mismatch redirect.",
-                },
-                "ambiguous": {
+                "ambiguous_query": {
                     "retryable": False,
                     "when": "input (e.g. an rsID) maps to >1 ALT allele; pick one variant_id "
                     "(see variant_ids / next_commands) and retry",
-                },
-                "build_mismatch": {
-                    "retryable": False,
-                    "when": "the coordinate is valid only on the OTHER build -- in range there "
-                    "and/or it scores there; set genome_build correctly (the fallback carries the "
-                    "inferred build). A position out of range in EVERY build is invalid_input, not "
-                    "this; a wrong REF at an in-range position is ref_mismatch.",
-                },
-                "unsupported_contig": {
-                    "retryable": False,
-                    "when": "variant is on a non-nuclear contig (MT or non-standard) the "
-                    "SpliceAI/Pangolin models do not score; use gnomad-link for MT variants",
-                },
-                "rate_limited": {
-                    "retryable": True,
-                    "when": "HTTP 429 or local concurrency saturation; back off and retry",
-                },
-                "validation_failed": {
-                    "retryable": False,
-                    "when": "arguments failed schema or local guard validation",
                 },
                 "upstream_unavailable": {
                     "retryable": True,
                     "when": "transient upstream/network fault or a slow comprehensive+distance 503",
                 },
-                "internal_error": {"retryable": False, "when": "unexpected server fault"},
+                "rate_limited": {
+                    "retryable": True,
+                    "when": "HTTP 429 or local concurrency saturation; back off and retry",
+                },
+                "internal": {"retryable": False, "when": "unexpected server fault"},
+            },
+            # Finer classification carried as `error_subtype` alongside the canonical
+            # `error_code` above; each subtype maps onto exactly one enum value (the
+            # runtime never widens the enum).
+            "error_subtypes": {
+                "ref_mismatch": {
+                    "error_code": "invalid_input",
+                    "when": "the coordinate REF does not match the genome reference at that "
+                    "position/build (swapped REF/ALT, wrong strand, or a typo). Detected "
+                    "pre-flight via an Ensembl reference-base check. If the REF matches the other "
+                    "build, other_build_hint carries a secondary suggestion.",
+                },
+                "build_mismatch": {
+                    "error_code": "invalid_input",
+                    "when": "the coordinate is valid only on the OTHER build; set genome_build "
+                    "correctly (the fallback carries the inferred build).",
+                },
+                "unsupported_contig": {
+                    "error_code": "invalid_input",
+                    "when": "variant is on a non-nuclear contig (MT or non-standard) the "
+                    "SpliceAI/Pangolin models do not score; use gnomad-link for MT variants",
+                },
+                "validation_failed": {
+                    "error_code": "invalid_input",
+                    "when": "arguments failed schema or local guard validation",
+                },
             },
         },
         "upstream_contract": {

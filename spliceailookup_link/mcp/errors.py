@@ -55,6 +55,7 @@ from spliceailookup_link.mcp.envelope import (
     frame_success,
     rate_budget_snapshot,
 )
+from spliceailookup_link.mcp.error_codes import canonical_error_code
 from spliceailookup_link.mcp.resources import get_capabilities_version
 from spliceailookup_link.variant import UnsupportedContigError, VariantParseError
 
@@ -334,7 +335,8 @@ def mcp_validation_tool_error(*, tool_name: str, exc: PydanticValidationError) -
     field_errors = sanitize_field_errors(list(exc.errors()))
     payload: dict[str, Any] = {
         "success": False,
-        "error_code": "validation_failed",
+        "error_code": "invalid_input",
+        "error_subtype": "validation_failed",
         "message": "Invalid MCP arguments.",
         "retryable": False,
         "recovery_action": "reformulate_input",
@@ -401,7 +403,7 @@ def install_validation_error_handler(mcp_server: Any) -> None:
                 }
                 record_mcp_error(
                     tool_name=str(getattr(_tool, "name", "unknown")),
-                    error_code="validation_failed",
+                    error_code="invalid_input",
                     message=envelope["message"],
                     raw_message=str(exc),
                 )
@@ -414,7 +416,11 @@ def install_validation_error_handler(mcp_server: Any) -> None:
 
 
 def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError:
-    error_code, retryable, fallback_tool, fallback_args = _classify(exc, context)
+    # ``_classify`` returns the fine-grained SUBTYPE; the wire ``error_code`` is the
+    # canonical six-value enum. Recovery text / message / action still key off the
+    # subtype so the actionable guidance stays as specific as before.
+    subtype, retryable, fallback_tool, fallback_args = _classify(exc, context)
+    error_code = canonical_error_code(subtype)
     next_commands: list[dict[str, Any]] = []
     if fallback_tool and fallback_args:
         next_commands.append({"tool": fallback_tool, "arguments": fallback_args})
@@ -422,18 +428,22 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
     payload: dict[str, Any] = {
         "success": False,
         "error_code": error_code,
-        "message": _envelope_message(exc, error_code),
+        "message": _envelope_message(exc, subtype),
         "retryable": retryable,
-        "recovery_action": _recovery_action(error_code, retryable),
+        "recovery_action": _recovery_action(subtype, retryable),
         "fallback_tool": fallback_tool,
         "fallback_args": fallback_args,
-        "recovery": _recovery_text(error_code, fallback_tool, tool_name=context.tool_name),
+        "recovery": _recovery_text(subtype, fallback_tool, tool_name=context.tool_name),
         "_meta": {
             "tool": context.tool_name,
             "next_commands": next_commands,
             **_provenance_meta(),
         },
     }
+    if subtype != error_code:
+        # Preserve the finer classification for clients that want it (never widens
+        # the wire enum; error_code above is always one of the closed six).
+        payload["error_subtype"] = subtype
     if isinstance(exc, CoordinateRangeError):
         payload["recovery"] = (
             "The position is beyond the chromosome length in every supported build, so no "
@@ -466,14 +476,14 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
                 f"{payload['recovery']} The ALT base matches the reference here, so the most "
                 "likely cause is a REF/ALT swap; the fallback re-runs with REF/ALT swapped."
             )
-    if error_code == "rate_limited":
+    if subtype == "rate_limited":
         # rate_budget reports the LOCAL concurrency cap (asyncio.Semaphore), not a time
         # window. remaining=0 is exact for local saturation; for an upstream HTTP 429 (also
         # RateLimitedError) it is a conservative floor. retry_after_s gives an actionable
         # backoff per current MCP rate-limit guidance.
         payload["_meta"]["rate_budget"] = rate_budget_snapshot(saturated=True)
     nearest = getattr(exc, "nearest_transcript", None)
-    if error_code == "not_found" and isinstance(nearest, dict):
+    if subtype == "not_found" and isinstance(nearest, dict):
         # W4: distance to the nearest annotated transcript so a caller can decide
         # mechanically whether widening max_distance would help.
         payload["nearest_transcript"] = nearest
@@ -566,7 +576,7 @@ async def run_mcp_tool(
     except McpToolError as exc:
         record_mcp_error(
             tool_name=tool_name,
-            error_code=exc.payload.get("error_code", "internal_error"),
+            error_code=exc.payload.get("error_code", "internal"),
             message=exc.payload.get("message", ""),
             raw_message=str(exc),
         )

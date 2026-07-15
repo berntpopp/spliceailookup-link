@@ -43,7 +43,8 @@ async def test_batch_over_cap_validation_failed(mcp) -> None:
         "predict_splicing_batch",
         {"variant_ids": [f"1-{i}-A-T" for i in range(26)]},
     )
-    assert data["error_code"] == "validation_failed"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "validation_failed"
 
 
 async def test_f10_batch_summary_full_histogram(mcp) -> None:
@@ -91,7 +92,8 @@ async def test_batch_flags_ambiguous_rsid_not_silently_scored(mcp) -> None:
     )
     by_variant = {r["variant"]: r for r in data["results"]}
     amb = by_variant["rs6025"]
-    assert amb["error_code"] == "ambiguous"
+    assert amb["error_code"] == "ambiguous_query"
+    assert amb["error_subtype"] == "ambiguous"
     assert amb["variant_ids"] == ["1-169549811-C-A", "1-169549811-C-T"]
     assert "error_code" not in by_variant["chr8-140300616-T-G"]
     assert data["summary"]["ok"] == 1

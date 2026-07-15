@@ -11,7 +11,8 @@ async def test_f19_mt_fast_fails_unsupported_contig_no_scoring(
     mcp, stub_service: StubService
 ) -> None:
     data = await expect_tool_error(mcp, "predict_splicing", {"variant_id": "MT-3243-A-G"})
-    assert data["error_code"] == "unsupported_contig"
+    assert data["error_code"] == "invalid_input"
+    assert data["error_subtype"] == "unsupported_contig"
     assert data["retryable"] is False
     # The whole point: no upstream scoring slot was ever consumed.
     assert stub_service.score_calls == []
@@ -29,7 +30,8 @@ async def test_f19_mt_in_batch_is_per_item_unsupported_contig(
         )
     )
     by_variant = {r["variant"]: r for r in data["results"]}
-    assert by_variant["MT-3243-A-G"]["error_code"] == "unsupported_contig"
+    assert by_variant["MT-3243-A-G"]["error_code"] == "invalid_input"
+    assert by_variant["MT-3243-A-G"]["error_subtype"] == "unsupported_contig"
     assert "error_code" not in by_variant["chr8-140300616-T-G"]
     # MT consumed no scoring slot; only the valid item scored (spliceai + pangolin).
     assert all(c["variant_id"] != "MT-3243-A-G" for c in stub_service.score_calls)
@@ -205,12 +207,18 @@ from spliceailookup_link.mcp.resources import (  # noqa: E402
 
 def test_f24_capabilities_documents_new_code_and_batch_semantics():
     doc = get_capabilities_resource()
-    assert "unsupported_contig" in doc["error_codes"]
+    # unsupported_contig is now an error_subtype of the canonical invalid_input wire code.
+    assert "invalid_input" in doc["error_codes"]
+    assert "unsupported_contig" not in doc["error_codes"]
     assert "batch_semantics" in doc
     assert "retry_variants" in doc["batch_semantics"]
     assert "include_hints" in doc["response_fields"]
     ref = get_reference_resource()
-    assert "unsupported_contig" in ref["error_taxonomy"]["codes"]
+    assert "unsupported_contig" in ref["error_taxonomy"]["error_subtypes"]
+    assert (
+        ref["error_taxonomy"]["error_subtypes"]["unsupported_contig"]["error_code"]
+        == "invalid_input"
+    )
 
 
 def test_f24_capabilities_version_stable_and_12_char():

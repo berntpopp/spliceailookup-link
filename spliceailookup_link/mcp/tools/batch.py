@@ -26,6 +26,8 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction"},
         task=True,
+        # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema.
+        output_schema=None,
     )
     async def predict_splicing_batch(
         variant_ids: Annotated[
@@ -33,21 +35,39 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
             Field(
                 min_length=1,
                 max_length=_MAX_BATCH,
-                description=f"1-{_MAX_BATCH} variants (CHROM-POS-REF-ALT / HGVS / rsID).",
+                description=f"A LIST of 1-{_MAX_BATCH} variants, each CHROM-POS-REF-ALT / HGVS / "
+                "rsID (HGVS/rsIDs are auto-resolved). Pass an array even for a single variant.",
+                examples=[["chr8-140300616-T-G", "NM_000123.4:c.10A>T", "rs6025"]],
             ),
         ],
         genome_build: Annotated[
             Literal["GRCh37", "GRCh38"],
-            Field(description="Build. GRCh38 default."),
+            Field(description="Reference build applied to every variant. GRCh38 default."),
         ] = "GRCh38",
-        max_distance: Annotated[int, Field(ge=1, le=10000)] = 500,
-        mask: Annotated[Literal["raw", "masked"], Field()] = "raw",
-        gene_set: Annotated[Literal["basic", "comprehensive"], Field()] = "basic",
-        transcripts: Annotated[Literal["mane", "all"], Field()] = "mane",
+        max_distance: Annotated[
+            int,
+            Field(ge=1, le=10000, description="nt window scanned per variant (default 500)."),
+        ] = 500,
+        mask: Annotated[
+            Literal["raw", "masked"],
+            Field(description="raw (default; alt-splicing) or masked (variant interpretation)."),
+        ] = "raw",
+        gene_set: Annotated[
+            Literal["basic", "comprehensive"],
+            Field(description="basic (default) or comprehensive GENCODE (much slower; may 503)."),
+        ] = "basic",
+        transcripts: Annotated[
+            Literal["mane", "all"],
+            Field(description="mane (default, MANE Select) or all overlapping transcripts."),
+        ] = "mane",
         response_mode: Annotated[
-            Literal["minimal", "compact", "standard", "full"], Field()
+            Literal["minimal", "compact", "standard", "full"],
+            Field(description="Per-item verbosity: minimal, compact (default), standard, or full."),
         ] = "compact",
-        cross_build_check: Annotated[bool, Field()] = True,
+        cross_build_check: Annotated[
+            bool,
+            Field(description="On not_found, probe the other build to detect a build mismatch."),
+        ] = True,
         correlation_id: Annotated[
             str | None,
             Field(
@@ -59,7 +79,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         ] = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
-        """Score a list of variants in ONE call. The server fans out under its concurrency cap and returns a single envelope with per-variant results (+ per-item errors that do not fail the batch) and a summary. Use this for gene panels instead of N predict_splicing calls. Accepts 1-25 variants (more than max_items=25 returns validation_failed, not a truncated result); each item returns about one compact predict_splicing result, so a full batch is ~25x a single compact response, and _meta echoes items_submitted and max_items. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
+        """Score a list of variants in ONE call. The server fans out under its concurrency cap and returns a single envelope with per-variant results (+ per-item errors that do not fail the batch) and a summary. Use this for gene panels instead of N predict_splicing calls. Accepts 1-25 variants (more than max_items=25 returns invalid_input, not a truncated result); each item returns about one compact predict_splicing result, so a full batch is ~25x a single compact response, and _meta echoes items_submitted and max_items. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()

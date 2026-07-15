@@ -3,6 +3,52 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.0.0] - 2026-07-15
+
+MCP contract-hardening (fleet-wide sweep). The server now passes the fleet's
+**Behaviour Conformance v1** gate (0 fail, 0 UNGATED); the vendored probe is wired
+into CI so it can never silently regress.
+
+### Changed
+
+- **BREAKING (wire error taxonomy): `error_code` is now the closed six-value fleet
+  enum** `{invalid_input, not_found, ambiguous_query, upstream_unavailable,
+  rate_limited, internal}` (Response-Envelope Standard v1). The finer classifications
+  the server used to emit on the wire — `validation_failed`, `ref_mismatch`,
+  `ambiguous`, `build_mismatch`, `unsupported_contig`, `internal_error` — are no longer
+  wire codes. They now map onto the canonical enum (all six mapped values above are
+  `invalid_input` except `ambiguous`→`ambiguous_query` and `internal_error`→`internal`)
+  and are preserved **additively** on the same envelope under a new `error_subtype`
+  field, so no diagnostic detail is lost. A client that only ever needed to know a call
+  failed, or that branched on the closed enum, is unaffected; a client that branched on
+  the old finer strings must read `error_subtype`. The capabilities/reference resources
+  and the batch semantics prose were updated to match (canonical `error_codes` list plus
+  a separate `error_subtypes` section). Normalisation happens at the single error
+  **egress** (`error_tool_result`), so every path — including a raw `McpToolError` whose
+  hand-built payload never passed through the classification helpers — is guaranteed to
+  emit a canonical code on the wire.
+- Batch per-item error envelopes carry the same `error_subtype` when present, mirroring
+  the single-call envelope.
+
+### Added
+
+- Every `predict_splicing_batch` input property now carries a `description`, and its
+  required `variant_ids` array carries an array-form `examples` value
+  (Tool-Schema Documentation Standard v1). Previously the tool could not be behaviourally
+  probed at all (reported UNGATED); it is now fully gated.
+- Vendored `tests/conformance/behaviour.py` + `test_behaviour_v1.py` (byte-identical to
+  the router's Behaviour Conformance v1 gate) and a "Run behaviour probe" step in
+  `conformance.yml`.
+
+### Removed
+
+- The advisory `outputSchema` is no longer published on any tool (`output_schema=None`),
+  and `FastMCP(dereference_schemas=False)` avoids inlining `$defs` at every use site
+  (Tool-Surface Budget Standard v1). No `structuredContent` is lost — every tool returns
+  a dict envelope. Advertised tool surface drops from ~4,223 to ~4,072 tokens with the
+  `outputSchema` share going from 7% to 0% and input-property documentation from 88% to
+  100%.
+
 ## [3.0.8] - 2026-07-14
 
 ### Changed

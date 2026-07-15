@@ -12,13 +12,13 @@ from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import after_resolve_many
-from spliceailookup_link.mcp.schema_relax import relax_output_schema
 from spliceailookup_link.mcp.tools._diagnose import check_ref as run_ref_check
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.variant import unsupported_contig_reason
 
-# Response-Envelope Standard v1 SS1: the frame is {success, result, _meta}; the
-# domain fields (below) live under `result`, not flat at the top level.
+# The domain fields resolve_variant returns under `result` (Response-Envelope v1 SS1).
+# Retained as documentation + the no-free-text-surface safety check even though the
+# outputSchema is no longer published on the wire (Tool-Surface Budget Standard v1).
 _RESULT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -39,18 +39,6 @@ _RESULT_SCHEMA = {
     "required": ["variant_id", "genome_build"],
 }
 
-_OUTPUT_SCHEMA = relax_output_schema(
-    {
-        "type": "object",
-        "properties": {
-            "success": {"type": "boolean"},
-            "result": _RESULT_SCHEMA,
-            "_meta": {"type": "object"},
-        },
-        "required": ["success"],
-    }
-)
-
 
 def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceService]) -> None:
     @mcp.tool(
@@ -58,7 +46,10 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
         title="Resolve Variant to Coordinates",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"resolve"},
-        output_schema=_OUTPUT_SCHEMA,
+        # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema
+        # (previously an explicit relax_output_schema doc). The tool still returns a
+        # dict envelope via run_mcp_tool, so structuredContent is preserved.
+        output_schema=None,
     )
     async def resolve_variant(
         variant_id: Annotated[

@@ -23,7 +23,10 @@ into CI so it can never silently regress.
   failed, or that branched on the closed enum, is unaffected; a client that branched on
   the old finer strings must read `error_subtype`. The capabilities/reference resources
   and the batch semantics prose were updated to match (canonical `error_codes` list plus
-  a separate `error_subtypes` section).
+  a separate `error_subtypes` section). Normalisation happens at the single error
+  **egress** (`error_tool_result`), so every path — including a raw `McpToolError` whose
+  hand-built payload never passed through the classification helpers — is guaranteed to
+  emit a canonical code on the wire.
 - Batch per-item error envelopes carry the same `error_subtype` when present, mirroring
   the single-call envelope.
 

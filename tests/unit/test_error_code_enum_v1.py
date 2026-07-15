@@ -14,6 +14,8 @@ widens the wire enum. Written to FAIL against the pre-canonicalisation code.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from spliceailookup_link.api import (
@@ -27,9 +29,11 @@ from spliceailookup_link.mcp.errors import (
     BuildMismatchError,
     CoordinateRangeError,
     McpErrorContext,
+    McpToolError,
     RefMismatchError,
     mcp_tool_error,
     mcp_validation_tool_error,
+    run_mcp_tool,
 )
 from spliceailookup_link.mcp.resources import (
     get_capabilities_resource,
@@ -148,3 +152,59 @@ def test_documented_taxonomy_never_advertises_an_off_enum_wire_code() -> None:
     assert subtypes.isdisjoint(CLOSED_SIX)
     for detail in ref["error_subtypes"].values():
         assert detail["error_code"] in CLOSED_SIX
+
+
+# --- Wire-level egress guard (the chokepoint the constructors do NOT guarantee) ---------
+#
+# The classification CONSTRUCTORS (mcp_tool_error / mcp_validation_tool_error) already emit a
+# canonical error_code. The bug this guards is one level lower: a RAW ``McpToolError`` whose
+# hand-built payload carries an off-enum ``error_code`` bypasses those constructors and, before
+# this fix, was emitted VERBATIM by ``run_mcp_tool``. The invariant must hold at the EGRESS --
+# the single point (``error_tool_result``) where the error ToolResult is actually built -- so
+# EVERY path is normalised, not just the ones that happen to go through a constructor.
+
+# (payload error_code as raised, expected wire error_code, expected wire error_subtype)
+_WIRE_CASES = [
+    ("validation_failed", "invalid_input", "validation_failed"),
+    ("ref_mismatch", "invalid_input", "ref_mismatch"),
+    ("build_mismatch", "invalid_input", "build_mismatch"),
+    ("unsupported_contig", "invalid_input", "unsupported_contig"),
+    ("ambiguous", "ambiguous_query", "ambiguous"),
+    ("internal_error", "internal", "internal_error"),
+    ("wat_is_this", "internal", "wat_is_this"),  # unknown off-enum string -> internal
+]
+
+
+@pytest.mark.parametrize("raised_code, wire_code, wire_subtype", _WIRE_CASES)
+async def test_raised_off_enum_mcptoolerror_is_normalized_on_the_wire(
+    raised_code, wire_code, wire_subtype
+) -> None:
+    async def call() -> dict:
+        # A hand-built payload that did NOT pass through the classification constructors.
+        raise McpToolError(
+            {"success": False, "error_code": raised_code, "message": "bypass", "_meta": {}}
+        )
+
+    result = await run_mcp_tool("predict_spliceai", call)
+    assert result.is_error is True
+    payload = result.structured_content
+    assert payload["error_code"] == wire_code
+    assert payload["error_code"] in CLOSED_SIX
+    assert payload["error_subtype"] == wire_subtype
+    # The TextContent mirror must agree with structuredContent (both are the wire).
+    mirror = json.loads(result.content[0].text)
+    assert mirror["error_code"] == wire_code
+    assert mirror["error_subtype"] == wire_subtype
+
+
+async def test_canonical_code_passes_through_egress_untouched() -> None:
+    # An already-canonical code is a no-op: no spurious error_subtype is invented.
+    async def call() -> dict:
+        raise McpToolError(
+            {"success": False, "error_code": "not_found", "message": "gone", "_meta": {}}
+        )
+
+    result = await run_mcp_tool("predict_spliceai", call)
+    payload = result.structured_content
+    assert payload["error_code"] == "not_found"
+    assert "error_subtype" not in payload

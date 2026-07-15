@@ -3,6 +3,14 @@
 All notable changes to `spliceailookup-link` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Re-vendored the behaviour conformance gate from genefoundry-router `ba09fdc`
+  (`docs/conformance/behaviour.py` blob `30d639242b`) so live MCP contract checks
+  treat not-found example probes as inconclusive instead of failures.
+
 ## [4.0.0] - 2026-07-15
 
 MCP contract-hardening (fleet-wide sweep). The server now passes the fleet's

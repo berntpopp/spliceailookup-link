@@ -1,5 +1,7 @@
 # Consumer-Assessment Fixes (F18–F24) Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close every finding in `docs/mcp-consumer-assessment-2026-06-12.md` so the server lands cleanly above 9.5/10, without breaking any existing tool name, schema field, or test.

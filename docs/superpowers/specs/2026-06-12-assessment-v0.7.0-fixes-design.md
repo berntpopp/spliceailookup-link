@@ -1,5 +1,7 @@
 # Design: spliceailookup-link v0.7.0 assessment fixes (target > 9.5 / 10)
 
+> Historical record
+
 **Date:** 2026-06-12
 **Source assessment:** `docs/mcp-assessment-v0.7.0-2026-06-12.md` (scored 8.5 / 10)
 **Status:** approved-to-execute (autonomous end-to-end per /goal directive)

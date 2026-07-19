@@ -1,5 +1,7 @@
 # spliceailookup-link — Evaluation-Driven Improvements (Design)
 
+> Historical record
+
 **Date:** 2026-06-11
 **Author:** MCP engineering (driven by `docs/mcp-evaluation.md`)
 **Status:** Design — pending implementation plan

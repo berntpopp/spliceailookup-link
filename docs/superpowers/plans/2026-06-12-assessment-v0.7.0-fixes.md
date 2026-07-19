@@ -1,5 +1,7 @@
 # v0.7.0 Assessment Fixes Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close every defect (D1–D5) and consumer recommendation (C3 batch contract, C4 `served_warm`, C5 lean resources, Rec-#5 coverage) from `docs/mcp-assessment-v0.7.0-2026-06-12.md` so a re-run scores > 9.5 / 10.

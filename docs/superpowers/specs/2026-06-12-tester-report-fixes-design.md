@@ -1,5 +1,7 @@
 # spliceailookup-link — Tester-Report Fixes (Design)
 
+> Historical record
+
 **Date:** 2026-06-12
 **Author:** MCP engineering (driven by the 2026-06-12 senior-tester report)
 **Status:** Design — pending implementation

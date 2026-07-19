@@ -1,5 +1,7 @@
 # v0.9.0 Assessment Fixes Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close every finding in `docs/mcp-assessment-v0.8.0-2026-06-12.md` (F1–F6 + Part 1 polish) to push the spliceailookup-link MCP from 8/10 to >9.5/10, releasing as v0.9.0.

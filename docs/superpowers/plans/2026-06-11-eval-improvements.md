@@ -1,5 +1,7 @@
 # Evaluation-Driven Improvements Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Lift spliceailookup-link past 9/10 on both axes of `docs/mcp-evaluation.md` by fixing findings F1–F5 and shipping runtime observability, token trims, progress + native MCP Tasks, a batch tool, a warmup tool, and a capabilities content-hash.

@@ -1,4 +1,4 @@
-.PHONY: help install lock upgrade sync format format-check lint lint-ci lint-fix lint-loc lint-readme typecheck typecheck-fresh test test-fast test-unit test-integration test-cov test-all check ci-local precommit clean dev serve-http run-prod docker-build docker-up docker-down docker-logs
+.PHONY: help install lock upgrade sync format format-check lint lint-ci lint-fix lint-loc lint-readme typecheck typecheck-fresh test test-fast test-unit test-contract-truth test-integration test-cov test-all check ci-local precommit clean dev serve-http run-prod docker-build docker-up docker-down docker-logs
 
 .DEFAULT_GOAL := help
 
@@ -57,6 +57,9 @@ test-fast: ## Run deterministic unit tests in parallel with pytest-xdist
 test-unit: ## Run unit tests in parallel
 	uv run pytest tests/unit -q -n auto
 
+test-contract-truth: ## Verify documentation against the live MCP registry
+	uv run pytest tests/conformance/test_contract_truth_v1.py -q
+
 test-integration: ## Run live integration tests against the SpliceAI/Pangolin APIs
 	uv run pytest tests/integration -q -m integration
 
@@ -67,7 +70,7 @@ test-all: test-cov ## Alias for full test run with coverage
 
 check: format lint ## Format and lint
 
-ci-local: format-check lint-ci lint-loc lint-readme typecheck test-fast ## Run fast local CI-equivalent checks
+ci-local: format-check lint-ci lint-loc lint-readme typecheck test-fast test-contract-truth ## Run fast local CI-equivalent checks
 
 precommit: ci-local ## Run checks expected before commit
 

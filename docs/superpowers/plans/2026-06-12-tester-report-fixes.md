@@ -1,5 +1,7 @@
 # Tester-Report Fixes (v0.6.0) Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the 8 findings in `docs/mcp-tester-report-2026-06-12.md` to lift the server above 9.5/10, primarily via correctness-adjacent fixes: a cheap Ensembl reference-base diagnostic (`ref_mismatch` + fast build disambiguation), resolver-ambiguity propagation (`ambiguous`), an echoed `capabilities_version`, a server-side soft deadline, a lean capabilities mode, and a `discordant_subthreshold` verdict.

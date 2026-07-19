@@ -1,5 +1,7 @@
 # spliceailookup-link — Build Record
 
+> Historical record
+
 Date: 2026-06-11
 Spec: `docs/superpowers/specs/2026-06-11-spliceailookup-link-design.md`
 API contract: `docs/API.md` (reverse-engineered from the live site + repo).

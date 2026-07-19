@@ -79,8 +79,8 @@ Same coordinate `8:140300616` (a real, repeatedly-scored GRCh38 locus; true REF 
 The cross-build heuristic fires whenever the typo'd REF coincidentally matches the *other* build's base at that coordinate, producing confidently-wrong recovery guidance for a common error class (swapped/mistyped REF). It is also internally inconsistent — the same mistake yields `ref_mismatch` for one allele and `build_mismatch` for another.
 
 Reproduction (verbatim):
-- `predict_spliceai(variant="chr8-140300616-C-A")` → `build_mismatch`, `fallback_args={variant:"8-140300616-C-A", genome_build:"GRCh37"}`
-- following that fallback → `predict_spliceai(variant="chr8-140300616-C-A", genome_build="GRCh37")` → `not_found` (dead end; user never learns the real issue is a one-char REF typo on GRCh38).
+- `predict_spliceai` with `variant="chr8-140300616-C-A"` → `build_mismatch`, `fallback_args={variant:"8-140300616-C-A", genome_build:"GRCh37"}`
+- following that fallback → `predict_spliceai` with `variant="chr8-140300616-C-A"` and `genome_build="GRCh37"` → `not_found` (dead end; user never learns the real issue is a one-char REF typo on GRCh38).
 
 **Fix:** when the requested-build coordinate is itself valid/scorable, prefer `ref_mismatch`; only assert `build_mismatch` when the coordinate does not fit the requested build at all. If genuinely ambiguous, report `ref_mismatch` as primary and mention the other-build possibility as secondary rather than redirecting outright.
 

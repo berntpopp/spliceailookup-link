@@ -1,5 +1,7 @@
 # spliceailookup-link — Design Spec
 
+> Historical record
+
 Date: 2026-06-11
 Status: Approved-for-build (autonomous goal directive)
 Author: reverse-engineered from `spliceailookup.broadinstitute.org` + sibling `-link` conventions

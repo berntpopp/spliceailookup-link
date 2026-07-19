@@ -1,5 +1,7 @@
 # spliceailookup-link v0.3.0 Corrective Pass — Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close eval findings F6–F10 and consumer improvements #2/#4/#5 from `docs/mcp-evaluation.md` Part 4 so a fresh independent re-evaluation clears >9/10 on both the LLM-consumer and senior-tester axes.

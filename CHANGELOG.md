@@ -301,9 +301,8 @@ deprecation aliases — the old argument names are removed immediately.
 full` (added `standard`, which behaves as `compact` in this server). `compact`
 remains the default.
 
-**Migration:** rename the argument in every call —
-`predict_splicing(variant=...)` → `predict_splicing(variant_id=...)`, and
-`predict_splicing_batch(variants=[...])` → `predict_splicing_batch(variant_ids=[...])`.
+**Migration:** rename `variant=` to `variant_id=` on `predict_splicing`, and
+rename `variants=` to `variant_ids=` on `predict_splicing_batch`.
 Tool names are unchanged (`predict_*`, `resolve_variant`,
 `get_server_capabilities`, `warmup`).
 

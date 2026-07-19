@@ -1,5 +1,7 @@
 # Design — v0.9.0: resolving the v0.8.0 LLM-consumer assessment to >9.5/10
 
+> Historical record
+
 - **Date:** 2026-06-12
 - **Source assessment:** `docs/mcp-assessment-v0.8.0-2026-06-12.md` (overall 8/10)
 - **Target:** >9.5/10 overall; all six findings + Part 1 polish closed

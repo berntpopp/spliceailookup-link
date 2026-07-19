@@ -1,5 +1,7 @@
 # spliceailookup-link v0.5.0 Evaluation Pass 3 — Implementation Plan
 
+> Historical record
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close `docs/mcp-evaluation.md` Part 7 findings F11–F17 + #C1 and add four structural parity invariants so a fresh independent re-test (Part 8) clears **>9.2 on both axes** with `predict_splicing_batch` ≥ 9.

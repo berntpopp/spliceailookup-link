@@ -1,5 +1,7 @@
 # spliceailookup-link — Consumer-Assessment Fixes (Design)
 
+> Historical record
+
 **Date:** 2026-06-12
 **Author:** MCP engineering (driven by `docs/mcp-consumer-assessment-2026-06-12.md`)
 **Status:** Design — pending implementation

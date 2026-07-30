@@ -1,6 +1,6 @@
 """FastMCP-core not-found reflection guard, driven through the REAL MCP surface.
 
-FastMCP core (pinned >=3.4.4,<4.0.0) reflects the caller's OWN requested tool
+FastMCP core (pinned >=3.4.5,<4.0.0) reflects the caller's OWN requested tool
 name / resource URI / prompt name back to the caller (and to logs) BEFORE any
 backend middleware runs. Probed leak surfaces on pristine main:
 

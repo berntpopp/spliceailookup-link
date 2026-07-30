@@ -1,6 +1,6 @@
 """FastMCP-core not-found reflection guard (Response-Envelope v1.1 fast-follow).
 
-FastMCP core (pinned ``>=3.4.4,<4.0.0``) reflects the caller's OWN requested tool
+FastMCP core (pinned ``>=3.4.5,<4.0.0``) reflects the caller's OWN requested tool
 name / resource URI / prompt name back to the caller (and to logs) BEFORE any
 backend middleware runs. This module closes that residual with fixed, input-free
 messages built from CONSTANTS only, mirroring the ratified fleet references

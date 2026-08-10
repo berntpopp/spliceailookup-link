@@ -31,3 +31,11 @@ def test_dockerfile_pins_uv_by_digest() -> None:
     assert f"COPY --from={_UV_PIN} /uv /usr/local/bin/uv" in text, (
         "uv must be copied from the digest-pinned official image"
     )
+
+
+def test_runtime_image_removes_unused_pip_installations() -> None:
+    text = DOCKERFILE.read_text(encoding="utf-8")
+    assert "/usr/local/lib/python*/site-packages/pip" in text
+    assert "/opt/venv/lib/python*/site-packages/pip" in text
+    assert "/usr/local/bin/pip3.14" in text
+    assert "/opt/venv/bin/pip3.14" in text

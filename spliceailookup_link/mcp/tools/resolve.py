@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
 from pydantic import Field
 
+from spliceailookup_link.api import SpliceApiError
 from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
@@ -96,7 +98,16 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
 
         async def call() -> dict[str, Any]:
             service = service_factory()
-            result = await service.resolve(variant_id, genome_build)
+            try:
+                result = await asyncio.wait_for(
+                    service.resolve(variant_id, genome_build),
+                    timeout=settings.RESOLVE_SOFT_DEADLINE_SECONDS,
+                )
+            except TimeoutError as exc:
+                raise SpliceApiError(
+                    "Variant resolution exceeded the server's "
+                    f"{settings.RESOLVE_SOFT_DEADLINE_SECONDS:g}s deadline."
+                ) from exc
             # All candidates of an ambiguous result share a locus, so the contig
             # check on the first id is representative (and never None).
             ids = result.get("variant_ids") or [result["variant_id"]]

@@ -20,8 +20,7 @@ loosely-declared) output_schema.
 
 Pure envelope-shape helpers (``rate_budget_snapshot``, ``latency_hint``,
 ``error_tool_result``, ``frame_success``) live in the sibling ``mcp/envelope.py``
-module (600-LOC budget); this module owns exception -> error_code classification
-and the ``run_mcp_tool`` orchestration.
+module (600-LOC budget); this module owns exception -> error_code classification and ``run_mcp_tool`` orchestration.
 
 Batch per-item failures are the deliberate exception: they are built with
 mcp_tool_error(...).payload and embedded in a SUCCESSFUL batch envelope so one
@@ -30,6 +29,7 @@ bad variant never fails its siblings -- those stay in-band by design.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -532,6 +532,7 @@ async def run_mcp_tool(
     lean_meta: bool = False,
     correlation_id: str | None = None,
     envelope_key: str | None = "result",
+    deadline: float | None = None,
 ) -> dict[str, Any] | ToolResult:
     """Execute an MCP tool body, converting any exception to an envelope dict.
 
@@ -570,7 +571,7 @@ async def run_mcp_tool(
         return envelope
 
     try:
-        result = await call()
+        result = await asyncio.wait_for(call(), timeout=deadline) if deadline else await call()
         result.setdefault("success", True)
         return frame_success(_stamp(result), envelope_key)
     except McpToolError as exc:

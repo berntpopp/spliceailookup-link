@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
+from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.envelope import latency_hint
 from spliceailookup_link.mcp.errors import run_mcp_tool
@@ -112,5 +113,11 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         # Already the SS1 collection frame (`results` array + sibling domain
         # keys count/summary/summary_top_variant) -- do not double-wrap under `result`.
         return await run_mcp_tool(
-            "predict_splicing_batch", call, correlation_id=correlation_id, envelope_key=None
+            "predict_splicing_batch",
+            call,
+            correlation_id=correlation_id,
+            envelope_key=None,
+            deadline=None
+            if running_as_task(ctx)
+            else settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
         )

@@ -14,7 +14,7 @@ from spliceailookup_link.mcp.envelope import latency_hint, rate_budget_snapshot
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import for_combined
 from spliceailookup_link.mcp.provenance import prediction_provenance
-from spliceailookup_link.mcp.tools._common import see_also_for
+from spliceailookup_link.mcp.tools._common import running_as_task, see_also_for
 from spliceailookup_link.mcp.tools._predict import predict_one
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.services.telemetry import is_served_warm
@@ -165,4 +165,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             ),
             lean_meta=lean,
             correlation_id=correlation_id,
+            deadline=None
+            if running_as_task(ctx)
+            else settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
         )

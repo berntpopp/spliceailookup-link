@@ -20,6 +20,7 @@ from spliceailookup_link.mcp.tools._common import (
     mask_to_int,
     prepare_variant,
     run_with_deadline,
+    running_as_task,
     see_also_for,
 )
 from spliceailookup_link.mcp.tools._diagnose import diagnose_coordinate_failure
@@ -197,4 +198,7 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             ),
             lean_meta=lean,
             correlation_id=correlation_id,
+            deadline=None
+            if running_as_task(ctx)
+            else settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
         )

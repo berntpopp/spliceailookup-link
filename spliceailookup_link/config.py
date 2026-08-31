@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # Background Tasks (ctx.is_background_task) bypass this deadline.
     PREDICT_SOFT_DEADLINE_SECONDS: int = 55
 
+    # Resolution normally completes quickly, but HGVS/rsID inputs depend on Ensembl VEP.
+    # Return a structured retryable error before a Streamable-HTTP client exhausts its
+    # 60-second behavior-probe budget; this does not change the 90-second upstream timeout.
+    RESOLVE_SOFT_DEADLINE_SECONDS: float = 55
+
     # In-process cache. Scores are deterministic per (model, build, variant,
     # distance, mask, gene_set), so a long TTL is safe and dramatically reduces
     # load on the rate-limited upstream.

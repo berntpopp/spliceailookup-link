@@ -15,8 +15,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   the repository badges correctly.
 - Upgrade Debian packages during the image build and remove bootstrap `setuptools` from the
   production virtual environment to remediate fixable OpenSSL and packaging-tool findings.
-- Bound Ensembl-backed variant resolution with an in-band, retryable upstream error before an MCP
-  client's behavior-probe timeout, while retaining the upstream request timeout.
+- Bound Ensembl-backed variant resolution and the full foreground prediction pipeline with an
+  in-band, retryable upstream error before an MCP client's behavior-probe timeout, while retaining
+  the upstream request timeout and background-task budget.
 
 ## [4.0.3] - 2026-08-10
 

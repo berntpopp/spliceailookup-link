@@ -41,3 +41,14 @@ async def test_prediction_deadline_covers_variant_preflight(monkeypatch) -> None
 
     assert error["error_code"] == "upstream_unavailable"
     assert error["retryable"] is True
+
+
+async def test_batch_deadline_covers_variant_preflight(monkeypatch) -> None:
+    """The foreground batch entry point shares the same totality guarantee."""
+    monkeypatch.setattr(settings, "PREDICT_SOFT_DEADLINE_SECONDS", 0.01)
+    mcp = create_spliceai_mcp(service_factory=SlowPreflightService)
+
+    error = await expect_tool_error(mcp, "predict_splicing_batch", {"variant_ids": ["1-100-A-T"]})
+
+    assert error["error_code"] == "upstream_unavailable"
+    assert error["retryable"] is True

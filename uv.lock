@@ -1799,7 +1799,7 @@ wheels = [
 
 [[package]]
 name = "spliceailookup-link"
-version = "4.0.4"
+version = "4.0.5"
 source = { editable = "." }
 dependencies = [
     { name = "asgi-correlation-id" },

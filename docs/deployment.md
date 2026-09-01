@@ -98,6 +98,34 @@ filesystem read-only with a writable `/tmp` tmpfs, sets `no-new-privileges`, dro
 > Compose *merges* list fields across `-f` overlays, so a plain empty list would leave
 > the base mapping in place. This is a footgun, not a style choice.
 
+## Fleet deploy contract
+
+`docker/docker-compose.npm.yml` is the Compose file the GeneFoundry fleet controller
+(`strato_v6_docker_npm`) deploys and validates. It declares `user: "999:999"` -- this
+image's own numeric uid:gid, read from `docker/Dockerfile`'s `useradd --system --gid
+app` default (confirmed with `docker run --rm --entrypoint id`); the controller's
+runtime observer proves the effective uid from `/proc`, so the declared value must be
+numeric, not the account name. `user` must NOT appear in `docker/docker-compose.yml`
+or `docker/docker-compose.prod.yml` -- those are the Compose files listed in
+`container-release.json`, and the shared release gate (`container_release.py
+validate-compose`) forbids `user` on them. `tests/unit/test_deploy_overlay_user.py`
+guards both halves of this contract.
+
+Release checklist: bump `pyproject.toml` `version`, run `uv lock`, add a
+`CHANGELOG.md` heading `## [x.y.z] - YYYY-MM-DD`, bump `CITATION.cff` `version:`
+(this repo's tests do not assert `date-released` tracks the CHANGELOG date -- it is
+regenerated externally by genefoundry-router), tag `vx.y.z`, then approve the
+`release` GitHub Environment gate (it fires twice) via `gh api
+repos/berntpopp/spliceailookup-link/actions/runs/<id>/pending_deployments`
+(`status: waiting` is the gate).
+
+Self-check that the controller can render and project this overlay:
+
+```bash
+SPLICEAILOOKUP_LINK_IMAGE="ghcr.io/berntpopp/spliceailookup-link@sha256:<64 hex>" docker compose -f docker/docker-compose.npm.yml config --format json > /tmp/r.json
+# from strato_v6_docker_npm: uv run python -c "import sys,json; sys.path.insert(0,'scripts'); from utils.deployment_preflight import canonical_projection; canonical_projection(json.load(open('/tmp/r.json')), project='spliceailookup-link'); print('PROJECTION OK')"
+```
+
 ## Multi-worker deployments
 
 Background tasks are backed by FastMCP's Docket. `DOCKET_URL` defaults to `memory://`,

@@ -5,6 +5,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.0.6] - 2026-09-18
+
+### Changed
+
+- Consolidated Dependabot updates: bump `gunicorn` to 26.2.0, `pydantic` to 2.13.5, `typer` to 0.27.2, `ruff` to 0.16.8, and `mypy` to 2.3.1.
+- Pin `genefoundry-router` reusable workflows to v0.9.1.
+- Pin GitHub Actions: `astral-sh/setup-uv` v10.1.0 and `github/codeql-action` v4.38.0.
+- Group Dependabot updates for python-dependencies and github-actions.
+
 ## [4.0.5] - 2026-09-02
 
 ### Changed

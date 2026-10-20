@@ -5,6 +5,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.0.9] - 2026-10-20
+
+### Security
+
+- Fix Dependabot alert for `mcp` (fixed in 1.30.0): raise the floor to `mcp[cli]>=1.30.0`.
+
+### Changed
+
+- Consolidated Dependabot updates: `mcp` 1.30.0, `fastapi`, `pydantic`, `pydantic-core`, `pydantic-settings`, `typer`, `ruff`, `mypy`, `orjson`, `async-lru`, `pre-commit`, `librt`, `ast-serialize`, `typing-inspection`.
+- Pin GitHub Actions: `astral-sh/setup-uv` v10.3.0, `actions/upload-artifact` v7.0.2, `github/codeql-action` v4.38.3.
+- Pin `genefoundry-router` reusable workflows to v0.10.4.
+
 ## [4.0.8] - 2026-10-03
 
 - Update FastAPI and pytest-mock to the current dependency releases.

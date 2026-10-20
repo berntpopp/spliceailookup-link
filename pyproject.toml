@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spliceailookup-link"
-version = "4.0.8"
+version = "4.0.9"
 description = "A unified server providing REST API and MCP interfaces for SpliceAI / Pangolin splice-impact prediction (Broad SpliceAI Lookup backends)."
 readme = "README.md"
 authors = [{ name = "Bernt Popp" }]
@@ -35,7 +35,7 @@ dependencies = [
     "orjson>=3.10.0,<4.0.0",
     "rich>=15.0.0,<16.0.0",
     "typer>=0.27.2,<1.0.0",
-    "mcp[cli]>=1.28.1,<2.0.0",
+    "mcp[cli]>=1.30.0,<2.0.0",
     "fastmcp[tasks]>=3.4.7,<4.0.0",
     "gunicorn>=26.2.0,<27.0.0",
     "asgi-correlation-id>=5.0.1,<6.0.0",

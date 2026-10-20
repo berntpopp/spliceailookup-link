@@ -82,14 +82,14 @@ _PRIORITY_LABELS = {
 def _to_float(value: Any) -> float | None:
     try:
         return round(float(value), 4)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
 def _to_int(value: Any) -> int | None:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

@@ -117,7 +117,7 @@ def detect_build_mismatch(variant_id: str, requested_build: str) -> str | None:
     try:
         chrom, pos_s, _, _ = variant_id.split("-", 3)
         pos = int(pos_s)
-    except (ValueError, AttributeError):
+    except ValueError, AttributeError:
         return None
     inferred = likely_build(chrom, pos)
     if inferred and inferred != requested_build:

@@ -5,11 +5,9 @@ Python 3.12. ``container-ci``/``conformance`` exercise the *image* on 3.14; the
 unit suite never did, so a 3.14-only stdlib or typing regression could ship
 uncaught.
 
-Both ends of the matrix are required. 3.12 is the declared ``requires-python``
-floor -- drop it and the floor is a false claim. 3.14 is what reaches
-production. And ``UV_PYTHON`` is load-bearing: ``uv`` resolves its interpreter
-from ``.python-version`` *before* it consults ``PATH``, so ``setup-python``
-alone would leave both matrix legs on 3.12 -- green, and meaningless.
+The matrix is the single declared ``requires-python`` floor (3.14). ``UV_PYTHON`` is
+load-bearing: ``uv`` resolves its interpreter from ``.python-version`` *before* it
+consults ``PATH``, so ``setup-python`` alone would not pin the interpreter.
 
 Research use only; not clinical decision support.
 """

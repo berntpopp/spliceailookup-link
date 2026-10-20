@@ -96,7 +96,7 @@ repos/berntpopp/spliceailookup-link/actions/runs/<id>/pending_deployments`
 
 - Use `uv` for dependency management; never direct `pip` installs.
 - Modern Python typing: `list[str]`, `dict[str, int]`, `str | None`.
-- Format and lint with Ruff; type check with mypy targeting Python 3.12.
+- Format and lint with Ruff; type check with mypy targeting Python 3.14.
 - Keep MCP tool behavior and service behavior covered by unit tests.
 - Preserve MCP tool names and response schemas unless the task calls for a
   breaking change.

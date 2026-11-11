@@ -5,6 +5,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.0.13] - 2026-11-11
+
+### Security
+
+- Fleet dependency sweep: fastmcp 3.4.11 (floor >=3.4.10), joserfc 1.8.0, opentelemetry-api 1.45.2,
+  filelock 4.2.10, virtualenv 21.15.6 (Dependabot alerts 24-52); full `uv lock --upgrade`.
+- GitHub Actions: setup-python v7.1.0, setup-uv v10.3.3, codeql-action v4.39.1.
+
 ## [4.0.12] - 2026-10-28
 
 ### Fixed

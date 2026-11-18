@@ -182,7 +182,8 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "(gnomad-link for allele frequency, genereviews-link / gtex-link for context, "
                 "uniprot-link for protein domains, features, and disease variants). "
                 "These are hints, not callable next_commands on this server. Omitted in minimal "
-                "mode; collapsed to {server, hint} in compact; full example args in full mode."
+                "mode; collapsed to {server, tool, hint} in compact; full example args in full "
+                "mode. tool is the GeneFoundry-gateway name (e.g. gnomad_get_variant_frequencies)."
             ),
             "include_hints": (
                 "predict_* and resolve_variant accept include_hints (default true). Set false to "

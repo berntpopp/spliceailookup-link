@@ -5,6 +5,28 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-11-18
+
+### Changed
+
+- Upgrade FastMCP 3.4 → 4.2.2 and MCP SDK 1.x → 2.x; supports the 2026-07-28 sessionless
+  protocol era alongside the legacy handshake.
+- Background tasks now run through the `fastmcp-tasks` SEP-2663 extension
+  (`io.modelcontextprotocol/tasks`, registered via `TasksExtension()`); tasks are negotiated only
+  on the 2026-07-28 era, legacy-handshake clients get synchronous calls. The capabilities
+  `background_execution.how_to` text is updated accordingly.
+- Not-found reflection guard Layer 3 ported to the SDK 2 request-handler API; resource/prompt
+  backstop errors keep JSON-RPC code -32602.
+
+### Security
+
+- MCP SDK 2 echoes an unknown JSON-RPC method name in the METHOD_NOT_FOUND `data`; a lowlevel
+  middleware now strips it (both eras), and the log scrub covers `mcp.server.runner`.
+
+### Deploy notes
+
+- Task backend is still `FASTMCP_DOCKET_URL` (default `memory://`).
+
 ## [4.0.14] - 2026-11-13
 
 ### Changed

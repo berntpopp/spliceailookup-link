@@ -105,7 +105,7 @@ async def test_long_running_tools_declare_task_support_optional(mcp) -> None:
         assert tool.task_config.mode == "optional", f"{name}: taskSupport != optional"
         mcp_tool = tool.to_mcp_tool()
         assert mcp_tool.execution is not None, f"{name}: no wire-level `execution` block"
-        assert mcp_tool.execution.taskSupport == "optional", (
+        assert mcp_tool.execution.task_support == "optional", (
             f"{name}: wire-level execution.taskSupport != optional"
         )
 

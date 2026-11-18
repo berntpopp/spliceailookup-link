@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
-from fastmcp.tools.tool import ToolResult
+from fastmcp.tools import ToolResult
 from mcp.types import TextContent
 
 from spliceailookup_link.config import settings
@@ -45,8 +45,8 @@ def latency_hint(
 
     Declared alongside the protocol-level ``execution.taskSupport`` (set via
     ``task=True`` on the ``@mcp.tool`` decorator; verified against the
-    installed fastmcp 3.4.2: ``Tool.task_config.mode`` feeds
-    ``mcp_tool.execution = ToolExecution(taskSupport=...)`` on the wire MCP
+    installed fastmcp 4.2.2: ``Tool.task_config.mode`` feeds
+    ``mcp_tool.execution = ToolExecution(task_support=...)`` on the wire MCP
     Tool -- ``fastmcp/tools/base.py`` ``Tool.to_mcp_tool``, backed by
     ``mcp.types.ToolExecution.taskSupport in {forbidden, optional, required}``)
     so an agent can plan for a slow call -- or fire it as a background task --
@@ -62,7 +62,7 @@ def error_tool_result(payload: dict[str, Any]) -> ToolResult:
     result with MCP ``isError: true`` AND this flat envelope present as
     ``structuredContent`` -- not raised as a bare ``fastmcp.exceptions.ToolError``
     (that shape only carries a text message and drops structuredContent).
-    Verified against the installed fastmcp 3.4.2: ``ToolResult(is_error=True,
+    Verified against the installed fastmcp 4.2.2: ``ToolResult(is_error=True,
     ...)`` round-trips through ``CallToolResult(isError=True,
     structuredContent=...)`` (``ToolResult.to_mcp_result``), and
     ``Tool.convert_result`` passes a returned ``ToolResult`` straight through

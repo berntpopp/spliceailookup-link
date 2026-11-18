@@ -305,8 +305,10 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "predict_splicing_batch",
             ],
             "how_to": (
-                "Augment the tools/call with a `task` field (MCP 2025-11-25 Tasks); "
-                "the call returns a taskId, poll tasks/get, retrieve via tasks/result."
+                "On the 2026-07-28 protocol era, declare the io.modelcontextprotocol/tasks "
+                "extension (SEP-2663) on the tools/call; it returns a taskId, poll tasks/get "
+                "(the result is inlined once complete), cancel via tasks/cancel. Legacy-"
+                "handshake clients always get a synchronous call."
             ),
             "backend": (
                 "in-process (memory://); tasks are session-local, lost on server restart, "

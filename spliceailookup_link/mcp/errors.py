@@ -40,7 +40,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from fastmcp.exceptions import ValidationError as FastMCPValidationError
-from fastmcp.tools.tool import ToolResult
+from fastmcp.tools import ToolResult
 from pydantic import ValidationError as PydanticValidationError
 
 from spliceailookup_link.api import (
@@ -285,7 +285,7 @@ def _recovery_text(error_code: str, fallback_tool: str | None, *, tool_name: str
             "The scoring service failed transiently, or the call exceeded the server's "
             "soft deadline (comprehensive gene_set and/or a large max_distance are slow "
             "and may 503 upstream). Retry with backoff using gene_set='basic' or a smaller "
-            "max_distance, or resubmit as a background task (task=...), which is not bound by "
+            "max_distance, or resubmit as a background task (MCP tasks extension), which is not bound by "
             "the deadline."
         )
     if error_code == "validation_failed":

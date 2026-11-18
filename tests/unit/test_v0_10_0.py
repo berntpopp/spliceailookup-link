@@ -28,10 +28,10 @@ async def test_all_tools_serialize_readonly_annotations() -> None:
     for t in tools:
         ann = t.annotations
         assert ann is not None, f"{t.name} has no annotations"
-        assert ann.readOnlyHint is True, f"{t.name} not readOnlyHint"
-        assert ann.idempotentHint is True, f"{t.name} not idempotentHint"
-        assert ann.openWorldHint is True, f"{t.name} not openWorldHint"
-        assert ann.destructiveHint is False, f"{t.name} destructiveHint should be False"
+        assert ann.read_only_hint is True, f"{t.name} not readOnlyHint"
+        assert ann.idempotent_hint is True, f"{t.name} not idempotentHint"
+        assert ann.open_world_hint is True, f"{t.name} not openWorldHint"
+        assert ann.destructive_hint is False, f"{t.name} destructiveHint should be False"
 
 
 def test_capabilities_advertises_tool_safety() -> None:

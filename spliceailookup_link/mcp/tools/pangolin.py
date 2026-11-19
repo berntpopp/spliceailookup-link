@@ -187,6 +187,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     meta["resolved_from"] = prepared.resolution.get("raw_input")
             if response_mode != "minimal":
                 shaped["provenance"] = prediction_provenance(genome_build)
+            if prepared.degraded_mode:
+                shaped["degraded_mode"] = prepared.degraded_mode
             shaped["_meta"] = meta
             return shaped
 

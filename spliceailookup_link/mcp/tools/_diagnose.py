@@ -115,17 +115,26 @@ def _ref_mismatch_error(
     )
 
 
+# Surfaced as `degraded_mode` when the optional Ensembl pre-check could not run (#115).
+ENSEMBL_DEGRADED_NOTE = (
+    "Ensembl REST was unavailable, so the optional REF/build pre-check was skipped. "
+    "Scores are unaffected (the scoring service checks REF itself); a wrong REF or "
+    "build would surface as not_found instead of ref_mismatch."
+)
+
+
 async def preflight_ref_mismatch(
     service: SpliceService, *, variant_id: str, requested_build: GenomeBuild
-) -> None:
+) -> str:
     """Raise RefMismatchError when the coordinate's REF mismatches the requested build.
 
-    No-op when the REF matches, is inconclusive (Ensembl unavailable), or is
-    non-ACGT/symbolic.
+    Otherwise return the check status ('match', 'skip', or 'inconclusive' when
+    Ensembl is unavailable).
     """
     check = await check_ref(service, variant_id=variant_id, requested_build=requested_build)
     if check.status == "mismatch":
         raise _ref_mismatch_error(variant_id, requested_build, check)
+    return check.status
 
 
 async def preflight_no_overlap(

@@ -209,6 +209,11 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "check was skipped (check_ref=false), inconclusive (Ensembl down), or N/A "
                 "(HGVS/rsID, ambiguous, non-nuclear contig)."
             ),
+            "degraded_mode": (
+                "Present on predict_* and resolve_variant results when Ensembl REST was "
+                "unavailable, so the optional REF/build pre-check was skipped (short timeout, no "
+                "retries). Scores are still returned; the scoring service checks REF itself."
+            ),
             "v0_9_0_shape": (
                 "Every prediction mode exposes the headline number consistently: single-model "
                 "results carry top:{class,score,position} + max_delta_score in minimal, compact, "

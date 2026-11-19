@@ -14,6 +14,7 @@ from spliceailookup_link.config import settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import after_resolve_many
+from spliceailookup_link.mcp.tools._diagnose import ENSEMBL_DEGRADED_NOTE
 from spliceailookup_link.mcp.tools._diagnose import check_ref as run_ref_check
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.variant import unsupported_contig_reason
@@ -150,6 +151,8 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
                             f"genome_build={verdict.other_build} if that build was intended.)"
                         )
                     result["ref_warning"] = warning
+                elif verdict.status == "inconclusive":
+                    result["degraded_mode"] = ENSEMBL_DEGRADED_NOTE
                 # inconclusive / skip: leave ref_validated unset (do not claim a check
                 # we could not perform).
             result["_meta"] = (

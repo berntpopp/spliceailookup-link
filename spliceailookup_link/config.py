@@ -98,6 +98,11 @@ class Settings(BaseSettings):
     # to real scoring (never invents a not_found). Disable if Ensembl overlap is unavailable.
     PREFLIGHT_OVERLAP_CHECK_ENABLED: bool = True
 
+    # The optional Ensembl pre-checks (REF base, transcript overlap, nearest transcript)
+    # fail open, so they get a short timeout and no retries: an unreachable Ensembl must
+    # not stall a prediction the scoring service answers in under a second.
+    ENSEMBL_PREFLIGHT_TIMEOUT_SECONDS: float = 3.0
+
     # Background-task (FastMCP Tasks / Docket) backend. memory:// is in-process and
     # correct for the single-process unified host; set redis://... for multi-worker.
     DOCKET_URL: str = "memory://"

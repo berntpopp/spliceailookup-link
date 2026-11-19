@@ -62,6 +62,7 @@ class PreparedVariant:
     genome_build: GenomeBuild
     consequence: str | None
     resolution: dict[str, Any] | None  # populated when the input was HGVS/rsID
+    degraded_mode: str | None = None  # set when the optional Ensembl pre-check was skipped
 
 
 async def prepare_variant(
@@ -101,13 +102,19 @@ async def prepare_variant(
                 inferred_build=inferred,
                 requested_build=genome_build,
             )
+        degraded: str | None = None
         if cross_build_check and settings.PREFLIGHT_REF_CHECK_ENABLED:
             # Local import avoids a module cycle (_diagnose imports _common).
-            from spliceailookup_link.mcp.tools._diagnose import preflight_ref_mismatch
+            from spliceailookup_link.mcp.tools._diagnose import (
+                ENSEMBL_DEGRADED_NOTE,
+                preflight_ref_mismatch,
+            )
 
-            await preflight_ref_mismatch(
+            status = await preflight_ref_mismatch(
                 service, variant_id=parsed.value, requested_build=genome_build
             )
+            if status == "inconclusive":
+                degraded = ENSEMBL_DEGRADED_NOTE
         if cross_build_check and settings.PREFLIGHT_OVERLAP_CHECK_ENABLED:
             # D4: fast-fail a genuine not_found before the slow scoring dispatch.
             from spliceailookup_link.mcp.tools._diagnose import preflight_no_overlap
@@ -123,6 +130,7 @@ async def prepare_variant(
             genome_build=genome_build,
             consequence=None,
             resolution=None,
+            degraded_mode=degraded,
         )
     resolution = await service.resolve(raw_variant, genome_build)
     if resolution.get("ambiguous"):

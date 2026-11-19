@@ -57,6 +57,12 @@ class EnsemblVepClient(BaseHTTPClient):
         """Resolve a known-variant identifier (e.g. rsID like rs12345)."""
         return await self._vep(f"/vep/human/id/{quote(variant_id, safe='')}", build)
 
+    async def _preflight_json(self, url: str, params: dict[str, Any]) -> Any:
+        """GET for the optional, fail-open lookups: short timeout, no retries (#115)."""
+        return await self.get_json(
+            url, params, timeout=settings.ENSEMBL_PREFLIGHT_TIMEOUT_SECONDS, max_retries=0
+        )
+
     async def reference_base(
         self, chrom: str, pos: int, length: int, build: GenomeBuild
     ) -> str | None:
@@ -70,7 +76,7 @@ class EnsemblVepClient(BaseHTTPClient):
         end = pos + max(1, length) - 1
         url = f"{settings.ensembl_url(build)}/sequence/region/human/{c}:{pos}..{end}"
         try:
-            payload = await self.get_json(url, {"content-type": "application/json"})
+            payload = await self._preflight_json(url, {"content-type": "application/json"})
         except SpliceApiError:
             return None
         seq = payload.get("seq") if isinstance(payload, dict) else None
@@ -90,7 +96,7 @@ class EnsemblVepClient(BaseHTTPClient):
         end = pos + window
         url = f"{settings.ensembl_url(build)}/overlap/region/human/{c}:{start}..{end}"
         try:
-            payload = await self.get_json(
+            payload = await self._preflight_json(
                 url, {"feature": "transcript", "content-type": "application/json"}
             )
         except SpliceApiError:
@@ -111,7 +117,7 @@ class EnsemblVepClient(BaseHTTPClient):
         end = pos + max_window
         url = f"{settings.ensembl_url(build)}/overlap/region/human/{c}:{start}..{end}"
         try:
-            payload = await self.get_json(
+            payload = await self._preflight_json(
                 url, {"feature": "transcript", "content-type": "application/json"}
             )
         except SpliceApiError:

@@ -137,21 +137,31 @@ class BaseHTTPClient:
                 "fan out fewer calls at once."
             ) from exc
 
-    async def get_json(self, url: str, params: dict[str, Any]) -> Any:
+    async def get_json(
+        self,
+        url: str,
+        params: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        max_retries: int | None = None,
+    ) -> Any:
         """GET `url` with `params`, returning parsed JSON (dict or list).
 
         Retries transient transport faults (timeouts, 5xx, 429) with jittered
         exponential backoff. A persistent 429 surfaces as RateLimitedError; other
         HTTP errors as SpliceApiError. The caller is responsible for inspecting an
         `error` field in a 200 body (this upstream reports failures that way).
+        `timeout`/`max_retries` override the client defaults for one call.
         """
         client = await self._ensure_client()
         loop = asyncio.get_running_loop()
         queue_deadline = loop.time() + settings.QUEUE_WAIT_TIMEOUT
         delay = _BACKOFF_BASE_SECONDS
         last_exc: BaseException | None = None
+        retries = settings.MAX_RETRIES if max_retries is None else max_retries
+        extra: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
 
-        for attempt in range(settings.MAX_RETRIES + 1):
+        for attempt in range(retries + 1):
             await self._acquire_slot(timeout=max(0.0, queue_deadline - loop.time()))
             try:
                 # Streamed, byte-capped read (fail-closed past the ceiling). The
@@ -159,7 +169,7 @@ class BaseHTTPClient:
                 # DisallowedURLError / ResponseTooLargeError are non-retryable and
                 # propagate straight out of the loop (not caught below).
                 body = await read_capped(
-                    client, "GET", url, params=params, max_bytes=self._max_response_bytes
+                    client, "GET", url, params=params, max_bytes=self._max_response_bytes, **extra
                 )
                 return json.loads(body)
             except httpx.HTTPStatusError as exc:
@@ -167,9 +177,9 @@ class BaseHTTPClient:
                 status = exc.response.status_code
                 if status in _INPUT_ERROR_STATUS:
                     raise UpstreamInputError(_status_error_message(status)) from exc
-                if status == 429 and attempt == settings.MAX_RETRIES:
+                if status == 429 and attempt == retries:
                     raise RateLimitedError(f"Rate limited by upstream (HTTP 429): {url}") from exc
-                if not _is_retryable(exc) or attempt == settings.MAX_RETRIES:
+                if not _is_retryable(exc) or attempt == retries:
                     raise SpliceApiError(f"Upstream HTTP {status} for {url}") from exc
             except httpx.TooManyRedirects as exc:
                 # httpx's own redirect exception is a RequestError and would
@@ -180,7 +190,7 @@ class BaseHTTPClient:
                 raise DisallowedURLError("outbound request blocked by HTTP policy") from exc
             except (httpx.TransportError, httpx.TimeoutException) as exc:
                 last_exc = exc
-                if attempt == settings.MAX_RETRIES:
+                if attempt == retries:
                     raise SpliceApiError(f"Upstream request failed: {exc!s}") from exc
             finally:
                 self._semaphore.release()

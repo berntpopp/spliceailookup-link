@@ -190,7 +190,10 @@ class SpliceService:
         self, chrom: str, pos: int, length: int, build: GenomeBuild
     ) -> str | None:
         """Cached reference-base lookup (used by the failure-path diagnostic)."""
-        return await self._refbase_cached(chrom, pos, length, build)
+        base = await self._refbase_cached(chrom, pos, length, build)
+        if base is None:  # Ensembl fault: retry next call instead of caching it for the TTL
+            self._refbase_cached.cache_invalidate(chrom, pos, length, build)
+        return base
 
     async def _overlap_uncached(
         self, chrom: str, pos: int, build: GenomeBuild, window: int
@@ -201,7 +204,10 @@ class SpliceService:
         self, chrom: str, pos: int, build: GenomeBuild, window: int
     ) -> int | None:
         """Cached transcript-overlap count for the not_found fast-fail pre-check."""
-        return await self._overlap_cached(chrom, pos, build, window)
+        count = await self._overlap_cached(chrom, pos, build, window)
+        if count is None:  # Ensembl fault: retry next call instead of caching it for the TTL
+            self._overlap_cached.cache_invalidate(chrom, pos, build, window)
+        return count
 
     async def _nearest_uncached(
         self, chrom: str, pos: int, build: GenomeBuild, max_window: int

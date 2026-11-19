@@ -5,6 +5,23 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-11-19
+
+### Fixed
+
+- An unreachable Ensembl REST no longer stalls `predict_*` / `resolve_variant` for 55-185 s
+  behind an error that blamed the scoring service. The optional Ensembl pre-checks (REF base,
+  transcript overlap, nearest transcript) now use a short timeout
+  (`ENSEMBL_PREFLIGHT_TIMEOUT_SECONDS`, default 3) and no retries; they already failed open (#115).
+- A failed Ensembl REF/overlap lookup is no longer cached for the 24 h TTL, so the pre-check
+  resumes as soon as Ensembl is back.
+
+### Added
+
+- `degraded_mode` on `predict_*` and `resolve_variant` results when the Ensembl pre-check could
+  not run, naming Ensembl and stating that scores are unaffected (the scoring service checks
+  REF itself).
+
 ## [4.2.0] - 2026-11-18
 
 ### Fixed

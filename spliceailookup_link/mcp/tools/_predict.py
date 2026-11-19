@@ -273,5 +273,7 @@ async def predict_one(
         body = minimal_combined(result, gene)
     else:
         body = result
+    if prepared.degraded_mode:
+        body["degraded_mode"] = prepared.degraded_mode
     body["_telemetry"] = telemetry
     return body

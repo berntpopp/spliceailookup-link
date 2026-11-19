@@ -14,7 +14,7 @@ from spliceailookup_link.mcp.envelope import latency_hint, rate_budget_snapshot
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import for_combined
 from spliceailookup_link.mcp.provenance import prediction_provenance
-from spliceailookup_link.mcp.tools._common import running_as_task, see_also_for
+from spliceailookup_link.mcp.tools._common import see_also_for
 from spliceailookup_link.mcp.tools._predict import predict_one
 from spliceailookup_link.services import SpliceService
 from spliceailookup_link.services.telemetry import is_served_warm
@@ -26,7 +26,6 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         title="Predict Splicing Impact (SpliceAI + Pangolin)",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction"},
-        task=True,
         # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema
         # (a model never reads it). structuredContent is still emitted -- every tool
         # returns a dict envelope via run_mcp_tool.
@@ -100,7 +99,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         ] = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
-        """BOTH models (SpliceAI + Pangolin) in one call; returns a headline, per-model delta scores, the SpliceAI-10k consequence and an agreement verdict -- the default "what does this variant do to splicing?" answer. Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls). Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
+        """BOTH models (SpliceAI + Pangolin) in one call; returns a headline, per-model delta scores, the SpliceAI-10k consequence and an agreement verdict -- the default "what does this variant do to splicing?" answer. Use this as the default one-call answer for "what does this variant do to splicing?". It resolves HGVS/rsIDs, runs SpliceAI and Pangolin (two independent models), includes the SpliceAI-10k consequence prediction, and reports whether the models agree. Read the top-level headline first. For a single model use predict_spliceai / predict_pangolin. Returns ~3-6kB. Note: cold calls take 15-40s (two model calls)."""
 
         lean = response_mode == "minimal" or not include_hints
 
@@ -122,7 +121,7 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             if response_mode != "minimal":
                 result["provenance"] = prediction_provenance(genome_build)
             # Response-Envelope Standard v1 SS7: typed cold-latency hint
-            # alongside the protocol-level execution.taskSupport (task=True above).
+            # (lets an agent plan for a slow call before it blocks a turn).
             # This is the ~60s two-model call the standard's SS7 names explicitly.
             meta: dict[str, Any] = dict(latency_hint("high", 60_000))
             if include_hints:
@@ -165,7 +164,5 @@ def register_combined_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             ),
             lean_meta=lean,
             correlation_id=correlation_id,
-            deadline=None
-            if running_as_task(ctx)
-            else settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
+            deadline=settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
         )

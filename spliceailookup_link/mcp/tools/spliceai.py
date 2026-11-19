@@ -20,7 +20,6 @@ from spliceailookup_link.mcp.tools._common import (
     mask_to_int,
     prepare_variant,
     run_with_deadline,
-    running_as_task,
     see_also_for,
 )
 from spliceailookup_link.mcp.tools._diagnose import diagnose_coordinate_failure
@@ -34,7 +33,6 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         title="Predict Splicing Impact (SpliceAI)",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction", "spliceai"},
-        task=True,
         # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema.
         output_schema=None,
     )
@@ -110,7 +108,7 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
         ] = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
-        """ONE model only (SpliceAI); returns acceptor/donor gain/loss delta scores (0-1, with positions) and an optional SpliceAI-10k consequence; use predict_splicing for BOTH models with an agreement verdict. Use this for the SpliceAI delta scores (acceptor/donor gain/loss, each 0-1 with a position) of a single variant, optionally with the SpliceAI-10k consequence prediction (exon skipping / intron retention / frameshift). For a quick raw-vs-masked or single-model question; use predict_splicing to also get Pangolin. Δ>=0.5 is high-confidence. Returns ~1-4kB (full/all larger). Note: cold calls take 10-30s. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
+        """ONE model only (SpliceAI); returns acceptor/donor gain/loss delta scores (0-1, with positions) and an optional SpliceAI-10k consequence; use predict_splicing for BOTH models with an agreement verdict. Use this for the SpliceAI delta scores (acceptor/donor gain/loss, each 0-1 with a position) of a single variant, optionally with the SpliceAI-10k consequence prediction (exon skipping / intron retention / frameshift). For a quick raw-vs-masked or single-model question; use predict_splicing to also get Pangolin. Δ>=0.5 is high-confidence. Returns ~1-4kB (full/all larger). Note: cold calls take 10-30s."""
 
         lean = response_mode == "minimal" or not include_hints
 
@@ -139,7 +137,6 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                         raw=variant_id,
                         consequence=prepared.consequence,
                     ),
-                    ctx=ctx,
                 )
             except DataNotFoundError:
                 if cross_build_check and prepared.resolution is None:
@@ -170,7 +167,7 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                 # P1#2: proactive pacing signal, kept even on the lean/minimal path.
                 "rate_budget": rate_budget_snapshot(saturated=False),
                 # Response-Envelope Standard v1 SS7: typed cold-latency hint
-                # alongside the protocol-level execution.taskSupport (task=True above).
+                # (lets an agent plan for a slow call before it blocks a turn).
                 **latency_hint("medium", 30_000),
             }
             if include_hints:
@@ -209,7 +206,5 @@ def register_spliceai_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             ),
             lean_meta=lean,
             correlation_id=correlation_id,
-            deadline=None
-            if running_as_task(ctx)
-            else settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
+            deadline=settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
         )

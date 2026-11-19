@@ -110,7 +110,6 @@ async def predict_one(
     response_mode: ResponseMode,
     cross_build_check: bool = True,
     ctx: Any = None,
-    enforce_deadline: bool = True,
 ) -> dict[str, Any]:
     if ctx is not None:
         await ctx.report_progress(progress=0, total=3, message="resolving variant")
@@ -139,8 +138,6 @@ async def predict_one(
                 service.score(model="pangolin", **common),
                 return_exceptions=True,
             ),
-            ctx=ctx,
-            enforce=enforce_deadline,
         )
     )
     sai_res, pang_res = gathered[0], gathered[1]

@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from fastmcp import FastMCP
-from fastmcp_tasks import TasksExtension
 
 from spliceailookup_link import __version__
 from spliceailookup_link.mcp.errors import install_validation_error_handler
@@ -51,10 +50,6 @@ def create_spliceai_mcp(*, service_factory: Callable[[], SpliceService]) -> Fast
     `app.state.splice_service` (constructed in the FastAPI lifespan) rather than
     building the service eagerly at import time.
     """
-    # Per-tool `task=True` (on the async prediction tools) opts those tools into the
-    # SEP-2663 background-task extension via Docket. We deliberately do NOT set a
-    # server-wide `tasks=True` default, which would force every component -- including
-    # the sync resources -- to be task-eligible (and async).
     mcp = FastMCP(
         name="spliceailookup-link",
         version=__version__,
@@ -65,9 +60,6 @@ def create_spliceai_mcp(*, service_factory: Callable[[], SpliceService]) -> Fast
         # advertised surface without touching any description the model reads.
         dereference_schemas=False,
     )
-    # FastMCP 4 moved background tasks into the SEP-2663 tasks extension; without it
-    # `task=True` tools raise at startup. Backend comes from FASTMCP_DOCKET_* (memory://).
-    mcp.add_extension(TasksExtension())
     # Guard the FastMCP-core not-found reflection surface: core echoes the
     # caller's OWN requested tool name / resource URI / prompt name (with any
     # control/zero-width/bidi/NUL code points) to the caller and to logs BEFORE

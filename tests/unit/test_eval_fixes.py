@@ -245,4 +245,4 @@ async def test_soft_deadline_returns_upstream_unavailable(mcp, stub_service, mon
     )
     assert data["error_code"] == "upstream_unavailable"
     assert data["retryable"] is True
-    assert "task" in data["recovery"].lower()
+    assert "gene_set" in data["recovery"]

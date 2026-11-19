@@ -5,6 +5,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-11-19
+
+### Changed
+
+- Dropped MCP background-task support (`task=True`) from `predict_splicing`,
+  `predict_spliceai`, `predict_pangolin` and `predict_splicing_batch`; tool
+  definitions are now protocol-version independent (no `execution.taskSupport` on
+  2025-06-18), so the release-attested definition digest matches what the router
+  sees on 2026-07-28. The foreground soft deadline is unchanged; the
+  `background_execution` capabilities block, the `fastmcp[tasks]` extra and
+  `DOCKET_URL` are removed.
+
 ## [4.3.1] - 2026-11-19
 
 - Tool descriptions lead with what each tool returns (D1, Tool-Schema Documentation v1.1).

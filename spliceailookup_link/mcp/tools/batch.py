@@ -14,7 +14,6 @@ from spliceailookup_link.mcp.envelope import latency_hint
 from spliceailookup_link.mcp.errors import run_mcp_tool
 from spliceailookup_link.mcp.provenance import prediction_provenance
 from spliceailookup_link.mcp.tools._batch_runner import run_batch
-from spliceailookup_link.mcp.tools._common import running_as_task
 from spliceailookup_link.services import SpliceService
 
 _MAX_BATCH = 25
@@ -26,7 +25,6 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         title="Predict Splicing for Many Variants",
         annotations=READ_ONLY_OPEN_WORLD,
         tags={"prediction"},
-        task=True,
         # Tool-Surface Budget Standard v1 (Rule 3): suppress the optional outputSchema.
         output_schema=None,
     )
@@ -80,7 +78,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
         ] = None,
         ctx: Context | None = None,
     ) -> dict[str, Any]:
-        """Score a list of variants in ONE call. The server fans out under its concurrency cap and returns a single envelope with per-variant results (+ per-item errors that do not fail the batch) and a summary. Use this for gene panels instead of N predict_splicing calls. Accepts 1-25 variants (more than max_items=25 returns invalid_input, not a truncated result); each item returns about one compact predict_splicing result, so a full batch is ~25x a single compact response, and _meta echoes items_submitted and max_items. Supports MCP background tasks (execution.taskSupport=optional): augment the call with a task to fire-and-continue instead of blocking 15-40s."""
+        """Score a list of variants in ONE call. The server fans out under its concurrency cap and returns a single envelope with per-variant results (+ per-item errors that do not fail the batch) and a summary. Use this for gene panels instead of N predict_splicing calls. Accepts 1-25 variants (more than max_items=25 returns invalid_input, not a truncated result); each item returns about one compact predict_splicing result, so a full batch is ~25x a single compact response, and _meta echoes items_submitted and max_items."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()
@@ -95,16 +93,12 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
                     "transcripts": transcripts,
                     "response_mode": response_mode,
                     "cross_build_check": cross_build_check,
-                    # A foreground batch enforces the per-item soft deadline; a
-                    # background-task batch bypasses it (large/comprehensive panels).
-                    "enforce_deadline": not running_as_task(ctx),
                 },
                 ctx=ctx,
                 max_items=_MAX_BATCH,
             )
             out["_meta"]["provenance"] = prediction_provenance(genome_build)
-            # Response-Envelope Standard v1 SS7: typed cold-latency hint alongside
-            # the protocol-level execution.taskSupport (task=True above). Items run
+            # Response-Envelope Standard v1 SS7: typed cold-latency hint. Items run
             # largely one at a time under the concurrency cap (see module docstring),
             # so the worst-case cold estimate scales with the submitted item count.
             out["_meta"].update(latency_hint("high", min(len(variant_ids), _MAX_BATCH) * 60_000))
@@ -117,7 +111,5 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
             call,
             correlation_id=correlation_id,
             envelope_key=None,
-            deadline=None
-            if running_as_task(ctx)
-            else settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
+            deadline=settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
         )

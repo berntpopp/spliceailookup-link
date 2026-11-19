@@ -31,21 +31,14 @@ def _reject_unsupported_contig(variant_id: str) -> None:
         raise UnsupportedContigError(reason)
 
 
-def running_as_task(ctx: Any) -> bool:
-    return bool(ctx is not None and getattr(ctx, "is_background_task", False))
+async def run_with_deadline(coro: Any) -> Any:
+    """Await `coro` under the foreground soft deadline (PREDICT_SOFT_DEADLINE_SECONDS; 0 disables).
 
-
-async def run_with_deadline(coro: Any, *, ctx: Any, enforce: bool = True) -> Any:
-    """Await `coro` under the foreground soft deadline, or directly when bypassed.
-
-    The deadline is bypassed when running as a background task, when `enforce`
-    is False (e.g. a batch item whose parent batch is a background task), or when
-    PREDICT_SOFT_DEADLINE_SECONDS is 0. On timeout, raises SpliceApiError, which
-    the error layer classifies as a retryable upstream_unavailable.
+    On timeout, raises SpliceApiError, which the error layer classifies as a
+    retryable upstream_unavailable.
     """
     deadline = settings.PREDICT_SOFT_DEADLINE_SECONDS
-    bypass = not enforce or running_as_task(ctx)
-    if deadline and not bypass:
+    if deadline:
         try:
             return await asyncio.wait_for(coro, timeout=deadline)
         except TimeoutError as exc:

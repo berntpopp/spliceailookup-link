@@ -30,8 +30,8 @@ hand to an agent:
 - **The upstream is fragile on purpose**: "interactive use only, several requests per
   user per minute", with cold calls taking 30s+. This server caches hard, caps
   concurrency, fast-fails wrong-build and no-transcript variants before the slow
-  dispatch, paces callers via `_meta.rate_budget`, and emits progress notifications and
-  MCP background tasks so an agent can fire-and-continue instead of blocking.
+  dispatch, paces callers via `_meta.rate_budget`, and emits progress notifications and a
+  typed cold-latency hint so an agent can plan for a slow call.
 
 ## Quick start
 
@@ -102,7 +102,7 @@ Cite the models, not this wrapper:
 ## Documentation
 
 - [Configuration](docs/configuration.md) — every `SPLICEAILOOKUP_LINK_*` variable, the tuned defaults and why they are low, and the CLI.
-- [Deployment](docs/deployment.md) — transport, TLS, the exact Host/Origin allowlists, Docker, and multi-worker background tasks.
+- [Deployment](docs/deployment.md) — transport, TLS, the exact Host/Origin allowlists, and Docker.
 - [Architecture](docs/architecture.md) — what the facade absorbs, the response contract, and what is deliberately out of scope.
 - [Data & upstreams](docs/data.md) — the upstream services, rate-limit etiquette, provenance and citations.
 - [Upstream API contract](docs/API.md) — the reverse-engineered SpliceAI Lookup / VEP behaviour this server is built against.

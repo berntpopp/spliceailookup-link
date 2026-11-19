@@ -98,8 +98,7 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
                     "Warms the (mask, basic gene_set) path per model. Cloud Run "
                     "autoscales per-instance: subsequent calls with other params or under "
                     "concurrency may still cold-start, and warmth decays after minutes idle. "
-                    "stay_warm_estimate_s is a conservative estimate, not a guarantee. "
-                    "For a guaranteed-cold first call, prefer a background task."
+                    "stay_warm_estimate_s is a conservative estimate, not a guarantee."
                 ),
             }
 

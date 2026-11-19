@@ -5,6 +5,23 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-11-18
+
+### Fixed
+
+- `_meta.see_also` examples named tools/arguments that do not exist (gtex `search_gtex_genes`,
+  uniprot `find_proteins(gene=...)`), and bare names were rewritten by the GeneFoundry gateway
+  to non-existent `spliceai_*` tools. Examples now carry the gateway name
+  (`gnomad_get_variant_frequencies`, `gtex_search_genes`, `uniprot_find_proteins(gene_symbol=...)`,
+  ...), which the gateway leaves untouched (#113).
+- `predict_splicing_batch` `next_commands` passed `variant` instead of `variant_id`.
+
+### Added
+
+- Compact-mode `see_also` entries now include `tool` (the callable gateway name).
+- Guard test `tests/unit/test_hint_targets.py`: every tool/argument named in a hint template or
+  emitted hint must exist in this server's schemas or a pinned sibling-tool parameter set.
+
 ## [4.1.0] - 2026-11-18
 
 ### Changed

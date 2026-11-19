@@ -237,7 +237,7 @@ async def run_batch(
             {
                 "tool": "predict_splicing",
                 "arguments": {
-                    "variant": top["variant"],
+                    "variant_id": top["variant"],
                     "genome_build": genome_build,
                     "response_mode": "full",
                 },

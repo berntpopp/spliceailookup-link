@@ -105,8 +105,8 @@ async def test_g1_see_also_includes_uniprot_full(mcp) -> None:
     servers = {h["server"] for h in data["_meta"]["see_also"]}
     assert "uniprot-link" in servers
     uni = next(h for h in data["_meta"]["see_also"] if h["server"] == "uniprot-link")
-    assert uni["example"]["tool"] == "find_proteins"
-    assert uni["example"]["arguments"]["gene"] == "TRAPPC9"
+    assert uni["example"]["tool"] == "uniprot_find_proteins"
+    assert uni["example"]["arguments"]["gene_symbol"] == "TRAPPC9"
 
 
 async def test_g1_see_also_uniprot_collapsed_in_compact(mcp) -> None:
@@ -114,7 +114,7 @@ async def test_g1_see_also_uniprot_collapsed_in_compact(mcp) -> None:
     servers = {h["server"] for h in data["_meta"]["see_also"]}
     assert "uniprot-link" in servers
     uni = next(h for h in data["_meta"]["see_also"] if h["server"] == "uniprot-link")
-    assert set(uni) == {"server", "hint"}  # compact collapses, no example
+    assert set(uni) == {"server", "tool", "hint"}  # compact collapses, no example
 
 
 # ===== G2: molecular_consequence =====

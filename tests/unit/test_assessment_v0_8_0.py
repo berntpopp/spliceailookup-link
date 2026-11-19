@@ -215,7 +215,7 @@ async def test_gtex_see_also_uses_gene_id_in_full(mcp) -> None:
         )
     )
     gtex = next(h for h in data["_meta"]["see_also"] if h["server"] == "gtex-link")
-    assert gtex["example"]["tool"] == "get_median_expression_levels"
+    assert gtex["example"]["tool"] == "gtex_get_median_expression_levels"
     assert gtex["example"]["arguments"]["gencode_id"] == ["ENSG00000167632.19"]
 
 

@@ -75,7 +75,7 @@ async def test_see_also_omitted_in_minimal(mcp) -> None:
 async def test_see_also_collapsed_in_compact(mcp) -> None:
     data = structured(await mcp.call_tool("predict_spliceai", {"variant_id": "8-140300616-T-G"}))
     for hint in data["_meta"]["see_also"]:
-        assert "example" not in hint and set(hint) == {"server", "hint"}
+        assert "example" not in hint and set(hint) == {"server", "tool", "hint"}
 
 
 async def test_see_also_full_keeps_example(mcp) -> None:

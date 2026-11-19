@@ -173,26 +173,30 @@ def see_also_for(
     response_mode: str = "compact",
     gene_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Cross-server hints. minimal -> []; compact -> {server,hint}; full -> + example args."""
+    """Cross-server hints. minimal -> []; compact -> {server,tool,hint}; full -> + example args."""
     if response_mode == "minimal":
         return []
     full = _see_also_full(variant_id, genome_build, gene, gene_id)
     if response_mode == "full":
         return full
-    return [{"server": h["server"], "hint": h["hint"]} for h in full]
+    return [{"server": h["server"], "tool": h["example"]["tool"], "hint": h["hint"]} for h in full]
 
 
 def _see_also_full(
     variant_id: str, genome_build: GenomeBuild, gene: str | None, gene_id: str | None = None
 ) -> list[dict[str, Any]]:
-    """Cross-server follow-up hints (sibling -link MCP servers). Not callable here."""
+    """Cross-server follow-up hints (sibling -link MCP servers). Not callable here.
+
+    ``tool`` is the GeneFoundry-gateway name (``<namespace>_<tool>``): the gateway leaves an
+    already-namespaced ref alone, whereas a bare name would be prefixed ``spliceai_``.
+    """
     dataset = "gnomad_r4" if genome_build == "GRCh38" else "gnomad_r2_1"
     hints: list[dict[str, Any]] = [
         {
             "server": "gnomad-link",
             "hint": "allele frequency and ClinVar classification for this variant",
             "example": {
-                "tool": "get_variant_frequencies",
+                "tool": "gnomad_get_variant_frequencies",
                 "arguments": {"variant_id": variant_id, "dataset": dataset},
             },
         }
@@ -202,17 +206,17 @@ def _see_also_full(
             {
                 "server": "genereviews-link",
                 "hint": f"gene-disease context for {gene}",
-                "example": {"tool": "search_passages", "arguments": {"q": gene}},
+                "example": {"tool": "genereviews_search_passages", "arguments": {"q": gene}},
             }
         )
         if gene_id:
             # F4: gtex expects an Ensembl/GENCODE id, not a gene symbol.
             gtex_example = {
-                "tool": "get_median_expression_levels",
+                "tool": "gtex_get_median_expression_levels",
                 "arguments": {"gencode_id": [gene_id]},
             }
         else:
-            gtex_example = {"tool": "search_gtex_genes", "arguments": {"query": gene}}
+            gtex_example = {"tool": "gtex_search_genes", "arguments": {"query": gene}}
         hints.append(
             {
                 "server": "gtex-link",
@@ -225,8 +229,8 @@ def _see_also_full(
                 "server": "uniprot-link",
                 "hint": f"protein domains, features, and disease variants for {gene}",
                 "example": {
-                    "tool": "find_proteins",
-                    "arguments": {"gene": gene, "organism_taxon": 9606, "reviewed": True},
+                    "tool": "uniprot_find_proteins",
+                    "arguments": {"gene_symbol": gene, "organism_taxon": 9606, "reviewed": True},
                 },
             }
         )

@@ -41,7 +41,7 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             ),
         ] = "full",
     ) -> dict[str, Any]:
-        """Use this first in a cold session to learn the tools, parameters, score glossary, recommended workflows, error codes, and limitations. detail='lean' returns a trimmed doc (tool list + verdicts + error codes + capabilities_version) that omits per-parameter prose already in the tool schemas. Full ~4kB, lean ~1-2kB."""
+        """Use this first in a cold session; returns the tools, parameters, score glossary, recommended workflows, error codes, and limitations. detail='lean' returns a trimmed doc (tool list + verdicts + error codes + capabilities_version) that omits per-parameter prose already in the tool schemas. Full ~4kB, lean ~1-2kB."""
 
         async def call() -> dict[str, Any]:
             return get_capabilities_resource(detail=detail)
@@ -69,7 +69,7 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             ),
         ] = "raw",
     ) -> dict[str, Any]:
-        """Pre-warm the SpliceAI + Pangolin Cloud Run containers before a burst so the first real call does not eat the 10-40s cold start. Warms the (basic gene_set, chosen mask) path per model; pass mask='both' to warm raw and masked together. Cloud Run scales per-instance, so other param combos or concurrent calls may still cold-start and warmth decays after minutes idle. Returns per-(model,mask) elapsed_ms, coverage, and stay_warm_estimate_s. Returns <1kB."""
+        """Pre-warm the SpliceAI + Pangolin Cloud Run containers before a burst so the first real call does not eat the 10-40s cold start; returns per-(model,mask) elapsed_ms, coverage, and stay_warm_estimate_s. Warms the (basic gene_set, chosen mask) path per model; pass mask='both' to warm raw and masked together. Cloud Run scales per-instance, so other param combos or concurrent calls may still cold-start and warmth decays after minutes idle. Returns <1kB."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()

@@ -95,7 +95,7 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
             ),
         ] = None,
     ) -> dict[str, Any]:
-        """Use this when the caller's variant is HGVS, an rsID, or loosely formatted, and you need the canonical CHROM-POS-REF-ALT that the prediction tools require. Coordinate inputs are normalized locally; HGVS/rsIDs are resolved via Ensembl VEP, which also returns the most-severe consequence and gene symbol. Then call predict_splicing. Returns <1kB. Coordinate inputs are normalized; by default the REF base is also checked against the requested build (one Ensembl lookup) and a ref_warning + ref_validated:false is returned on mismatch (set check_ref=false to skip). HGVS/rsIDs are resolved and validated via Ensembl VEP."""
+        """Use this when the caller's variant is HGVS, an rsID, or loosely formatted, and you need the canonical CHROM-POS-REF-ALT that the prediction tools require; returns variant_id plus, for HGVS/rsIDs, the gene_symbol and most-severe consequence. Coordinate inputs are normalized locally; HGVS/rsIDs are resolved via Ensembl VEP, which also returns the most-severe consequence and gene symbol. Then call predict_splicing. Returns <1kB. Coordinate inputs are normalized; by default the REF base is also checked against the requested build (one Ensembl lookup) and a ref_warning + ref_validated:false is returned on mismatch (set check_ref=false to skip). HGVS/rsIDs are resolved and validated via Ensembl VEP."""
 
         async def call() -> dict[str, Any]:
             service = service_factory()

@@ -47,7 +47,6 @@ _PARAMS = {
     "transcripts": "mane",
     "response_mode": "compact",
     "cross_build_check": True,
-    "enforce_deadline": True,
 }
 
 

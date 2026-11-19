@@ -11,9 +11,8 @@ genefoundry-router-standards repo) for spliceailookup-link:
   as ``structuredContent`` on that same result -- not a raised ToolError.
 - ``_meta.unsafe_for_clinical_use`` is present on every result (success and
   error).
-- Long-running prediction tools declare protocol-level
-  ``execution.taskSupport`` (SEP-1686 / MCP 2025-11-25) AND type their cold
-  latency into ``_meta`` (``cost_tier`` / ``expected_cold_latency_ms``).
+- Long-running prediction tools type their cold latency into ``_meta``
+  (``cost_tier`` / ``expected_cold_latency_ms``).
 """
 
 from __future__ import annotations
@@ -27,13 +26,6 @@ _SINGLE_ITEM_TOOLS = (
     "resolve_variant",
     "get_server_capabilities",
     "warmup",
-)
-
-_LONG_RUNNING_TOOLS = (
-    "predict_spliceai",
-    "predict_pangolin",
-    "predict_splicing",
-    "predict_splicing_batch",
 )
 
 
@@ -94,20 +86,6 @@ async def test_success_envelope_carries_unsafe_for_clinical_use(mcp) -> None:
     ):
         raw = envelope(await mcp.call_tool(name, args))
         assert raw["_meta"]["unsafe_for_clinical_use"] is True, name
-
-
-async def test_long_running_tools_declare_task_support_optional(mcp) -> None:
-    # SEP-1686 / MCP 2025-11-25 execution.taskSupport, verified against the
-    # installed fastmcp 3.4.2 (Tool.task_config.mode -> ToolExecution(taskSupport=...)).
-    for name in _LONG_RUNNING_TOOLS:
-        tool = await mcp.get_tool(name)
-        assert tool.task_config is not None, f"{name}: no task_config"
-        assert tool.task_config.mode == "optional", f"{name}: taskSupport != optional"
-        mcp_tool = tool.to_mcp_tool()
-        assert mcp_tool.execution is not None, f"{name}: no wire-level `execution` block"
-        assert mcp_tool.execution.task_support == "optional", (
-            f"{name}: wire-level execution.taskSupport != optional"
-        )
 
 
 async def test_long_running_tools_type_cold_latency_in_meta(mcp) -> None:

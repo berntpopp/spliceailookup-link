@@ -181,7 +181,6 @@ async def test_batch_dedups_coordinate_and_hgvs(stub_service) -> None:
             "transcripts": "mane",
             "response_mode": "compact",
             "cross_build_check": True,
-            "enforce_deadline": True,
         },
         max_items=25,
     )
@@ -215,7 +214,6 @@ async def test_batch_distinct_variants_not_deduped(stub_service) -> None:
             "transcripts": "mane",
             "response_mode": "compact",
             "cross_build_check": True,
-            "enforce_deadline": True,
         },
         max_items=25,
     )

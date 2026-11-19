@@ -34,7 +34,7 @@ is how you get rate-limited.
 | `QUEUE_WAIT_TIMEOUT` | `30` | Seconds a call waits for a concurrency slot. |
 | `MAX_RETRIES` | `3` | Upstream retry attempts. |
 | `BATCH_RETRY_BACKOFF_SECONDS` | `1.0` | Caps the jittered backoff when `predict_splicing_batch` retries a per-item retryable failure (`rate_limited` / `upstream_unavailable`) once inside the batch. Tests set `0` for determinism. |
-| `PREDICT_SOFT_DEADLINE_SECONDS` | `55` | Foreground soft deadline: a `comprehensive` gene set with a large `max_distance` can outlive the client's MCP timeout, so the server returns a structured `upstream_unavailable` before the client gives up. `0` disables. Background tasks bypass it. |
+| `PREDICT_SOFT_DEADLINE_SECONDS` | `55` | Foreground soft deadline: a `comprehensive` gene set with a large `max_distance` can outlive the client's MCP timeout, so the server returns a structured `upstream_unavailable` before the client gives up. `0` disables. |
 | `RATE_BUDGET_MIN_INTERVAL_MS` | `12000` | Recommended soft spacing between cache-miss scoring calls, surfaced as `_meta.rate_budget.min_interval_ms` (and `retry_after_s` on a `rate_limited` error) so an autonomous caller paces a burst instead of discovering the limit by hitting it. |
 
 ## Caching
@@ -46,7 +46,7 @@ the cache is long-lived by design and is the main thing keeping load off the ups
 |---|---|---|
 | `CACHE_SIZE` | `1024` | Entries (in-process). |
 | `CACHE_TTL_MINUTES` | `1440` | 24h. |
-| `WARM_THRESHOLD_MS` | `5000` | A response counts as "warm" if it was a cache hit or the upstream answered faster than this (cold starts are ~13s+, warm calls sub-second). Surfaced as `_meta.served_warm` so a client can choose blocking vs. background execution. |
+| `WARM_THRESHOLD_MS` | `5000` | A response counts as "warm" if it was a cache hit or the upstream answered faster than this (cold starts are ~13s+, warm calls sub-second). Surfaced as `_meta.served_warm` so a client can tell a warm answer from a cold one. |
 
 ## Preflight checks
 
@@ -73,14 +73,10 @@ Streamable HTTP only — there is **no stdio entry point**. See
 | `ALLOWED_ORIGINS` | `[]` | Exact browser-Origin allowlist (request admission). |
 | `CORS_ORIGINS` | `*` | Browser **response** headers, comma-separated. Distinct from `ALLOWED_ORIGINS`. |
 
-## Background tasks
-
-Every prediction tool opts into the MCP background-task protocol, which FastMCP backs
-with Docket.
+## Warmup
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DOCKET_URL` | `memory://` | In-process, and correct for the single-process unified host. For a multi-worker deployment set `SPLICEAILOOKUP_LINK_DOCKET_URL=redis://…` (the FastMCP-native `FASTMCP_DOCKET_URL` is also honoured). |
 | `WARMUP_STAY_WARM_ESTIMATE_SECONDS` | `900` | Conservative Cloud Run idle-decay estimate reported by `warmup` as `stay_warm_estimate_s`. An estimate, not a guarantee. |
 
 ## Logging

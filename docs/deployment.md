@@ -126,12 +126,4 @@ SPLICEAILOOKUP_LINK_IMAGE="ghcr.io/berntpopp/spliceailookup-link@sha256:<64 hex>
 # from strato_v6_docker_npm: uv run python -c "import sys,json; sys.path.insert(0,'scripts'); from utils.deployment_preflight import canonical_projection; canonical_projection(json.load(open('/tmp/r.json')), project='spliceailookup-link'); print('PROJECTION OK')"
 ```
 
-## Multi-worker deployments
-
-Background tasks are backed by FastMCP's Docket. `DOCKET_URL` defaults to `memory://`,
-which is in-process — correct for the single-process unified host, and **wrong** as
-soon as you run multiple workers, because a task submitted to one worker is invisible
-to the others. Set `SPLICEAILOOKUP_LINK_DOCKET_URL=redis://…` (or the FastMCP-native
-`FASTMCP_DOCKET_URL`) for a multi-worker deployment.
-
 See [Configuration](configuration.md) for every other environment variable.

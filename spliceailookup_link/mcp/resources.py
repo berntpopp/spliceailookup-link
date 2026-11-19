@@ -241,8 +241,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             ),
             "observability": (
                 "every _meta carries request_id, timing.elapsed_ms, and served_warm "
-                "(true on a cache hit or a sub-cold-start upstream answer -- use it to "
-                "choose blocking vs a background task); prediction payloads add cache "
+                "(true on a cache hit or a sub-cold-start upstream answer); prediction payloads add cache "
                 "('hit'|'miss'|'partial') and upstream_elapsed_ms (on a miss). On the lean "
                 "path (response_mode='minimal' or include_hints=false) the repetitive "
                 "capabilities_version and cache_ttl_s/cache_age_s are dropped to save tokens "
@@ -290,7 +289,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
             "unsupported_contig error_subtypes -- plus not_found and ambiguous_query; do not "
             "resubmit) and retryable_failed; the "
             "variants in retryable_failed are listed in the top-level retry_variants array for "
-            "resubmission (ideally as a background task). summary.retried counts auto-retries. "
+            "resubmission. summary.retried counts auto-retries. "
             "predict_splicing_batch accepts max_items=25 variants; submitting more returns "
             "invalid_input (the cap is enforced, not silently truncated). Each item returns "
             "about one compact predict_splicing result, and the envelope _meta echoes "
@@ -299,36 +298,15 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
         "prediction_deadline": (
             "Foreground predict_* calls have a server soft deadline "
             f"({settings.PREDICT_SOFT_DEADLINE_SECONDS}s); exceeding it returns a retryable "
-            "upstream_unavailable. Background tasks bypass the deadline -- use them for "
-            "comprehensive gene_set / large max_distance."
+            "upstream_unavailable; for comprehensive gene_set / large max_distance, prefer "
+            "gene_set='basic' or a smaller max_distance."
         ),
-        "background_execution": {
-            "task_support": "optional",
-            "task_eligible_tools": [
-                "predict_spliceai",
-                "predict_pangolin",
-                "predict_splicing",
-                "predict_splicing_batch",
-            ],
-            "how_to": (
-                "On the 2026-07-28 protocol era, declare the io.modelcontextprotocol/tasks "
-                "extension (SEP-2663) on the tools/call; it returns a taskId, poll tasks/get "
-                "(the result is inlined once complete), cancel via tasks/cancel. Legacy-"
-                "handshake clients always get a synchronous call."
-            ),
-            "backend": (
-                "in-process (memory://); tasks are session-local, lost on server restart, "
-                "and not auth-context-bound -- retrieve results within the session."
-            ),
-            "recommended_for": "cold predict_* calls (13-40s) and predict_splicing_batch.",
-        },
         "warmth": {
             "scope": "warmup warms the (basic gene_set, chosen mask) path per model.",
             "ttl": "upstream-controlled (Cloud Run idle scale-down, ~minutes); not guaranteed.",
             "caveat": (
                 "Cloud Run autoscales per-instance, so a subsequent call with other params or "
-                "under concurrency may still cold-start. For a guaranteed-cold first call, "
-                "prefer a background task over relying on warmup."
+                "under concurrency may still cold-start."
             ),
         },
         "agreement_verdicts": [

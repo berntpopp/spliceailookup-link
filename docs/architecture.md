@@ -42,14 +42,12 @@ predict_splicing(variant_id="chr8-140300616-T-G")
 
 ## Long-running calls are first-class
 
-Every prediction tool emits MCP **progress notifications** and opts into the 2025-11-25
-**background-task protocol** (`task=True`), so an agent can fire-and-continue instead
-of blocking on a 30s+ cold call. `_meta.served_warm` tells a client whether the last
-comparable call was fast, which is the signal for choosing blocking vs. background
-execution. Background tasks bypass the foreground soft deadline.
-
-The task backend is Docket; the single-process default is in-memory. Multi-worker
-deployments need Redis — see [Deployment](deployment.md#multi-worker-deployments).
+Every prediction tool emits MCP **progress notifications** and a typed cold-latency
+hint (`_meta.cost_tier` / `expected_cold_latency_ms`). `_meta.served_warm` tells a
+client whether the last comparable call was fast. Calls run under a foreground soft
+deadline (`PREDICT_SOFT_DEADLINE_SECONDS`) that returns a retryable
+`upstream_unavailable` before the client's MCP timeout. MCP background tasks are not
+offered: they would make the advertised tool definitions protocol-version dependent.
 
 ## Response contract
 

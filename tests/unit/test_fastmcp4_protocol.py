@@ -1,4 +1,4 @@
-"""FastMCP 4 / MCP SDK 2: modern (2026-07-28) era, method-name reflection, background tasks."""
+"""FastMCP 4 / MCP SDK 2: modern (2026-07-28) era, method-name reflection, protocol-independent definitions."""
 
 from __future__ import annotations
 
@@ -9,8 +9,6 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from fastmcp import Client
-from fastmcp_tasks import call_tool_task
 
 from spliceailookup_link.config import ServerConfig
 from spliceailookup_link.server_manager import UnifiedServerManager
@@ -107,16 +105,34 @@ def test_unknown_jsonrpc_method_is_not_reflected() -> None:
         assert "evil" not in resp.text and "IGNORE" not in resp.text
 
 
-@pytest.mark.parametrize("tool", ["predict_spliceai", "predict_splicing"])
-async def test_task_tools_run_as_background_tasks(mcp, tool: str) -> None:
-    """``call_tool_task`` raises if the server ran the call synchronously, so this
-    proves the TasksExtension is registered and the task path is negotiated."""
-    async with Client(mcp) as client:
-        task = await call_tool_task(client, tool, {"variant_id": "chr8-140300616-T-G"})
-        assert task.task_id
-        result = await task.result()
-    assert result.is_error is False
-    assert result.structured_content["success"] is True
+def test_tools_list_has_no_execution_block_on_either_protocol() -> None:
+    """Definitions must be protocol-version independent: the release workflow attests
+    them on 2025-06-18, the router reads them on 2026-07-28. FastMCP 4 sends
+    ``execution.taskSupport`` only on the legacy protocol, so no tool may declare it."""
+    legacy_headers = {**_JSON_HEADERS, "mcp-protocol-version": "2025-06-18"}
+    init = {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "probe", "version": "0"},
+        },
+    }
+    with TestClient(_app(), follow_redirects=False) as client:
+        client.post("/mcp", headers=legacy_headers, json=init)
+        legacy = client.post(
+            "/mcp",
+            headers=legacy_headers,
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        )
+        modern = _post(client, 2, "tools/list", {})
+
+    for resp in (legacy, modern):
+        tools = resp.json()["result"]["tools"]
+        assert tools
+        assert [t["name"] for t in tools if t.get("execution") is not None] == []
 
 
 @pytest.mark.parametrize(

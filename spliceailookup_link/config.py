@@ -61,7 +61,6 @@ class Settings(BaseSettings):
     # Foreground prediction soft deadline (seconds). A comprehensive gene_set with a
     # large max_distance can exceed the client's MCP timeout; this returns a
     # structured upstream_unavailable before the client gives up. Set 0 to disable.
-    # Background Tasks (ctx.is_background_task) bypass this deadline.
     PREDICT_SOFT_DEADLINE_SECONDS: int = 55
 
     # Resolution normally completes quickly, but HGVS/rsID inputs depend on Ensembl VEP.
@@ -77,7 +76,7 @@ class Settings(BaseSettings):
 
     # A response is "warm" if it was a cache hit or the upstream answered faster
     # than this (cold Cloud Run starts are ~13s+; warm calls are sub-second).
-    # Surfaced as _meta.served_warm so a client can choose blocking vs background.
+    # Surfaced as _meta.served_warm so a client can tell a warm answer from a cold one.
     WARM_THRESHOLD_MS: int = 5000
 
     # Proactive client-pacing signal. The upstream is "several requests/min"; this is the
@@ -102,10 +101,6 @@ class Settings(BaseSettings):
     # fail open, so they get a short timeout and no retries: an unreachable Ensembl must
     # not stall a prediction the scoring service answers in under a second.
     ENSEMBL_PREFLIGHT_TIMEOUT_SECONDS: float = 3.0
-
-    # Background-task (FastMCP Tasks / Docket) backend. memory:// is in-process and
-    # correct for the single-process unified host; set redis://... for multi-worker.
-    DOCKET_URL: str = "memory://"
 
     # Transport (Streamable HTTP only; no stdio)
     MCP_TRANSPORT: Literal["unified", "http"] = "unified"

@@ -43,14 +43,7 @@ def latency_hint(
 ) -> dict[str, Any]:
     """Typed cold-latency hint for `_meta` (Response-Envelope Standard v1 SS7).
 
-    Declared alongside the protocol-level ``execution.taskSupport`` (set via
-    ``task=True`` on the ``@mcp.tool`` decorator; verified against the
-    installed fastmcp 4.2.2: ``Tool.task_config.mode`` feeds
-    ``mcp_tool.execution = ToolExecution(task_support=...)`` on the wire MCP
-    Tool -- ``fastmcp/tools/base.py`` ``Tool.to_mcp_tool``, backed by
-    ``mcp.types.ToolExecution.taskSupport in {forbidden, optional, required}``)
-    so an agent can plan for a slow call -- or fire it as a background task --
-    before it blocks a turn, without waiting on a live response to find out.
+    Lets an agent plan for a slow call before it blocks a turn.
     """
     return {"cost_tier": cost_tier, "expected_cold_latency_ms": expected_cold_latency_ms}
 

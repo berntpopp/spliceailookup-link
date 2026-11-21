@@ -9,7 +9,7 @@ from fastmcp import FastMCP
 from mcp.types import Annotations
 from pydantic import Field
 
-from spliceailookup_link.config import settings
+from spliceailookup_link.config import BUILD_ALIAS_NOTE, GenomeBuildArg, settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import run_mcp_tool
 from spliceailookup_link.mcp.resources import (
@@ -58,8 +58,10 @@ def register_metadata_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
     )
     async def warmup(
         genome_build: Annotated[
-            Literal["GRCh37", "GRCh38"],
-            Field(description="Build whose scoring containers to warm. GRCh38 default."),
+            GenomeBuildArg,
+            Field(
+                description=f"Build whose scoring containers to warm. GRCh38 default. {BUILD_ALIAS_NOTE}"
+            ),
         ] = "GRCh38",
         mask: Annotated[
             Literal["raw", "masked", "both"],

@@ -9,7 +9,7 @@ from fastmcp import Context, FastMCP
 from pydantic import Field
 
 from spliceailookup_link.api import DataNotFoundError
-from spliceailookup_link.config import settings
+from spliceailookup_link.config import BUILD_ALIAS_NOTE, GenomeBuildArg, settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.envelope import latency_hint, rate_budget_snapshot
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
@@ -47,8 +47,8 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             ),
         ],
         genome_build: Annotated[
-            Literal["GRCh37", "GRCh38"],
-            Field(description="Reference build. GRCh38 default."),
+            GenomeBuildArg,
+            Field(description=f"Reference build. GRCh38 default. {BUILD_ALIAS_NOTE}"),
         ] = "GRCh38",
         max_distance: Annotated[
             int,

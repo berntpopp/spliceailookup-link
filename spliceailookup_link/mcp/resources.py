@@ -97,7 +97,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
         ],
         "parameters": {
             "variant_id": "CHROM-POS-REF-ALT (chr optional), HGVS, or rsID. resolve_variant normalizes it.",
-            "genome_build": "GRCh37 or GRCh38 (default GRCh38).",
+            "genome_build": "GRCh37 or GRCh38 (default GRCh38); hg19/hg38 accepted case-insensitively.",
             "max_distance": (
                 "nt window scanned around the variant (1-10000, default 500). Larger = slower; "
                 "the SAI-10k consequence prediction benefits from a wider window."

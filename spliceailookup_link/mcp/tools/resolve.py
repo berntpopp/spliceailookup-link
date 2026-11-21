@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from fastmcp import FastMCP
 from pydantic import Field
 
 from spliceailookup_link.api import SpliceApiError
-from spliceailookup_link.config import settings
+from spliceailookup_link.config import BUILD_ALIAS_NOTE, GenomeBuildArg, settings
 from spliceailookup_link.mcp.annotations import READ_ONLY_OPEN_WORLD
 from spliceailookup_link.mcp.errors import McpErrorContext, run_mcp_tool
 from spliceailookup_link.mcp.next_commands import after_resolve_many
@@ -69,8 +69,10 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
             ),
         ],
         genome_build: Annotated[
-            Literal["GRCh37", "GRCh38"],
-            Field(description="Reference build for resolution and scoring. GRCh38 default."),
+            GenomeBuildArg,
+            Field(
+                description=f"Reference build for resolution and scoring. GRCh38 default. {BUILD_ALIAS_NOTE}"
+            ),
         ] = "GRCh38",
         check_ref: Annotated[
             bool,

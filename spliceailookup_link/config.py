@@ -3,13 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import field_validator
+from pydantic import BeforeValidator, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 GenomeBuild = Literal["GRCh37", "GRCh38"]
 _BUILD_TO_HG = {"GRCh37": "37", "GRCh38": "38"}
+_BUILD_ALIASES = {"grch37": "GRCh37", "hg19": "GRCh37", "grch38": "GRCh38", "hg38": "GRCh38"}
+BUILD_ALIAS_NOTE = "UCSC aliases hg19/hg38 accepted (case-insensitive)."
+
+
+def normalize_build(value: object) -> object:
+    """Map GRCh37/GRCh38/hg19/hg38 (any case) to the canonical build; pass others to validation."""
+    return _BUILD_ALIASES.get(value.strip().lower(), value) if isinstance(value, str) else value
+
+
+# Tool-parameter form of GenomeBuild (#120): sibling tools emit hg38/hg19, so accept and
+# normalise them, and advertise the aliases so the schema matches what runtime accepts.
+GenomeBuildArg = Annotated[
+    GenomeBuild,
+    BeforeValidator(normalize_build),
+    Field(json_schema_extra={"enum": ["GRCh37", "GRCh38", "hg19", "hg38"]}),
+]
 
 
 @dataclass

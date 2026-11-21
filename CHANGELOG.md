@@ -5,6 +5,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.3.3] - 2026-11-21
+
+### Fixed
+
+- `genome_build` now accepts the UCSC aliases `hg19` / `hg38` and any casing of
+  `GRCh37` / `GRCh38`, normalised to the canonical build before validation, on
+  every tool that takes it (`predict_splicing`, `predict_spliceai`,
+  `predict_pangolin`, `predict_splicing_batch`, `resolve_variant`, `warmup`).
+  The advertised schema enum lists the aliases so schema and runtime agree
+  (#120).
+
 ## [4.3.2] - 2026-11-19
 
 ### Changed

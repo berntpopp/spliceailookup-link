@@ -36,6 +36,7 @@ class StubService:
         self.overlap_calls: list[tuple[str, int, str, int]] = []
         self.nearest: dict[str, Any] | None = None  # canned nearest_transcript result
         self.nearest_calls: list[tuple[str, int, str]] = []
+        self.warmup_builds: list[str] = []
 
     async def score(self, *, model: str, build: str, variant_id: str, **kwargs: Any):
         from spliceailookup_link.services.telemetry import CallTelemetry
@@ -120,6 +121,7 @@ class StubService:
         return self.nearest
 
     async def warmup(self, build: str, mask: int = 0) -> dict[str, Any]:
+        self.warmup_builds.append(build)
         return {
             "spliceai": {"status": "ok", "elapsed_ms": 3},
             "pangolin": {"status": "ok", "elapsed_ms": 4},

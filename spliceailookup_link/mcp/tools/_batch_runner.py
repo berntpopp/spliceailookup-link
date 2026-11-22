@@ -25,10 +25,6 @@ from spliceailookup_link.services import SpliceService
 
 PredictFn = Callable[..., Awaitable[dict[str, Any]]]
 
-# Codes worth one in-batch retry (transient contention / upstream blip). Terminal
-# codes (bad input, no overlap, wrong build, unsupported contig) never improve.
-_RETRYABLE_CODES = {"rate_limited", "upstream_unavailable"}
-
 _VERDICTS = (
     "concordant_high",
     "concordant_moderate",
@@ -71,8 +67,8 @@ def _success_item(one: dict[str, Any], variant: str, request_id: str) -> dict[st
 
 def _error_item(
     exc: BaseException, variant: str, genome_build: str, request_id: str
-) -> tuple[dict[str, Any], str]:
-    """Return (per-item error dict, error_code). Mirrors the single-call envelope."""
+) -> dict[str, Any]:
+    """Return the per-item error dict. Mirrors the single-call envelope."""
     env = mcp_tool_error(
         exc,
         McpErrorContext(tool_name="predict_splicing", variant=variant, genome_build=genome_build),
@@ -99,7 +95,7 @@ def _error_item(
     # F23: surface the advertised rate_budget on per-item rate_limited failures.
     if env["_meta"].get("rate_budget"):
         item["rate_budget"] = env["_meta"]["rate_budget"]
-    return item, env["error_code"]
+    return item
 
 
 async def _run_item(
@@ -122,13 +118,15 @@ async def _run_item(
             one = await predict_fn(service, variant=variant, genome_build=genome_build, **params)
             return _success_item(one, variant, request_id), "ok", retried
         except Exception as exc:  # boundary: classify every per-item fault into an envelope
-            item, code = _error_item(exc, variant, genome_build, request_id)
-            if code in _RETRYABLE_CODES and not retried:
+            item = _error_item(exc, variant, genome_build, request_id)
+            # One in-batch retry only for envelope-retryable faults (transient contention /
+            # upstream blip); terminal ones (bad input, HTTP-policy rejection) never improve.
+            if item["retryable"] and not retried:
                 retried = True
                 if retry_backoff_s:
                     await asyncio.sleep(random.uniform(0, retry_backoff_s))  # noqa: S311
                 continue
-            kind = "retryable" if code in _RETRYABLE_CODES else "terminal"
+            kind = "retryable" if item["retryable"] else "terminal"
             return item, kind, retried
 
 

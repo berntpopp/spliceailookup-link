@@ -18,6 +18,7 @@ from spliceailookup_link.variant import (
 )
 
 _MASK_TO_INT = {"raw": 0, "masked": 1}
+_SCORING_SHARE = 0.8
 
 
 def mask_to_int(mask: str) -> int:
@@ -37,13 +38,16 @@ async def run_with_deadline(coro: Any) -> Any:
     On timeout, raises SpliceApiError, which the error layer classifies as a
     retryable upstream_unavailable.
     """
-    deadline = settings.PREDICT_SOFT_DEADLINE_SECONDS
+    # The whole-tool deadline (run_mcp_tool) is the same setting and also covers variant
+    # prep + Ensembl preflights; scoring gets 80% so this descriptive error fires first.
+    # ponytail: fixed share; if prep ever needs >20% of the budget, the generic outer error wins.
+    deadline = settings.PREDICT_SOFT_DEADLINE_SECONDS * _SCORING_SHARE
     if deadline:
         try:
             return await asyncio.wait_for(coro, timeout=deadline)
         except TimeoutError as exc:
             raise SpliceApiError(
-                f"Scoring exceeded the server's {deadline}s deadline "
+                f"Scoring exceeded the server's {deadline:g}s deadline "
                 "(comprehensive gene_set and/or a large max_distance are slow)."
             ) from exc
     return await coro

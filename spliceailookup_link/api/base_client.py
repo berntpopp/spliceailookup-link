@@ -17,6 +17,8 @@ import httpx
 
 from spliceailookup_link.api.url_guard import (
     MAX_RESPONSE_BYTES,
+    REDIRECT_LIMIT_ERROR,
+    DisallowedURLError,
     build_host_allowlist,
     make_url_guard,
     read_capped,
@@ -185,9 +187,10 @@ class BaseHTTPClient:
                 # httpx's own redirect exception is a RequestError and would
                 # otherwise be retried. Redirect exhaustion is deterministic
                 # policy failure, so turn it into the fixed non-retryable class.
-                from spliceailookup_link.api.url_guard import DisallowedURLError
-
-                raise DisallowedURLError("outbound request blocked by HTTP policy") from exc
+                logger.warning(
+                    "outbound_url_blocked reason=redirect_limit host=%s", exc.request.url.host
+                )
+                raise DisallowedURLError(REDIRECT_LIMIT_ERROR) from exc
             except (httpx.TransportError, httpx.TimeoutException) as exc:
                 last_exc = exc
                 if attempt == retries:

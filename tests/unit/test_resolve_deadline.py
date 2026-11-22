@@ -41,6 +41,7 @@ async def test_prediction_deadline_covers_variant_preflight(monkeypatch) -> None
 
     assert error["error_code"] == "upstream_unavailable"
     assert error["retryable"] is True
+    assert "0.01s deadline" in error["message"]  # #123: never the bare "TimeoutError"
 
 
 async def test_batch_deadline_covers_variant_preflight(monkeypatch) -> None:
@@ -52,3 +53,4 @@ async def test_batch_deadline_covers_variant_preflight(monkeypatch) -> None:
 
     assert error["error_code"] == "upstream_unavailable"
     assert error["retryable"] is True
+    assert "0.01s deadline" in error["message"]

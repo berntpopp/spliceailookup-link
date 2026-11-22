@@ -424,6 +424,13 @@ def get_reference_resource() -> dict[str, Any]:
             # `error_code` above; each subtype maps onto exactly one enum value (the
             # runtime never widens the enum).
             "error_subtypes": {
+                "upstream_policy": {
+                    "error_code": "upstream_unavailable",
+                    "retryable": False,
+                    "when": "the upstream redirected outside the HTTP policy (non-allowlisted "
+                    "or non-https URL, too many redirects) or sent an oversized body; "
+                    "deterministic, do not retry immediately",
+                },
                 "ref_mismatch": {
                     "error_code": "invalid_input",
                     "when": "the coordinate REF does not match the genome reference at that "

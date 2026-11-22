@@ -5,6 +5,25 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.3.4] - 2026-11-22
+
+### Fixed
+
+- An outbound HTTP-policy rejection (a redirect to a non-allowlisted or non-https
+  URL, redirect exhaustion, or an oversized body) is now a named, non-retryable
+  `upstream_unavailable` error with `error_subtype: upstream_policy` and a fixed
+  per-reason message, instead of `internal` "Internal error: DisallowedURLError".
+  The rejected scheme/host/port and reason are logged at WARNING (never path or
+  query). Batch items now retry only when the envelope says `retryable`, so a
+  policy rejection is not retried in-batch (#122).
+- The inner scoring deadline is now 80% of `PREDICT_SOFT_DEADLINE_SECONDS`
+  (44 s of 55 s) instead of the same value as the whole-tool deadline, which also
+  covers variant prep and Ensembl preflights and so always fired first. The
+  descriptive "Scoring exceeded the server's 44s deadline" error now wins; if the
+  whole-tool deadline still fires, its message names the deadline instead of the
+  bare string `TimeoutError`. The total budget stays 55 s, under the clients'
+  60 s MCP timeout (#123).
+
 ## [4.3.3] - 2026-11-21
 
 ### Fixed

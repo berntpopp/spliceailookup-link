@@ -49,13 +49,18 @@ from spliceailookup_link.api import (
     SpliceApiError,
     UpstreamInputError,
 )
+from spliceailookup_link.api.url_guard import DisallowedURLError, ResponseTooLargeError
 from spliceailookup_link.mcp._sanitize import sanitize_field_errors, sanitize_message
 from spliceailookup_link.mcp.envelope import (
     error_tool_result,
     frame_success,
     rate_budget_snapshot,
 )
-from spliceailookup_link.mcp.error_codes import canonical_error_code
+from spliceailookup_link.mcp.error_codes import (
+    canonical_error_code,
+    recovery_action,
+    recovery_text,
+)
 from spliceailookup_link.mcp.resources import get_capabilities_version
 from spliceailookup_link.variant import UnsupportedContigError, VariantParseError
 
@@ -158,6 +163,20 @@ class CoordinateRangeError(ValueError):
         )
 
 
+async def _call_with_deadline(
+    call: Callable[[], Awaitable[dict[str, Any]]], deadline: float | None
+) -> dict[str, Any]:
+    if not deadline:
+        return await call()
+    try:
+        return await asyncio.wait_for(call(), timeout=deadline)
+    except TimeoutError as exc:
+        raise SpliceApiError(
+            f"Tool exceeded the server's {deadline:g}s deadline "
+            "(comprehensive gene_set and/or a large max_distance are slow)."
+        ) from exc
+
+
 def _provenance_meta() -> dict[str, Any]:
     return {**_BASE_META, "capabilities_version": get_capabilities_version()}
 
@@ -231,85 +250,15 @@ def _classify(
         return "invalid_input", False, tool, args
     if isinstance(exc, RateLimitedError):
         return "rate_limited", True, _FALLBACK_TOOL, None
+    if isinstance(exc, (DisallowedURLError, ResponseTooLargeError)):
+        # Deterministic HTTP-policy rejection (off-policy redirect / oversized body):
+        # an immediate retry hits the same wall, so non-retryable.
+        return "upstream_policy", False, _FALLBACK_TOOL, None
     if isinstance(exc, ValueError):
         return "validation_failed", False, _FALLBACK_TOOL, None
     if isinstance(exc, (SpliceApiError, TimeoutError)):
         return "upstream_unavailable", True, _FALLBACK_TOOL, None
     return "internal_error", False, _FALLBACK_TOOL, None
-
-
-def _recovery_action(error_code: str, retryable: bool) -> str:
-    if retryable:
-        return "retry_backoff"
-    if error_code in {"invalid_input", "validation_failed", "ref_mismatch", "ambiguous"}:
-        return "reformulate_input"
-    if error_code == "build_mismatch":
-        return "switch_tool"
-    return "switch_tool"
-
-
-def _recovery_text(error_code: str, fallback_tool: str | None, *, tool_name: str) -> str:
-    if error_code == "not_found":
-        return (
-            "The variant is well-formed but the model returned no scores -- it likely does not "
-            "overlap a transcript in the chosen gene_set. Try gene_set='comprehensive', widen "
-            "max_distance, or confirm the coordinates/build with resolve_variant."
-        )
-    if error_code == "invalid_input":
-        if tool_name == "resolve_variant":
-            # Already inside the resolver: do not tell the caller to call it again.
-            return (
-                "The input could not be parsed into any supported variant form. Do not "
-                "retry unchanged. Provide CHROM-POS-REF-ALT (chr optional), transcript or "
-                "genomic HGVS (e.g. NM_000123.4:c.10A>T), or an rsID (e.g. rs6025); call "
-                "get_server_capabilities for accepted formats and examples."
-            )
-        return (
-            "The variant could not be parsed or the upstream rejected it. Do not retry "
-            "unchanged. Call resolve_variant to normalize HGVS / rsIDs / loose coordinates into "
-            "CHROM-POS-REF-ALT, then retry the prediction."
-        )
-    if error_code == "build_mismatch":
-        return (
-            "The coordinate looks like the other genome build. Re-call with the corrected "
-            "genome_build (the fallback arguments already carry the inferred build)."
-        )
-    if error_code == "rate_limited":
-        return (
-            "Upstream is interactive-use-only and rate-limited, or local concurrency is "
-            "saturated. Back off (a few seconds) and retry; reduce concurrent calls. Cached "
-            "results do not count against the limit."
-        )
-    if error_code == "upstream_unavailable":
-        return (
-            "The scoring service failed transiently, or the call exceeded the server's "
-            "soft deadline (comprehensive gene_set and/or a large max_distance are slow "
-            "and may 503 upstream). Retry with backoff using gene_set='basic' or a smaller "
-            "max_distance."
-        )
-    if error_code == "validation_failed":
-        return "Inputs failed validation. Check the tool schema and call get_server_capabilities."
-    if error_code == "ref_mismatch":
-        return (
-            "The REF allele does not match the genome reference at this position "
-            "(likely a swapped REF/ALT, the opposite strand, or the wrong build). "
-            "Fix the REF allele, or pass an HGVS/rsID to resolve_variant to get "
-            "canonical CHROM-POS-REF-ALT, then retry."
-        )
-    if error_code == "ambiguous":
-        return (
-            "This input maps to more than one ALT allele at the locus. Pick one "
-            "variant_id (see variant_ids / next_commands, one prediction per allele) "
-            "and retry, or call resolve_variant to review the candidates."
-        )
-    if error_code == "unsupported_contig":
-        return (
-            "This contig is outside the SpliceAI/Pangolin nuclear scope (chr1-22, X, Y). "
-            "Do not retry unchanged. For mitochondrial variants, use gnomad-link "
-            "get_mitochondrial_variant; otherwise confirm the variant is on a nuclear "
-            "chromosome and re-submit."
-        )
-    return f"Unexpected failure. Call {fallback_tool} for a safe entry point."
 
 
 def _envelope_message(exc: BaseException, error_code: str) -> str:
@@ -320,6 +269,7 @@ def _envelope_message(exc: BaseException, error_code: str) -> str:
         "ref_mismatch",
         "ambiguous",
         "unsupported_contig",
+        "upstream_policy",
     }:
         # These carry developer-authored or upstream guidance safe to surface.
         return _safe_message(exc)
@@ -429,10 +379,10 @@ def mcp_tool_error(exc: BaseException, context: McpErrorContext) -> McpToolError
         "error_code": error_code,
         "message": _envelope_message(exc, subtype),
         "retryable": retryable,
-        "recovery_action": _recovery_action(subtype, retryable),
+        "recovery_action": recovery_action(subtype, retryable),
         "fallback_tool": fallback_tool,
         "fallback_args": fallback_args,
-        "recovery": _recovery_text(subtype, fallback_tool, tool_name=context.tool_name),
+        "recovery": recovery_text(subtype, fallback_tool, tool_name=context.tool_name),
         "_meta": {
             "tool": context.tool_name,
             "next_commands": next_commands,
@@ -570,7 +520,7 @@ async def run_mcp_tool(
         return envelope
 
     try:
-        result = await asyncio.wait_for(call(), timeout=deadline) if deadline else await call()
+        result = await _call_with_deadline(call, deadline)
         result.setdefault("success", True)
         return frame_success(_stamp(result), envelope_key)
     except McpToolError as exc:

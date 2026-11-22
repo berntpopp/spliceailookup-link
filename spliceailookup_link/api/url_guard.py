@@ -20,6 +20,7 @@ Research use only; not clinical decision support.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import SplitResult, urlsplit
@@ -31,6 +32,8 @@ import httpx
 # applied to bytes-on-the-wire, never to elapsed time.
 MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
+logger = logging.getLogger(__name__)
+
 
 class DisallowedURLError(Exception):
     """An outbound request/redirect targeted a non-allowlisted URL. NON-RETRYABLE."""
@@ -41,6 +44,8 @@ class ResponseTooLargeError(Exception):
 
 
 _POLICY_ERROR = "outbound request blocked by HTTP policy"
+#: Fixed per-reason messages (never the URL) -- they reach the client envelope verbatim.
+REDIRECT_LIMIT_ERROR = "outbound request blocked by HTTP policy: upstream redirect limit exceeded"
 _SIZE_ERROR = "upstream response exceeds HTTP policy byte limit"
 
 
@@ -81,14 +86,25 @@ def make_url_guard(
 
     async def _guard(request: httpx.Request) -> None:
         url = request.url
-        if url.scheme != "https":
-            raise DisallowedURLError(_POLICY_ERROR)
-        if url.userinfo:
-            raise DisallowedURLError(_POLICY_ERROR)
         host = (url.host or "").lower()
         port = url.port if url.port is not None else 443
-        if (host, port) not in allowed_hosts:
-            raise DisallowedURLError(_POLICY_ERROR)
+        if url.scheme != "https":
+            reason = "non-https scheme"
+        elif url.userinfo:
+            reason = "userinfo in URL"
+        elif (host, port) not in allowed_hosts:
+            reason = "host not allowlisted"
+        else:
+            return
+        # Scheme/host/port only: path and query may carry variant data.
+        logger.warning(
+            "outbound_url_blocked reason=%s scheme=%s host=%s port=%s",
+            reason,
+            url.scheme,
+            host,
+            port,
+        )
+        raise DisallowedURLError(f"{_POLICY_ERROR}: {reason}")
 
     return _guard
 

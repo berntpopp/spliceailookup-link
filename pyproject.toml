@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spliceailookup-link"
-version = "4.3.4"
+version = "4.4.0"
 description = "A unified server providing REST API and MCP interfaces for SpliceAI / Pangolin splice-impact prediction (Broad SpliceAI Lookup backends)."
 readme = "README.md"
 authors = [{ name = "Bernt Popp" }]
@@ -50,6 +50,7 @@ dev = [
     "ruff>=0.16.8,<1.0.0",
     "mypy>=2.3.1,<3.0.0",
     "pre-commit>=4.0.0,<5.0.0",
+    "jsonschema>=4.23.0,<5.0.0",
 ]
 
 [project.scripts]

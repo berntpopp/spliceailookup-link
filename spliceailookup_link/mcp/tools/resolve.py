@@ -172,4 +172,5 @@ def register_resolve_tools(mcp: FastMCP, *, service_factory: Callable[[], Splice
                 query=variant_id,
             ),
             correlation_id=correlation_id,
+            source="ensembl_vep",
         )

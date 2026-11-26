@@ -62,6 +62,7 @@ from spliceailookup_link.mcp.error_codes import (
     recovery_text,
 )
 from spliceailookup_link.mcp.resources import get_capabilities_version
+from spliceailookup_link.services.telemetry import start_fetch_log, utc_now
 from spliceailookup_link.variant import UnsupportedContigError, VariantParseError
 
 logger = logging.getLogger(__name__)
@@ -346,7 +347,8 @@ def install_validation_error_handler(mcp_server: Any) -> None:
                 elapsed_ms = int((time.perf_counter() - start) * 1000)
                 envelope["_meta"] = {
                     "request_id": request_id,
-                    "timing": {"elapsed_ms": elapsed_ms},
+                    "elapsed_ms": elapsed_ms,
+                    "timing": {"elapsed_ms": elapsed_ms},  # deprecated copy of elapsed_ms
                     **_provenance_meta(),
                     **envelope.get("_meta", {}),
                 }
@@ -482,6 +484,7 @@ async def run_mcp_tool(
     correlation_id: str | None = None,
     envelope_key: str | None = "result",
     deadline: float | None = None,
+    source: str | None = None,
 ) -> dict[str, Any] | ToolResult:
     """Execute an MCP tool body, converting any exception to an envelope dict.
 
@@ -494,20 +497,31 @@ async def run_mcp_tool(
     lean_meta=True (response_mode='minimal' or include_hints=False) drops the
     repetitive capabilities_version from _meta to save tokens on high-volume
     calls; the research-use disclaimer (unsafe_for_clinical_use) is always kept.
+
+    ``source`` names the upstream of a data tool. Its successes then carry the
+    Response-Envelope v1.2 provenance (``source``, ``data_version``, ``retrieved_at``).
     """
     ctx = context or McpErrorContext(tool_name=tool_name)
     request_id = uuid.uuid4().hex[:12]
     start = time.perf_counter()
+    fetches = start_fetch_log()
 
     def _stamp(envelope: dict[str, Any]) -> dict[str, Any]:
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         existing: dict[str, Any] = envelope.get("_meta") or {}
         meta: dict[str, Any] = {
             "request_id": request_id,
-            "timing": {"elapsed_ms": elapsed_ms},
+            "elapsed_ms": elapsed_ms,
+            "timing": {"elapsed_ms": elapsed_ms},  # deprecated copy of elapsed_ms
             **existing,
             **_BASE_META,  # unsafe_for_clinical_use -- always present
         }
+        if source is not None and envelope.get("success") is True:
+            # The upstreams publish no release identifier. The oldest fetch dates the
+            # result; one that needed no upstream call is dated by this response.
+            meta["source"] = source
+            meta["data_version"] = "live"
+            meta["retrieved_at"] = min(fetches, default=None) or utc_now()
         if not lean_meta and "capabilities_version" not in envelope:
             # P1#1: the capabilities document already carries capabilities_version at the
             # top level; do not duplicate it in _meta on that one call.

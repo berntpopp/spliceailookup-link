@@ -5,6 +5,29 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-11-26
+
+### Added
+
+- Response-Envelope v1.2 provenance: every successful data result carries `_meta.source`
+  (`spliceai`, `pangolin`, or `ensembl_vep` for `resolve_variant`), `_meta.data_version`
+  (`live`; the upstreams publish no release identifier) and `_meta.retrieved_at` (UTC). The
+  fetch time is cached with the payload, so a cache hit reports the original upstream fetch;
+  a call with several fetches reports the oldest.
+- `_meta.elapsed_ms` on every envelope (Response-Envelope v1, section 4), and
+  `_meta.request_id` on the unknown-tool error.
+
+### Deprecated
+
+- `_meta.timing.elapsed_ms` is a copy of `_meta.elapsed_ms` and will be removed in the next
+  minor release.
+
+### Tests
+
+- Every data tool result is validated against the published envelope JSON Schema v1.2.0,
+  vendored with a pinned SHA-256 (`tests/conformance/envelope-v1.2.schema.json`).
+- Re-vendored the behaviour gate, which now checks the provenance rule.
+
 ## [4.3.4] - 2026-11-22
 
 ### Fixed

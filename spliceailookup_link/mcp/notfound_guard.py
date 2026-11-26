@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from typing import Any, cast
 
 import mcp.types
@@ -102,6 +103,8 @@ def _unknown_tool_payload() -> dict[str, Any]:
         "fallback_args": {},
         "recovery": _UNKNOWN_TOOL_SUGGESTION,
         "_meta": {
+            "request_id": uuid.uuid4().hex[:12],
+            "elapsed_ms": 0,  # refused before any tool ran
             "next_commands": [{"tool": _FALLBACK_TOOL, "arguments": {}}],
             "unsafe_for_clinical_use": True,
             "capabilities_version": get_capabilities_version(),

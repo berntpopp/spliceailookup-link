@@ -108,11 +108,16 @@ The sections above describe the *upstream* APIs. The MCP facade reshapes them; t
 authoritative facade contract is `get_server_capabilities` / `spliceailookup://capabilities`
 and `spliceailookup://reference`. Key facade behaviors:
 
-- **`_meta` observability.** Every envelope carries `request_id`, `timing.elapsed_ms`,
-  and `served_warm` (true on a cache hit or a sub-cold-start upstream answer —
+- **`_meta` observability.** Every envelope carries `request_id`, `elapsed_ms`
+  (`timing.elapsed_ms` is a deprecated copy), and `served_warm` (true on a cache hit or a sub-cold-start upstream answer —
   `WARM_THRESHOLD_MS`, default 5 s — so a client can choose blocking vs a background
   task without parsing `upstream_elapsed_ms`). Prediction payloads add
   `cache` (`hit`|`miss`|`partial`) and, on a miss, `upstream_elapsed_ms`.
+- **Provenance (Response-Envelope v1.2).** Every successful data result carries
+  `_meta.source` (`spliceai`, `pangolin`, or `ensembl_vep` for `resolve_variant`),
+  `_meta.data_version` (`live`: the upstreams publish no release identifier) and
+  `_meta.retrieved_at` (UTC). A cache hit reports the time of the original upstream
+  fetch; a call with several fetches reports the oldest.
 - **Lean `_meta`.** When `response_mode=minimal` or `include_hints=false`, the
   repetitive `capabilities_version`, `cache_ttl_s`, and `cache_age_s` are dropped to
   save tokens; `request_id`, `timing`, `cache`, `served_warm`, and the

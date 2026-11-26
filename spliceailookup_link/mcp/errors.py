@@ -63,7 +63,11 @@ from spliceailookup_link.mcp.error_codes import (
 )
 from spliceailookup_link.mcp.resources import get_capabilities_version
 from spliceailookup_link.services.telemetry import start_fetch_log, utc_now
-from spliceailookup_link.variant import UnsupportedContigError, VariantParseError
+from spliceailookup_link.variant import (
+    UnsupportedContigError,
+    VariantParseError,
+    validated_variant,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +151,7 @@ class AmbiguousVariantError(ValueError):
         self.candidates = candidates
         self.note = note
         super().__init__(
-            note or f"{variant} resolves to {len(candidates)} alleles; pick one variant_id."
+            note or f"Input resolves to {len(candidates)} alleles; pick one variant_id."
         )
 
 
@@ -191,8 +195,9 @@ def _fallback_for(context: McpErrorContext) -> tuple[str, dict[str, Any] | None]
     """Resolve the context-appropriate fallback tool + ready-to-call arguments."""
     if context.tool_name == "resolve_variant":
         return _FALLBACK_TOOL, None
-    if context.tool_name in _PREDICTION_TOOLS and context.variant:
-        return "resolve_variant", {"variant_id": context.variant}
+    variant = validated_variant(context.variant)
+    if context.tool_name in _PREDICTION_TOOLS and variant:
+        return "resolve_variant", {"variant_id": variant}
     return _FALLBACK_TOOL, None
 
 
@@ -238,7 +243,10 @@ def _classify(
         tool, args = _ref_mismatch_fallback(exc, context)
         return "ref_mismatch", False, tool, args
     if isinstance(exc, AmbiguousVariantError):
-        return "ambiguous", False, "resolve_variant", {"variant_id": exc.variant}
+        variant = validated_variant(exc.variant)
+        if variant is None:
+            return "ambiguous", False, _FALLBACK_TOOL, None
+        return "ambiguous", False, "resolve_variant", {"variant_id": variant}
     if isinstance(exc, CoordinateRangeError):
         return "invalid_input", False, _FALLBACK_TOOL, None
     if isinstance(exc, DataNotFoundError):

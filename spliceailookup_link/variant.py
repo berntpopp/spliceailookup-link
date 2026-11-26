@@ -21,6 +21,8 @@ _RSID_RE = re.compile(r"^rs\d+$", re.IGNORECASE)
 # HGVS markers: a transcript/genomic reference followed by a :c./:g./:n./:m. change.
 _HGVS_RE = re.compile(r"[:.]\s*[cgnmr]\.", re.IGNORECASE)
 _HGVS_PREFIX_RE = re.compile(r"^(NM_|NR_|NC_|NG_|XM_|XR_|ENST|ENSG|LRG_)", re.IGNORECASE)
+# Strict HGVS shape for values echoed in hints (no spaces, no free text).
+_STRICT_HGVS_RE = re.compile(r"^[A-Za-z0-9_.]+:[cgnmr]\.[A-Za-z0-9_+*>?()\[\];=-]+$")
 
 
 class VariantParseError(ValueError):
@@ -176,6 +178,20 @@ def parse_variant_input(text: str) -> VariantInput:
         "transcript or genomic HGVS (e.g. NM_000123.4:c.10A>T or 17:g.43044295G>A), "
         "or an rsID (e.g. rs6025)."
     )
+
+
+def validated_variant(text: str | None) -> str | None:
+    """Return the normalized variant if it is a strict identifier, else None.
+
+    Hints (next_commands, fallback_args) may only carry this value, never raw input.
+    """
+    try:
+        parsed = parse_variant_input(text)  # type: ignore[arg-type]
+    except VariantParseError:
+        return None
+    if parsed.kind == "hgvs" and not _STRICT_HGVS_RE.match(parsed.value):
+        return None
+    return parsed.value
 
 
 def split_variant_id(variant_id: str) -> tuple[str, int, str, str]:

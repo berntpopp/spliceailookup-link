@@ -197,5 +197,6 @@ def register_pangolin_tools(mcp: FastMCP, *, service_factory: Callable[[], Splic
             ),
             lean_meta=lean,
             correlation_id=correlation_id,
+            source="pangolin",
             deadline=settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
         )

@@ -112,6 +112,7 @@ def register_batch_tools(mcp: FastMCP, *, service_factory: Callable[[], SpliceSe
             "predict_splicing_batch",
             call,
             correlation_id=correlation_id,
+            source="spliceai",
             envelope_key=None,
             deadline=settings.PREDICT_SOFT_DEADLINE_SECONDS or None,
         )

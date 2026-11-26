@@ -9,9 +9,34 @@ after TTL expiry / LRU eviction, which is acceptable for advisory telemetry.
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from spliceailookup_link.config import settings
+
+# Response-Envelope v1.2: the upstream fetch times behind the current tool call. A list
+# shared through the ContextVar, so fetches made in child tasks (batch) are seen too.
+_FETCHES: ContextVar[list[str] | None] = ContextVar("upstream_fetches", default=None)
+
+
+def utc_now() -> str:
+    """Now as an RFC 3339 UTC timestamp with ``Z``."""
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def start_fetch_log() -> list[str]:
+    """Begin collecting the upstream fetch times of one tool call."""
+    log: list[str] = []
+    _FETCHES.set(log)
+    return log
+
+
+def record_fetch(fetched_at: str) -> None:
+    """Note when a value served to the current tool call was fetched upstream."""
+    log = _FETCHES.get()
+    if log is not None:
+        log.append(fetched_at)
 
 
 def is_served_warm(

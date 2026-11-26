@@ -55,7 +55,8 @@ offered: they would make the advertised tool definitions protocol-version depend
   compact and widen only if needed.
 - **Domain parameter surface** — GRCh37 and GRCh38; `raw` or `masked` scores;
   `basic` or `comprehensive` gene sets; MANE-only or all transcripts.
-- **`_meta` on every response** — `request_id` and `timing.elapsed_ms`; prediction
+- **`_meta` on every response** — `request_id` and `elapsed_ms`; data results add
+  `source`, `data_version` and `retrieved_at` (Response-Envelope v1.2); prediction
   payloads add `cache` (`hit` / `miss` / `partial`), `upstream_elapsed_ms`,
   `served_warm`, and `rate_budget`.
 - **`_meta.next_commands`** — ready-to-run follow-up calls, present on success *and*

@@ -21,7 +21,7 @@ from spliceailookup_link.api import (
     SpliceApiError,
 )
 from spliceailookup_link.config import GenomeBuild
-from spliceailookup_link.services.telemetry import CallTelemetry
+from spliceailookup_link.services.telemetry import CallTelemetry, record_fetch, utc_now
 from spliceailookup_link.variant import VariantInput, parse_variant_input
 
 logger = logging.getLogger(__name__)
@@ -74,8 +74,10 @@ class SpliceService:
         gene_set: str,
         raw: str | None,
         consequence: str | None,
-    ) -> dict[str, Any]:
-        return await self._scoring.score(
+    ) -> tuple[dict[str, Any], str]:
+        # The fetch time is cached with the payload: a hit reports the original fetch.
+        fetched_at = utc_now()
+        payload = await self._scoring.score(
             model=model,  # type: ignore[arg-type]
             build=build,
             variant=variant_id,
@@ -85,6 +87,7 @@ class SpliceService:
             raw=raw,
             variant_consequence=consequence,
         )
+        return payload, fetched_at
 
     async def score(
         self,
@@ -102,9 +105,10 @@ class SpliceService:
         key = (model, build, variant_id, distance, mask, gene_set, raw, consequence)
         cached = key in self._scored_keys
         start = perf_counter()
-        payload = await self._score_cached(
+        payload, fetched_at = await self._score_cached(
             model, build, variant_id, distance, mask, gene_set, raw, consequence
         )
+        record_fetch(fetched_at)
         elapsed_ms = int((perf_counter() - start) * 1000)
         now = perf_counter()
         if cached:
@@ -157,10 +161,13 @@ class SpliceService:
 
     # ---------------- resolution ----------------
 
-    async def _resolve_uncached(self, value: str, kind: str, build: GenomeBuild) -> dict[str, Any]:
+    async def _resolve_uncached(
+        self, value: str, kind: str, build: GenomeBuild
+    ) -> tuple[dict[str, Any], str]:
+        fetched_at = utc_now()
         if kind == "hgvs":
-            return await self._ensembl.resolve_hgvs(value, build)
-        return await self._ensembl.resolve_id(value, build)
+            return await self._ensembl.resolve_hgvs(value, build), fetched_at
+        return await self._ensembl.resolve_id(value, build), fetched_at
 
     async def resolve(self, text: str, build: GenomeBuild) -> dict[str, Any]:
         """Resolve any supported input to a normalized result dict.
@@ -178,7 +185,8 @@ class SpliceService:
                 "source": "direct",
                 "raw_input": text,
             }
-        record = await self._resolve_cached(parsed.value, parsed.kind, build)
+        record, fetched_at = await self._resolve_cached(parsed.value, parsed.kind, build)
+        record_fetch(fetched_at)
         return _normalize_vep_record(record, parsed, build, text)
 
     async def _refbase_uncached(

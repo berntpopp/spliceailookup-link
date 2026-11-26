@@ -240,7 +240,7 @@ def get_capabilities_resource(detail: str = "full") -> dict[str, Any]:
                 "intron_retention, frameshift, etc.)."
             ),
             "observability": (
-                "every _meta carries request_id, timing.elapsed_ms, and served_warm "
+                "every _meta carries request_id, elapsed_ms, and served_warm "
                 "(true on a cache hit or a sub-cold-start upstream answer); prediction payloads add cache "
                 "('hit'|'miss'|'partial') and upstream_elapsed_ms (on a miss). On the lean "
                 "path (response_mode='minimal' or include_hints=false) the repetitive "

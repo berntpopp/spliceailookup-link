@@ -5,6 +5,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-11-26
+
+### Fixed
+
+- `_meta.next_commands` and `fallback_args` no longer carry the caller's unvalidated input (GTS-CORE-TXT-04): on an invalid, not-found or ambiguous variant, `predict_spliceai`, `predict_pangolin` and `predict_splicing` forward the variant to `resolve_variant` only after it parsed into a normalized coordinate, rsID or strict HGVS form; otherwise the only step is `get_server_capabilities`. The ambiguous-variant fallback message no longer interpolates the input.
+
 ## [4.4.0] - 2026-11-26
 
 ### Added
